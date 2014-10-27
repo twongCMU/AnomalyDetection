@@ -48,7 +48,7 @@ public class SVMKernel implements Runnable {
      * the L training instances are represented by histogramsB and the new instances are histogramsA.
      * In the calculation, the size of A will determine the number of rows and the size of B determines the number of columns
      *
-     * @param histogramsA The ArrayList of histograms that we're applying the kernel to
+     * @param histogramsA The ArrayList of histograms that we're applying the kernel to (the test set)
      * @param histogramsB The ArrayList of histograms for the training set (same as histogramsA when training, different when histogramsA is the test set)
      * @param threadCount The number of threads to use to perform the computation
      * @param svm_type The type of SVM to use. This is a value from the svm_parameter namespace

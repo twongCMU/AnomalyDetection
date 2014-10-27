@@ -14,6 +14,10 @@ public class DaemonService {
 
     static int nextHistogramMapID = 0;
 
+    static int anomalyID = -1;
+    static String anomalyIp = "";
+    static String anomalyApp = "";
+
     /**
      * Get the histogram's number of dimensions and their names. This is so that calls to /evaluate can be constructed properly
      *
@@ -263,6 +267,20 @@ public class DaemonService {
     public Response getCalcType() {
 	String output = "Calc type is " + AnomalyDetectionConfiguration.CALC_TYPE_NAMES[AnomalyDetectionConfiguration.CALC_TYPE_TO_USE];
 	output += "<br>" + AnomalyDetectionConfiguration.printCalcTypeNameLinksHTML("setCalcType/");
+	return Response.status(200).entity(output).build();
+    }
+
+    @GET
+    @Path("/setAnomalyKey")
+    @Produces(MediaType.TEXT_HTML)
+    public Response setAnomalyKey(@QueryParam("id") Integer id,
+				  @QueryParam("ip") String ip,
+				  @QueryParam("appname") String app) {
+	String output = "ok";
+	
+	anomalyID = id;
+	anomalyIp = ip;
+	anomalyApp = app;
 	return Response.status(200).entity(output).build();
     }
 }

@@ -21,14 +21,19 @@ public class SVMCalc {
     public static HashMap<Pair<String, String>, svm_model> makeSVMModel(HashMap<Pair<String, String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> histograms, StringBuilder output, double targetAccuracy) {
 	HashMap<Pair<String, String>, svm_model> newMap = new HashMap();
 
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
+	if (DaemonService.anomalyID >= 0) {
+	    anomalyData = DaemonService.allHistogramsMap.get(DaemonService.anomalyID).get(new Pair(DaemonService.anomalyIp, DaemonService.anomalyApp));
+	}
 	for (Pair<String, String> keyAddr : histograms.keySet()) {
-	    newMap.put(keyAddr, generateModel(histograms.get(keyAddr), targetAccuracy, -1, 0.0));
+	    // change 99.9 to be a parameter or maybe input to the rest call that sets the other anomaly key info
+	    newMap.put(keyAddr, generateModel(histograms.get(keyAddr), targetAccuracy, anomalyData, 99.9));
 	}
 
 	return newMap;
     }
 
-    private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, int anomalyID, double targetAnomalyAccuracy) {
+    private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
 	TreeMap<Double, Double> nuValues = new TreeMap();
 	System.out.println("YYY -------------------------");
 	// generate a list of nu values to try (we can add to this later)
@@ -44,14 +49,23 @@ public class SVMCalc {
 	svmProblem.y = new double[histograms.size()];
 	Arrays.fill(svmProblem.y, 1.0); // all of our training data is non-anomalous
 	svmProblem.x =  (new SVMKernel(histograms, histograms, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
-	
+
+	svm_problem svmProblemAnomaly = null;
+	if (histogramsAnomaly != null) {
+	    svmProblemAnomaly = new svm_problem();
+	    svmProblemAnomaly.l = histogramsAnomaly.size();
+	    svmProblemAnomaly.y = new double[histogramsAnomaly.size()];
+	    Arrays.fill(svmProblemAnomaly.y, -1.0); // set all of this data to anomalous
+	    svmProblemAnomaly.x =  (new SVMKernel(histogramsAnomaly, histograms, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+	}
+
 	svm_parameter svmParameter = new svm_parameter();
 	svmParameter.svm_type = svm_parameter.ONE_CLASS;
 	svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_KERNEL_TYPE;
 	svmParameter.cache_size = AnomalyDetectionConfiguration.SVM_CACHE_SIZE;
 	svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
 	// the library uses kfold
-	svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, -1, 0.0);
+	svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, targetAnomalyAccuracy);
 	if (svmParameter.nu == -1) {
 	    throw new RuntimeException("nu was not set");
 	}
@@ -74,7 +88,7 @@ public class SVMCalc {
 	    nuValues.put(svmParameter.nu, -1.0);
 
 	    AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
-	    svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, -1, 0.0);
+	    svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
 	    expandTimes++;
 	}
 
@@ -95,7 +109,7 @@ public class SVMCalc {
      *
      * @return a nu that generates the accuracy closest (absolute value) to the targetCrossTrainAccuracy parameter
      */
-    private static double allCrossValidate(svm_problem svmProblem, svm_parameter svmParameter, TreeMap<Double, Double> nuValues, double targetCrossTrainAccuracy, int anomalyID, double targetAnomalyAccuracy) {
+    private static double allCrossValidate(svm_problem svmProblem, svm_parameter svmParameter, TreeMap<Double, Double> nuValues, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, svm_problem svmProblemAnomaly, double targetAnomalyAccuracy) {
 	double closestNUAccuracyDiff = Integer.MAX_VALUE;
 	double closestNU = -1;
 
@@ -121,33 +135,67 @@ public class SVMCalc {
 		}
 	    }
 
-	    /*
-	    if (anomalyID >= 0) {
-		svm_model TempSVMModel = svm.svm_train(svmProblem, svmParameter);
+	    int totalCorrectAnomaly = -1;
+	    if (histogramsAnomaly != null) {
+		svm_model trainModel = svm.svm_train(svmProblem, svmParameter);
+		totalCorrectAnomaly = 0;
+		int index = 0;
+		for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramsAnomaly) {
+		    double[] values = new double[1];
+		    svm.svm_predict_values(trainModel, svmProblemAnomaly.x[index], values);
+		    double prediction = values[0];
 
-		Pair<String, String> tempKey = new Pair("","");
-		ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyHistograms = DaemonService.allHistogramsMap.get(anomalyID).get(tempKey);
-		
-		histogramsToChiSquaredSVMNode(anomalyHistograms);
+		    // this code returns a lower score for more anomalous so we flip it to match kdtree
+		    prediction *= -1;
+		    if (prediction >= 0) {
+			totalCorrectAnomaly++;
+		    }
+
+		    index++;
+		}
 	    }
-	    */
 
 	    double accuracy = (1.0 * total_correct)/(1.0 * svmProblem.l);
 	    System.out.print("YYY Cross Validation Accuracy = " + accuracy + " for nu " + nu + "\n");  
 
-	    // If our current best nu is at the edge of the range and the current nu is just as good but not on the edge, use it instead
-	    if ((closestNU == nuValues.lastKey() || closestNU == nuValues.firstKey()) &&
-		Math.abs(Math.abs(accuracy-targetCrossTrainAccuracy) - closestNUAccuracyDiff) < .000001 && nu != nuValues.lastKey() && nu != nuValues.firstKey()) {
-		closestNUAccuracyDiff = Math.abs(accuracy - targetCrossTrainAccuracy);
-		closestNU = nu;
-		System.out.println("YYY this is better because it is not on the range edge");
+	    double accuracyAnomaly = -1;
+	    if (totalCorrectAnomaly != -1) {
+		accuracyAnomaly = (1.0 * totalCorrectAnomaly) / (1.0 * svmProblemAnomaly.l);
+		System.out.print("YYY Cross Validation Accuracy for Anomaly = " + accuracyAnomaly + " for nu " + nu + "\n");  
 	    }
-	    else if (Math.abs(accuracy - targetCrossTrainAccuracy) < closestNUAccuracyDiff) {
-		closestNUAccuracyDiff = Math.abs(accuracy - targetCrossTrainAccuracy);
-		closestNU = nu;
-		System.out.println("YYY this is closer to " + targetCrossTrainAccuracy + " with diff " + closestNUAccuracyDiff);
+
+	    // these two cases can eventually be collapsed into one case but I'm not sure where this nu calculation via anomaly will go in the fugure
+	    // so I'm leaving it separate for now
+	    if (totalCorrectAnomaly == -1) {
+		// If our current best nu is at the edge of the range and the current nu is just as good but not on the edge, use it instead
+		if ((closestNU == nuValues.lastKey() || closestNU == nuValues.firstKey()) &&
+		    Math.abs(Math.abs(accuracy-targetCrossTrainAccuracy) - closestNUAccuracyDiff) < .000001 && nu != nuValues.lastKey() && nu != nuValues.firstKey()) {
+		    closestNUAccuracyDiff = Math.abs(accuracy - targetCrossTrainAccuracy);
+		    closestNU = nu;
+		    System.out.println("YYY this is better because it is not on the range edge");
+		}
+		else if (Math.abs(accuracy - targetCrossTrainAccuracy) < closestNUAccuracyDiff) {
+		    closestNUAccuracyDiff = Math.abs(accuracy - targetCrossTrainAccuracy);
+		    closestNU = nu;
+		    System.out.println("YYY this is closer to " + targetCrossTrainAccuracy + " with diff " + closestNUAccuracyDiff);
+		}
+		nuValues.put(nu, accuracy);
 	    }
-	    nuValues.put(nu, accuracy);
+	    else {
+		// If our current best nu is at the edge of the range and the current nu is just as good but not on the edge, use it instead
+		if ((closestNU == nuValues.lastKey() || closestNU == nuValues.firstKey()) &&
+		    Math.abs(Math.abs(accuracy-targetCrossTrainAccuracy) + Math.abs(accuracyAnomaly-targetAnomalyAccuracy) - closestNUAccuracyDiff) < .000001 && nu != nuValues.lastKey() && nu != nuValues.firstKey()) {
+		    closestNUAccuracyDiff = Math.abs(accuracy - targetCrossTrainAccuracy) + Math.abs(accuracyAnomaly-targetAnomalyAccuracy);
+		    closestNU = nu;
+		    System.out.println("YYY this is better because it is not on the range edge");
+		}
+		else if (Math.abs(accuracy - targetCrossTrainAccuracy)  + Math.abs(accuracyAnomaly-targetAnomalyAccuracy) < closestNUAccuracyDiff) {
+		    closestNUAccuracyDiff = Math.abs(accuracy - targetCrossTrainAccuracy) + Math.abs(accuracyAnomaly-targetAnomalyAccuracy);
+		    closestNU = nu;
+		    System.out.println("YYY this is closer to " + targetCrossTrainAccuracy + " with diff " + closestNUAccuracyDiff);
+		}
+		nuValues.put(nu, accuracy * accuracyAnomaly / 2);
+	    }
 	}
 
 	return closestNU;
