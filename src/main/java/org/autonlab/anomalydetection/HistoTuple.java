@@ -1,6 +1,7 @@
 package org.autonlab.anomalydetection;
 
 import java.util.*;
+import java.util.concurrent.locks.*;
 import org.javatuples.*;
 import com.savarese.spatial.*;
 
@@ -8,15 +9,20 @@ import com.savarese.spatial.*;
  * This class is not thread safe
  */
 public class HistoTuple {
-    static int _msgNameCount = 0;
-    static double _startTime = Double.MAX_VALUE;
-    static double _endTime = 0;
-
     /*
      * There are few unique strings so to save memory we map the string
      * to an Integer and store with each record instead
      */
-    static HashMap<String, Integer> _msgTypeMap = new HashMap<String, Integer>();
+    static volatile HashMap<String, Integer> _msgTypeMap = new HashMap<String, Integer>();
+
+    static volatile int _msgNameCount = 0;
+    static volatile double _startTime = Double.MAX_VALUE;
+    static volatile double _endTime = 0;
+    static volatile Lock _histoTupleDataLock = new ReentrantLock(); //this protects all above static data
+    /*
+     * we use the volatile keyword for the above static values because each REST daemon call
+     * starts a new thread 
+     */
 
     double _timeStamp;
     int _msgIndex;
@@ -37,6 +43,7 @@ public class HistoTuple {
 	_msgIndex = -1;
 	_wasCounted = false; 
 
+	_histoTupleDataLock.lock();
 	if (_msgTypeMap.containsKey(msgType)) {
 	    _msgIndex = _msgTypeMap.get(msgType).intValue();
 	}
@@ -53,6 +60,7 @@ public class HistoTuple {
 	if (timeStamp > _endTime) {
 	    _endTime = timeStamp;
 	}
+	_histoTupleDataLock.unlock();
     }
 
      /**
@@ -96,7 +104,9 @@ public class HistoTuple {
      * @param dim override the number of dimensions (used in testing)
      */
     public static void setDimensions(int dim) {
+	_histoTupleDataLock.lock();
 	_msgNameCount = dim;
+	_histoTupleDataLock.unlock();
     }
 
     /**
@@ -105,9 +115,11 @@ public class HistoTuple {
     public static String getDimensionNames() {
 	String output = new String();
 
+	_histoTupleDataLock.lock();
 	for (String keyVal : _msgTypeMap.keySet()) {
 	    output += "" +  _msgTypeMap.get(keyVal) + " " + keyVal + "\n";
 	}
+	_histoTupleDataLock.unlock();
 
 	return output;
     }
@@ -123,6 +135,9 @@ public class HistoTuple {
 	}
 
 	HashMap<Pair<String, String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> ret = new HashMap();
+
+	// if a different REST thread is also loading data we don't want to have the dimensions change while we're using or changing it
+	_histoTupleDataLock.lock();
 
 	Iterator<Pair<String, String>> listMapIter = listMap.keySet().iterator();
 	while (listMapIter.hasNext()) {
@@ -140,6 +155,7 @@ public class HistoTuple {
 
 	    // this check also allows us to safely do list.get(0) later on
 	    if (list.size() == 0) {
+		_histoTupleDataLock.unlock();
 		throw new RuntimeException("Got no tuples from arraylist");
 	    }
 
@@ -201,6 +217,7 @@ public class HistoTuple {
 		}
 
 		if (tailIndex > headIndex) {
+		    _histoTupleDataLock.unlock();
 		    throw new RuntimeException("tailIndex (" + tailIndex + ") is higher than headIndex (" + headIndex + ")");
 		}
 
@@ -232,6 +249,37 @@ public class HistoTuple {
 	    }
 	    ret.put(mapKey, data);
 	}
+
+	_histoTupleDataLock.unlock();
+
 	return ret;
     }
+
+    // do this in here so we can handle the locking better
+    public static boolean upgradeWindowsDimensions(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
+
+	_histoTupleDataLock.lock();
+	if (histogram.get(0).getValue1().getDimensions() == _msgNameCount) {
+	    _histoTupleDataLock.unlock();
+	    return false;
+	}
+	for (int ii = 0; ii < histogram.size(); ii++) {
+	    GenericPoint oldPoint = histogram.get(ii).getValue1();
+	    GenericPoint newPoint = new GenericPoint(_msgNameCount);
+	    for (int jj = 0; jj < _msgNameCount; jj++) {
+		if (jj < oldPoint.getDimensions()) {
+		    newPoint.setCoord(jj, oldPoint.getCoord(jj));
+		}
+		else {
+		    newPoint.setCoord(jj, 0);
+		}
+	    }
+
+	    Pair<Integer, GenericPoint<Integer>> histogramTemp = new Pair(histogram.get(ii).getValue0(), newPoint);
+	    histogram.set(ii, histogramTemp);
+	}
+	_histoTupleDataLock.unlock();
+	return true;
+    }
+
 }

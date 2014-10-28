@@ -235,7 +235,18 @@ public class SVMCalc {
 	    return output;
 	}
 
+	boolean trainChanged = HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(new Pair(trainIP, trainApp)));
+	boolean testChanged = HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(testID).get(new Pair(testIP, testApp)));
+
 	_svmModelsCacheLock.lock();
+
+	if (trainChanged) {
+	    _svmModelsCache.remove(trainID);
+	}
+	if (testChanged) {
+	    _svmModelsCache.remove(testID);
+	}
+
 	allModels = _svmModelsCache.get(trainID);
 	if (allModels == null) {
 	    _svmModelsCacheLock.unlock();

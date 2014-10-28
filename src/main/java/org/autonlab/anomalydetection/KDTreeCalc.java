@@ -55,6 +55,9 @@ public class KDTreeCalc {
 	Pair<String, String> trainKey = new Pair<String, String>(trainIP, trainApp);
 	Pair<String, String> testKey = new Pair<String, String>(testIP, testApp);
 
+	HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey));
+	HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(testID).get(testKey));
+
 	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(DaemonService.allHistogramsMap.get(trainID).get(trainKey));
 	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> testTree = KDTreeCalc.GetKDTree(DaemonService.allHistogramsMap.get(testID).get(testKey));
 
