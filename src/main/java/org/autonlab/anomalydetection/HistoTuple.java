@@ -255,12 +255,24 @@ public class HistoTuple {
 	return ret;
     }
 
-    // do this in here so we can handle the locking better
-    public static boolean upgradeWindowsDimensions(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
+    public static boolean upgradeWindowsDimensions(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramA, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramB) {
+	boolean retA;
+	boolean retB;
 
-	_histoTupleDataLock.lock();
+	_histoTupleDataLock.lock();	
+	retA = upgradeWindowsDimensionsOne(histogramA);
+	retB = upgradeWindowsDimensionsOne(histogramB);
+	_histoTupleDataLock.unlock();
+
+	if (retA == true || retB == true) {
+	    return true;
+	}
+	return false;
+    }
+
+    // do this in here so we can handle the locking better
+    private static boolean upgradeWindowsDimensionsOne(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
 	if (histogram.get(0).getValue1().getDimensions() == _msgNameCount) {
-	    _histoTupleDataLock.unlock();
 	    return false;
 	}
 	for (int ii = 0; ii < histogram.size(); ii++) {
@@ -278,7 +290,6 @@ public class HistoTuple {
 	    Pair<Integer, GenericPoint<Integer>> histogramTemp = new Pair(histogram.get(ii).getValue0(), newPoint);
 	    histogram.set(ii, histogramTemp);
 	}
-	_histoTupleDataLock.unlock();
 	return true;
     }
 
