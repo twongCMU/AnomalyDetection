@@ -14,16 +14,13 @@ public class KDTreeCalc {
      * @return HashMap of <IP, AppName>  to KDTree
      * 
      */
-    public static HashMap<Pair<String, String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> makeKDTree(HashMap<Pair<String, String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> trainHashMap, StringBuilder output) {
-	HashMap<Pair<String, String>, KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = new HashMap();
+    public static HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> makeKDTree(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> trainHashMap, StringBuilder output) {
+	HashMap<GenericPoint<String>, KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = new HashMap();
 
-	for (Pair<String, String> keyAddr : trainHashMap.keySet()) {
-	    String ipAddress = keyAddr.getValue0();
-	    String appName = keyAddr.getValue1();
+	for (GenericPoint<String> keyAddr : trainHashMap.keySet()) {
 	    if (output != null) {
-		output.append(ipAddress + "," + appName + "\n");
+		output.append(keyAddr.toString());
 	    }
-	    System.out.println("ok ok " + ipAddress + " '" + appName + "' " + trainHashMap.get(keyAddr).size());
 	    newMap.put(keyAddr, GetKDTree(trainHashMap.get(keyAddr)));
 	}
 
@@ -52,8 +49,12 @@ public class KDTreeCalc {
 	NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer> neighbor = new NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer>();
 
 	String output = new String();
-	Pair<String, String> trainKey = new Pair<String, String>(trainIP, trainApp);
-	Pair<String, String> testKey = new Pair<String, String>(testIP, testApp);
+	GenericPoint<String> trainKey = new GenericPoint<String>(2);
+	trainKey.setCoord(0, trainIP);
+	trainKey.setCoord(1, trainApp);
+	GenericPoint<String> testKey = new GenericPoint<String>(2);
+	testKey.setCoord(0, testIP);
+	testKey.setCoord(1, testApp);
 
 	HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testKey));
 
@@ -82,19 +83,19 @@ public class KDTreeCalc {
 
 	for (Integer keyID : DaemonService.allHistogramsMap.keySet()) {
 	    for (Integer keyIDInner : DaemonService.allHistogramsMap.keySet()) {
-		HashMap<Pair<String, String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyID), null);
-		HashMap<Pair<String, String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMapInner = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyIDInner), null);
+		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyID), null);
+		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMapInner = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyIDInner), null);
 
 		// iterate through all combinations of <IP, App names>
-		for (Pair<String, String> keyPair : newMap.keySet()) {
-		    for (Pair<String, String> keyPairInner : newMapInner.keySet()) {
+		for (GenericPoint<String> key : newMap.keySet()) {
+		    for (GenericPoint<String> keyInner : newMapInner.keySet()) {
 			// track Score -> timestamp
 			// A MultiValueMap is a HashMap where the value is an Collection of values (to handle duplicate keys)
 			MultiValueMap resultsHash = new MultiValueMap();
 
-			output.append("Highest 3 scores for ID " + keyID + " : <" + keyPair.getValue(0) + "," + keyPair.getValue(1) + "> vs ID " + keyIDInner + " : <" + keyPairInner.getValue(0) + "," + keyPairInner.getValue(1) + ">\n");
+			output.append("Highest 3 scores for ID " + keyID + " : <" + key.toString() + "> vs ID " + keyIDInner + " : <" + keyInner.toString() + ">\n");
 			// intentionally ignore the return string since we're generating our own display info later
-			KDTreeCalc.runOneTestKDTree(keyID, keyPair.getValue0(), keyPair.getValue1(), keyIDInner, keyPairInner.getValue0(), keyPairInner.getValue1(), resultsHash);
+			KDTreeCalc.runOneTestKDTree(keyID, key.getCoord(0), key.getCoord(1), keyIDInner, keyInner.getCoord(0), keyInner.getCoord(1), resultsHash);
 
 			List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 			Collections.sort(resultsHashList);

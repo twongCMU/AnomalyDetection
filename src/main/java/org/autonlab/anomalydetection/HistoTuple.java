@@ -128,20 +128,18 @@ public class HistoTuple {
      * This code works for any number of dimensions
      * This code assumes that the input file is ordered by time
      */
-    public static HashMap<Pair<String, String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> mergeWindows(HashMap<Pair<String, String>, ArrayList<HistoTuple>> listMap, int windowSecs, int slideSecs) {
+    public static HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> mergeWindows(HashMap<GenericPoint<String>, ArrayList<HistoTuple>> listMap, int windowSecs, int slideSecs) {
 	// The code will probably work if this restriction is removed. It was written to handle this case.
 	if (slideSecs > windowSecs) {
 	    throw new RuntimeException("slideSecs is higher than windowSecs. This is not permitted as it might skip training data");
 	}
 
-	HashMap<Pair<String, String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> ret = new HashMap();
+	HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> ret = new HashMap();
 
 	// if a different REST thread is also loading data we don't want to have the dimensions change while we're using or changing it
 	_histoTupleDataLock.lock();
 
-	Iterator<Pair<String, String>> listMapIter = listMap.keySet().iterator();
-	while (listMapIter.hasNext()) {
-	    Pair<String, String> mapKey = listMapIter.next();
+	for (GenericPoint<String> mapKey : listMap.keySet()) {
 	    ArrayList<HistoTuple> list = listMap.get(mapKey);
 
 	    // the highest index that has not yet been processed

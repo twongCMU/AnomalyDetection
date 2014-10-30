@@ -1,8 +1,8 @@
 package org.autonlab.anomalydetection;
 
+import com.savarese.spatial.*;
 import java.io.*;
 import java.util.*;
-import org.javatuples.*; //Tuples, Pair
 
 public class DataIOFile implements DataIO {
     private BufferedReader br = null;
@@ -17,11 +17,11 @@ public class DataIOFile implements DataIO {
     }
 
     /**
-     * Read a csv file and return a HashMap of <Pair<ip, app name> -> <timestamp, histogram>>
+     * Read a csv file and return a HashMap of <GenericPoint<String> -> <timestamp, histogram>>
      *
      */
-    public HashMap<Pair<String, String>, ArrayList<HistoTuple>> getData() {
-	HashMap<Pair<String, String>, ArrayList<HistoTuple>> trainMap = new HashMap();
+    public HashMap<GenericPoint<String>, ArrayList<HistoTuple>> getData() {
+	HashMap<GenericPoint<String>, ArrayList<HistoTuple>> trainMap = new HashMap();
 
 	int count = 0;
 
@@ -51,12 +51,14 @@ public class DataIOFile implements DataIO {
 		    applicationName = sParts[3];
 		}
 
-		Pair<String, String> keyPair = new Pair(ipAddress, applicationName);
+		GenericPoint<String> key = new GenericPoint<String>(2);
+		key.setCoord(0, ipAddress);
+		key.setCoord(1, applicationName);
 
-		if (!trainMap.containsKey(keyPair)) {
-		    trainMap.put(keyPair, new ArrayList<HistoTuple>());
+		if (!trainMap.containsKey(key)) {
+		    trainMap.put(key, new ArrayList<HistoTuple>());
 		}
-		trainMap.get(keyPair).add(new HistoTuple(timeStamp, messageType));
+		trainMap.get(key).add(new HistoTuple(timeStamp, messageType));
 
 		count++;
 	    }

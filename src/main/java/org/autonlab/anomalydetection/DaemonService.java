@@ -10,7 +10,7 @@ import org.javatuples.*;
 @Path("/")
 public class DaemonService {
     // we key on <IP, AppName> pairs. We can expand this in the future to up to 10 fields. See http://www.javatuples.org/apidocs/index.html
-    static HashMap<Integer, HashMap<Pair<String, String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> allHistogramsMap = new HashMap();
+    static HashMap<Integer, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> allHistogramsMap = new HashMap();
 
     static int nextHistogramMapID = 0;
 
@@ -46,53 +46,10 @@ public class DaemonService {
 
 	DataIOFile foo = new DataIOFile(filename);
 	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
-	for (Pair<String, String> key : allHistogramsMap.get(nextHistogramMapID).keySet()) {
-	    output.append("Key: " + key.getValue0() + ", " + key.getValue1() + " (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(key).size() + ")\n");
+	for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).keySet()) {
+	    output.append("Key: " + key.toString());
+	    output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(key).size() + ")\n");
 	}
-	nextHistogramMapID++;
-	return Response.status(200).entity(output.toString()).build();
-    }
-
-    @GET
-    @Path("/getfakedata")
-    @Produces(MediaType.TEXT_PLAIN)
-    public Response getFakeData() {
-	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
-
-	HashMap<Pair<String, String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> fakeData = new HashMap();
-
-	// generate a sparse-ish lower half of a matrix. This will be our training data
-	ArrayList<Pair<Integer, GenericPoint<Integer>>> lowerHalf = new ArrayList();
-	int fakeTime = 1;
-	for (int i = 10; i < 50; i += 10) {
-	    for (int j = 10; j <= (50-i); j += 10) {
-		GenericPoint<Integer> fakePoint = new GenericPoint(i, j);
-		output.append(fakePoint.toString() + "\n");
-		Pair<Integer, GenericPoint<Integer>> fakePair = new Pair(fakeTime, fakePoint);
-		lowerHalf.add(fakePair);
-		fakeTime++;
-	    }
-	}
-	fakeData.put(new Pair("1.1.1.1", "myapp"), lowerHalf);
-	output.append("Key: 1.1.1.1, myapp (" + lowerHalf.size() + ")\n");
-
-	// generate a dense full matrix. This will be test data used to run against the lower half matrix
-	ArrayList<Pair<Integer, GenericPoint<Integer>>> fullMatrix = new ArrayList();
-	for (int i = 10; i < 100; i += 10) {
-	    for (int j = 10; j < 100; j += 10) {
-		GenericPoint<Integer> fakePoint = new GenericPoint(i, j);
-		Pair<Integer, GenericPoint<Integer>> fakePair = new Pair(fakeTime, fakePoint);
-		fullMatrix.add(fakePair);
-		fakeTime++;
-	    }
-	}
-	fakeData.put(new Pair("5.5.5.5", "otherthing"), fullMatrix);
-	output.append("Key: 5.5.5.5, otherthing (" + fullMatrix.size() + ")\n");
-
-	// override this since we don't use the
-	HistoTuple.setDimensions(2);
-
-	allHistogramsMap.put(nextHistogramMapID, fakeData);
 	nextHistogramMapID++;
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -108,6 +65,59 @@ public class DaemonService {
 
 	DataIOCassandraDB foo = new DataIOCassandraDB(hostname, "demo");
 	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
+	for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).keySet()) {
+	    output.append("Key: " + key.toString());
+	    output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(key).size() + ")\n");
+	}
+	nextHistogramMapID++;
+	return Response.status(200).entity(output.toString()).build();
+    }
+
+    @GET
+    @Path("/getfakedata")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response getFakeData() {
+	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
+
+	HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> fakeData = new HashMap();
+
+	// generate a sparse-ish lower half of a matrix. This will be our training data
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> lowerHalf = new ArrayList();
+	int fakeTime = 1;
+	for (int i = 10; i < 50; i += 10) {
+	    for (int j = 10; j <= (50-i); j += 10) {
+		GenericPoint<Integer> fakePoint = new GenericPoint(i, j);
+		output.append(fakePoint.toString() + "\n");
+		Pair<Integer, GenericPoint<Integer>> fakePair = new Pair(fakeTime, fakePoint);
+		lowerHalf.add(fakePair);
+		fakeTime++;
+	    }
+	}
+	GenericPoint<String> key = new GenericPoint(2);
+	key.setCoord(0, "1.1.1.1");
+	key.setCoord(1, "myapp");
+	fakeData.put(key, lowerHalf);
+	output.append("Key: 1.1.1.1, myapp (" + lowerHalf.size() + ")\n");
+
+	// generate a dense full matrix. This will be test data used to run against the lower half matrix
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> fullMatrix = new ArrayList();
+	for (int i = 10; i < 100; i += 10) {
+	    for (int j = 10; j < 100; j += 10) {
+		GenericPoint<Integer> fakePoint = new GenericPoint(i, j);
+		Pair<Integer, GenericPoint<Integer>> fakePair = new Pair(fakeTime, fakePoint);
+		fullMatrix.add(fakePair);
+		fakeTime++;
+	    }
+	}
+	key.setCoord(0, "5.5.5.5");
+	key.setCoord(1, "otherthing");
+	fakeData.put(key, fullMatrix);
+	output.append("Key: 5.5.5.5, otherthing (" + fullMatrix.size() + ")\n");
+
+	// override this since we don't use the
+	HistoTuple.setDimensions(2);
+
+	allHistogramsMap.put(nextHistogramMapID, fakeData);
 	nextHistogramMapID++;
 	return Response.status(200).entity(output.toString()).build();
     }
