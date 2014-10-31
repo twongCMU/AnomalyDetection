@@ -14,12 +14,11 @@ public interface DataIO {
     /**
      * Write one record to the data store. Not implemented by all subclasses
      *
+     * @param keyCSV Key index for the histogram
      * @param dataSecs Timestamp of record in seconds since epoch
-     * @param ipAddress Ip address of sender
      * @param messageType Sending message type
-     * @param appName Sending application name
      */
-    public void putData(int dateSecs, String ipAddress, String messageType, String appName);
+    public void putData(String keyCSV, int dateSecs, String messageType);
 
     /**
      * Close data store

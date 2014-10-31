@@ -9,14 +9,12 @@ import org.javatuples.*;
 
 @Path("/")
 public class DaemonService {
-    // we key on <IP, AppName> pairs. We can expand this in the future to up to 10 fields. See http://www.javatuples.org/apidocs/index.html
     static HashMap<Integer, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> allHistogramsMap = new HashMap();
 
     static int nextHistogramMapID = 0;
 
     static int anomalyID = -1;
-    static String anomalyIp = "";
-    static String anomalyApp = "";
+    static GenericPoint<String> anomalyKey;
 
     /**
      * Get the histogram's number of dimensions and their names. This is so that calls to /evaluate can be constructed properly
@@ -146,16 +144,14 @@ public class DaemonService {
     @Path("/test")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getData(@QueryParam("trainID") Integer trainID,
-			    @QueryParam("trainIP") String trainIP,
-			    @QueryParam("trainApp") String trainApp,
+			    @QueryParam("trainKeyCSV") String trainKey,
 			    @QueryParam("testID") Integer testID,
-			    @QueryParam("testIP") String testIP,
-			    @QueryParam("testApp") String testApp) {
+			    @QueryParam("testKeyCSV") String testKey) {
 	if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
-	    return getDataKDTree(trainID, trainIP, trainApp, testID, testIP, testApp);
+	    return getDataKDTree(trainID, trainKey, testID, testKey);
 	}
 	else if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
-	    return getDataSVM(trainID, trainIP, trainApp, testID, testIP, testApp);
+	    return getDataSVM(trainID, trainKey, testID, testKey);
 	}
 	else {
 	    throw new RuntimeException("unknown calculation type");
@@ -166,27 +162,36 @@ public class DaemonService {
     @Path("/testKDTree")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDataKDTree(@QueryParam("trainID") Integer trainID,
-			    @QueryParam("trainIP") String trainIP,
-			    @QueryParam("trainApp") String trainApp,
+			    @QueryParam("trainKeyCSV") String trainKey,
 			    @QueryParam("testID") Integer testID,
-			    @QueryParam("testIP") String testIP,
-			    @QueryParam("testApp") String testApp) {
+  	                    @QueryParam("testKeyCSV") String testKey) {
 	String output = "Calculation method: KDTree\n";
-	output += KDTreeCalc.runOneTestKDTree(trainID, trainIP, trainApp, testID, testIP, testApp, null);
+
+	output += KDTreeCalc.runOneTestKDTree(trainID, getPointFromCSV(trainKey), testID, getPointFromCSV(testKey), null);
 	return Response.status(200).entity(output).build();
+    }
+
+    public GenericPoint<String> getPointFromCSV(String csv) {
+	String[] sParts = csv.split(",");
+	GenericPoint<String> point = new GenericPoint(sParts.length);
+
+	for (int ii = 0; ii < sParts.length; ii++) {
+	    point.setCoord(ii, sParts[ii]);
+	}
+
+	return point;
     }
 
     @GET
     @Path("/testSVM")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDataSVM(@QueryParam("trainID") Integer trainID,
-			       @QueryParam("trainIP") String trainIP,
-			       @QueryParam("trainApp") String trainApp,
+			       @QueryParam("trainKeyCSV") String trainKey,
 			       @QueryParam("testID") Integer testID,
-			       @QueryParam("testIP") String testIP,
-			       @QueryParam("testApp") String testApp) {
+			       @QueryParam("testKeyCSV") String testKey) {
 	StringBuilder output = new StringBuilder("Calculation method: SVM\n");
-	output.append(SVMCalc.runOneTestSVM(trainID, trainIP, trainApp, testID, testIP, testApp, null));
+
+	output.append(SVMCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), testID, getPointFromCSV(testKey), null));
 	return Response.status(200).entity(output.toString()).build();
     }
 
@@ -284,13 +289,12 @@ public class DaemonService {
     @Path("/setAnomalyKey")
     @Produces(MediaType.TEXT_HTML)
     public Response setAnomalyKey(@QueryParam("id") Integer id,
-				  @QueryParam("ip") String ip,
-				  @QueryParam("appname") String app) {
+				  @QueryParam("csvKey") String csvKey) {
 	String output = "ok";
 	
 	anomalyID = id;
-	anomalyIp = ip;
-	anomalyApp = app;
+	anomalyKey = getPointFromCSV(csvKey);
+
 	return Response.status(200).entity(output).build();
     }
 }

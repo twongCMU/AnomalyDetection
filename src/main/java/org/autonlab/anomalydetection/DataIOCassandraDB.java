@@ -107,9 +107,11 @@ public class DataIOCassandraDB implements DataIO {
 	return trainMap;
     }
 
-    public void putData(int dateSecs, String ipAddress, String messageType, String appName) {
-	_session.execute("INSERT INTO " + _keyspace + ".packet (time_stamp, source_addr, text_values, dest_addr) VALUES (" + dateSecs + ",'" + ipAddress + "',{'messagetype' : '" + messageType + "', 'endpoint' : '" + appName + "'}, '" + _counter + "')");
-	_counter++;
+    public void putData(String keyCSV, int dateSecs, String messageType) {
+    // from group meeting, we're going to write to a different db not the cassandra one so we won't reimplement this in a dynamic key friendly way 
+    // until we know more details
+    //	_session.execute("INSERT INTO " + _keyspace + ".packet (time_stamp, source_addr, text_values, dest_addr) VALUES (" + dateSecs + ",'" + ipAddress + "',{'messagetype' : '" + messageType + "', 'endpoint' : '" + appName + "'}, '" + _counter + "')");
+    //_counter++;
     }
 
     public void close() {

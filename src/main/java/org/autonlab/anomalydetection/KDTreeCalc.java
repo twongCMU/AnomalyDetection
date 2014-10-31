@@ -7,11 +7,11 @@ import org.javatuples.*;
 
 public class KDTreeCalc {
    /**
-     * Convert the training data from a hash of (<IP, AppName> -> HistoTuple<date, message type>) to (<IP, AppName> -> KDTree)
+     * Convert the training data from a hash of (<GenericPoint> -> HistoTuple<date, message type>) to (<GenericPoint> -> KDTree)
      *
      * @param trainHashMap The HashMap to be converted to a mapping to KDTree
-     * @param output this function will append the list all seen combinations of <IP, AppName>
-     * @return HashMap of <IP, AppName>  to KDTree
+     * @param output this function will append the list all seen combinations of <GenericPoint>
+     * @return HashMap of <GenericPoint>  to KDTree
      * 
      */
     public static HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> makeKDTree(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> trainHashMap, StringBuilder output) {
@@ -38,23 +38,15 @@ public class KDTreeCalc {
 
    /**
      * @param trainID ID of the model to use to train on
-     * @param trainIP IP address within the trainID model to consider
-     * @param trainApp Application name within the trainID model to consider
+     * @param trainKey Key index for the training set histograms
      * @param testID ID of the model to use to test on
-     * @param testIP IP address within the testID model to consider
-     * @param testApp Application name within the testID model to consider
+     * @param testKey Key index for the test set histograms
      * @param results If not null, every result will be recorded here as score->timestamp. We use a MultiValueMap so duplicate scores will still be recorded
      */
-    public static String runOneTestKDTree(Integer trainID, String trainIP, String trainApp, Integer testID, String testIP, String testApp, MultiValueMap results) {
+    public static String runOneTestKDTree(Integer trainID, GenericPoint<String> trainKey, Integer testID, GenericPoint<String> testKey, MultiValueMap results) {
 	NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer> neighbor = new NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer>();
 
 	String output = new String();
-	GenericPoint<String> trainKey = new GenericPoint<String>(2);
-	trainKey.setCoord(0, trainIP);
-	trainKey.setCoord(1, trainApp);
-	GenericPoint<String> testKey = new GenericPoint<String>(2);
-	testKey.setCoord(0, testIP);
-	testKey.setCoord(1, testApp);
 
 	HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testKey));
 
@@ -95,7 +87,7 @@ public class KDTreeCalc {
 
 			output.append("Highest 3 scores for ID " + keyID + " : <" + key.toString() + "> vs ID " + keyIDInner + " : <" + keyInner.toString() + ">\n");
 			// intentionally ignore the return string since we're generating our own display info later
-			KDTreeCalc.runOneTestKDTree(keyID, key.getCoord(0), key.getCoord(1), keyIDInner, keyInner.getCoord(0), keyInner.getCoord(1), resultsHash);
+			KDTreeCalc.runOneTestKDTree(keyID, key, keyIDInner, keyInner, resultsHash);
 
 			List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 			Collections.sort(resultsHashList);

@@ -23,10 +23,7 @@ public class SVMCalc {
 
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
 	if (DaemonService.anomalyID >= 0) {
-	    GenericPoint temp = new GenericPoint(2);
-	    temp.setCoord(0, DaemonService.anomalyIp);
-	    temp.setCoord(1, DaemonService.anomalyApp);
-	    anomalyData = DaemonService.allHistogramsMap.get(DaemonService.anomalyID).get(temp);
+	    anomalyData = DaemonService.allHistogramsMap.get(DaemonService.anomalyID).get(DaemonService.anomalyKey);
 	}
 	for (GenericPoint<String> keyAddr : histograms.keySet()) {
 	    // change 99.9 to be a parameter or maybe input to the rest call that sets the other anomaly key info
@@ -206,16 +203,14 @@ public class SVMCalc {
 
     /**
      * @param trainID ID of the model to use to train on
-     * @param trainIP IP address within the trainID model to consider
-     * @param trainApp Application name within the trainID model to consider
+     * @param trainKey Key index for the training set histograms
      * @param testID ID of the model to use to test on
-     * @param testIP IP address within the testID model to consider
-     * @param testApp Application name within the testID model to consider
+     * @param testKey Key index for the test set histograms
      * @param results If not null, every result will be recorded here as score->timestamp. We use a MultiValueMap so duplicate scores will still be recorded
      *
      * @return some text that can be displayed to the user
      */
-    public static StringBuilder runOneTestSVM(Integer trainID, String trainIP, String trainApp, Integer testID, String testIP, String testApp, MultiValueMap results) {
+    public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, Integer testID, GenericPoint<String> testKey, MultiValueMap results) {
 
 	StringBuilder output = new StringBuilder();
 
@@ -225,26 +220,22 @@ public class SVMCalc {
 	    output.append("Error: trainID " + trainID + " not found");
 	    return output;
 	}
-	GenericPoint tempTrain = new GenericPoint(2);
-	tempTrain.setCoord(0, trainIP);
-	tempTrain.setCoord(1, trainApp);
-	if (DaemonService.allHistogramsMap.get(trainID).get(tempTrain) == null) {
-	    output.append("Error: trainIP, trainApp pair of " + tempTrain.toString() + " for trainID " + trainID + " not found");
+
+	if (DaemonService.allHistogramsMap.get(trainID).get(trainKey) == null) {
+	    output.append("Error: trainIP, trainApp pair of " + trainKey.toString() + " for trainID " + trainID + " not found");
 	    return output;
 	}
 	if (DaemonService.allHistogramsMap.get(testID) == null) {
 	    output.append("Error: testID " + testID + " not found");
 	    return output;
 	}
-	GenericPoint tempTest = new GenericPoint(2);
-	tempTest.setCoord(0, testIP);
-	tempTest.setCoord(1, testApp);
-	if (DaemonService.allHistogramsMap.get(testID).get(tempTest) == null) {
-	    output.append("Error: testIP, testApp pair of " + tempTest.toString() + " for testID " + testID + " not found");
+
+	if (DaemonService.allHistogramsMap.get(testID).get(testKey) == null) {
+	    output.append("Error: testIP, testApp pair of " + testKey.toString() + " for testID " + testID + " not found");
 	    return output;
 	}
 
-	boolean changed = HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(tempTrain), DaemonService.allHistogramsMap.get(testID).get(tempTest));
+	boolean changed = HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testKey));
 
 	_svmModelsCacheLock.lock();
 
@@ -272,12 +263,12 @@ public class SVMCalc {
 	// If we're running many instances of similar test data against the same training data
 	// we might want to implement a cache that's per-training set and save it externally
 	// rather than the current scheme of only caching within an instance of SVMKernel
-	SVMKernel svmKernel = new SVMKernel(DaemonService.allHistogramsMap.get(testID).get(tempTest), DaemonService.allHistogramsMap.get(trainID).get(tempTrain), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
+	SVMKernel svmKernel = new SVMKernel(DaemonService.allHistogramsMap.get(testID).get(testKey), DaemonService.allHistogramsMap.get(trainID).get(trainKey), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
 	svm_node[][] bar = svmKernel.getData();
 
-	svm_model oneModel = allModels.get(tempTrain);
+	svm_model oneModel = allModels.get(trainKey);
 	int index = 0;
-	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(tempTest)) {
+	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testKey)) {
 	    double[] values = new double[1];
 	    svm.svm_predict_values(oneModel, bar[index], values);
 	    double prediction = values[0];
@@ -315,7 +306,7 @@ public class SVMCalc {
 			MultiValueMap resultsHash = new MultiValueMap();
 
 			output.append("Highest 5 scores for ID " + keyID + " : <" + key.toString() + "> vs ID " + keyIDInner + " : <" + keyInner.toString() + ">\n");
-			runOneTestSVM(keyID, key.getCoord(0), key.getCoord(1), keyIDInner, keyInner.getCoord(0), keyInner.getCoord(1), resultsHash);
+			runOneTestSVM(keyID, key, keyIDInner, keyInner, resultsHash);
 
 			List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 			Collections.sort(resultsHashList); // ascending order

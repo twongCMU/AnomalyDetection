@@ -78,7 +78,7 @@ public class DataIOFile implements DataIO {
 	return trainMap;
     }
 
-    public void putData(int dateSecs, String ipAddress, String messageType, String appName) {
+    public void putData(String keyCSV, int dateSecs, String messageType) {
 	throw new RuntimeException("putData for files not implemented");
     }
 
