@@ -16,8 +16,8 @@ public class HistoTuple {
     static volatile HashMap<String, Integer> _msgTypeMap = new HashMap<String, Integer>();
 
     static volatile int _msgNameCount = 0;
-    static volatile double _startTime = Double.MAX_VALUE;
-    static volatile double _endTime = 0;
+    //    static volatile double _startTime = Double.MAX_VALUE;
+    //static volatile double _endTime = 0;
     static volatile Lock _histoTupleDataLock = new ReentrantLock(); //this protects all above static data
     /*
      * we use the volatile keyword for the above static values because each REST daemon call
@@ -53,13 +53,13 @@ public class HistoTuple {
 	    _msgNameCount++;
 	}
 
-	if (timeStamp < _startTime) {
+	/*	if (timeStamp < _startTime) {
 	    _startTime = timeStamp;
 	}
 
 	if (timeStamp > _endTime) {
 	    _endTime = timeStamp;
-	}
+	    }*/
 	_histoTupleDataLock.unlock();
     }
 
@@ -139,6 +139,20 @@ public class HistoTuple {
 	// if a different REST thread is also loading data we don't want to have the dimensions change while we're using or changing it
 	_histoTupleDataLock.lock();
 
+	double startTime = Double.MAX_VALUE;
+	double endTime = 0;
+	for (GenericPoint<String> mapKey : listMap.keySet()) {
+	    ArrayList<HistoTuple> list = listMap.get(mapKey);
+	    for (HistoTuple oneTuple : list) {
+		if (oneTuple._timeStamp < startTime) {
+		    startTime = oneTuple._timeStamp;
+		}
+		if (oneTuple._timeStamp > endTime) {
+		    endTime = oneTuple._timeStamp;
+		}
+	    }
+	}
+
 	for (GenericPoint<String> mapKey : listMap.keySet()) {
 	    ArrayList<HistoTuple> list = listMap.get(mapKey);
 
@@ -149,7 +163,7 @@ public class HistoTuple {
 	    int tailIndex = 0;
 	    HistoTuple tailTuple = null;
 	    // the beginning of the current window
-	    int currentSecs = (int)_startTime;
+	    int currentSecs = (int)startTime;
 
 	    // this check also allows us to safely do list.get(0) later on
 	    if (list.size() == 0) {
@@ -169,7 +183,7 @@ public class HistoTuple {
 	    // headTuple points to the newest tuple within the sliding window
 	    // tailTuple the oldest
 	    //while (headTuple != null && tailTuple != null) {
-	    while (currentSecs < _endTime) {
+	    while (currentSecs < endTime) {
 		addCount = 0;
 		// System.out.print("Window is " + currentSecs + " to " + (currentSecs+windowSecs) + ". Histogram: ");
 		// add to the histogram tuples that have entered the window
