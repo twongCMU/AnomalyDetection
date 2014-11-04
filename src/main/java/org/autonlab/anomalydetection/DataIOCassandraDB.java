@@ -28,6 +28,15 @@ public class DataIOCassandraDB implements DataIO {
 	_dataFieldsList.add("text_values.endpoint");
     }
 
+    public void setKeyFields(String keyFieldsCSV) {
+	String[] sParts = keyFieldsCSV.split(",");
+	_keyFieldsList = new ArrayList<String>();
+
+	for (int ii = 0; ii < sParts.length; ii++) {
+	    _keyFieldsList.add(sParts[ii]);
+	}
+    }
+
     public HashMap<GenericPoint<String>, ArrayList<HistoTuple>> getData() {
 	HashMap<GenericPoint<String>, ArrayList<HistoTuple>> trainMap = new HashMap();
 

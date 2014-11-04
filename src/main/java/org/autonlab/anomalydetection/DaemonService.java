@@ -33,6 +33,30 @@ public class DaemonService {
 	return Response.status(200).entity(output).build();
     }
 
+
+    @GET
+    @Path("/getDatasetKeys")
+    @Produces(MediaType.TEXT_HTML)
+    public Response getDatasetKeys() {
+	String output = new String();
+
+	for (Integer id : allHistogramsMap.keySet()) {
+	    output += "ID " + id + "<ul>";
+	    for (GenericPoint<String> keyFields : allHistogramsMap.get(id).keySet()) {
+		output += "<li>";
+		for (int ii = 0; ii < keyFields.getDimensions(); ii++) {
+		    output += keyFields.getCoord(ii);
+		    if (ii != keyFields.getDimensions() - 1) {
+			output += ",";
+		    }
+		}
+		output += "</li>";
+	    }
+	    output += "</ul>";
+	}
+	return Response.status(200).entity(output).build();
+    }
+
     /**
      * 
      */
@@ -56,13 +80,19 @@ public class DaemonService {
      *
      */
     @GET
-    @Path("/getdb/{hostname}")
+    @Path("/getdb")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDb(@PathParam("hostname") String hostname) {
-	StringBuilder output = new StringBuilder("ok\n");
+    public Response getDb(@QueryParam("hostname") String hostname,
+			  @QueryParam("keyCSV") String keyCSV) {
+	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
+	    
+	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, "demo");
 
-	DataIOCassandraDB foo = new DataIOCassandraDB(hostname, "demo");
-	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
+	if (keyCSV != null) {
+	    dbHandle.setKeyFields(keyCSV);
+	}
+
+	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(dbHandle.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
 	for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).keySet()) {
 	    output.append("Key: " + key.toString());
 	    output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(key).size() + ")\n");
@@ -297,4 +327,5 @@ public class DaemonService {
 
 	return Response.status(200).entity(output).build();
     }
+	
 }
