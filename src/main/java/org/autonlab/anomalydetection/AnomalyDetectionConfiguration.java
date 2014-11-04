@@ -26,16 +26,18 @@ public class AnomalyDetectionConfiguration {
 
     static final int SVM_CACHE_SIZE = 28000;
     static final double SVM_EPS = .001; // README says "eps is the stopping criterion. (we usually use 0.00001 in nu-SVC, 0.001 in others)"
+    static final double SVM_GAMMA = 1; // For the RBF Kernel, we need the additional gamma = 1/(2*variance) factor. 
 
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_NONE = 0;
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_CHI_SQUARED = 1;
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_LINEAR = 2;
+    static final int SVM_PRECOMPUTED_KERNEL_TYPE_RBF = 3;
 
     static final int SVM_TYPE_PRECOMPUTED_KERNEL_TYPE = SVM_PRECOMPUTED_KERNEL_TYPE_CHI_SQUARED;
     //static final int SVM_TYPE_PRECOMPUTED_KERNEL_TYPE = SVM_PRECOMPUTED_KERNEL_TYPE_LINEAR;
 
-    static final int SVM_KERNEL_TYPE = svm_parameter.PRECOMPUTED;
-    //static final int SVM_KERNEL_TYPE = svm_parameter.LINEAR;
+    //static final int SVM_KERNEL_TYPE = svm_parameter.PRECOMPUTED;
+    static final int SVM_KERNEL_TYPE = svm_parameter.RBF;
 
     public static String printCalcTypeNameLinksHTML(String prefix) {
 	String output = "<br><br>Set new calc type:<ul>\n";
