@@ -15,9 +15,6 @@ public class HistoTuple {
      */
     static volatile HashMap<String, Integer> _msgTypeMap = new HashMap<String, Integer>();
 
-    static volatile int _msgNameCount = 0;
-    //    static volatile double _startTime = Double.MAX_VALUE;
-    //static volatile double _endTime = 0;
     static volatile Lock _histoTupleDataLock = new ReentrantLock(); //this protects all above static data
     /*
      * we use the volatile keyword for the above static values because each REST daemon call
@@ -25,7 +22,7 @@ public class HistoTuple {
      */
 
     double _timeStamp;
-    int _msgIndex;
+    int _msgIndex; // This HistoTuple's message type as an index into the _msgTypeMap mapping
 
     // if this HistoTuple is in the current sliding window or not
     // we need this so we don't remove it if it was never in it in the first place
@@ -48,18 +45,10 @@ public class HistoTuple {
 	    _msgIndex = _msgTypeMap.get(msgType).intValue();
 	}
 	else {
-	    _msgTypeMap.put(msgType, _msgNameCount);
-	    _msgIndex = _msgNameCount;
-	    _msgNameCount++;
+	    _msgTypeMap.put(msgType, _msgTypeMap.size());
+	    _msgIndex = _msgTypeMap.size() - 1; // -1 because _msgTypeMap.size() increased in the previous line
 	}
 
-	/*	if (timeStamp < _startTime) {
-	    _startTime = timeStamp;
-	}
-
-	if (timeStamp > _endTime) {
-	    _endTime = timeStamp;
-	    }*/
 	_histoTupleDataLock.unlock();
     }
 
@@ -97,16 +86,7 @@ public class HistoTuple {
      * @return the number of unique msgType seen
      */
     public static int getDimensions() {
-	return _msgNameCount;
-    }
-
-    /**
-     * @param dim override the number of dimensions (used in testing)
-     */
-    public static void setDimensions(int dim) {
-	_histoTupleDataLock.lock();
-	_msgNameCount = dim;
-	_histoTupleDataLock.unlock();
+	return _msgTypeMap.size();
     }
 
     /**
@@ -284,13 +264,13 @@ public class HistoTuple {
 
     // do this in here so we can handle the locking better
     private static boolean upgradeWindowsDimensionsOne(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
-	if (histogram.get(0).getValue1().getDimensions() == _msgNameCount) {
+	if (histogram.get(0).getValue1().getDimensions() == _msgTypeMap.size()) {
 	    return false;
 	}
 	for (int ii = 0; ii < histogram.size(); ii++) {
 	    GenericPoint oldPoint = histogram.get(ii).getValue1();
-	    GenericPoint newPoint = new GenericPoint(_msgNameCount);
-	    for (int jj = 0; jj < _msgNameCount; jj++) {
+	    GenericPoint newPoint = new GenericPoint(_msgTypeMap.size());
+	    for (int jj = 0; jj < _msgTypeMap.size(); jj++) {
 		if (jj < oldPoint.getDimensions()) {
 		    newPoint.setCoord(jj, oldPoint.getCoord(jj));
 		}

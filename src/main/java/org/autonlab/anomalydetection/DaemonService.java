@@ -137,13 +137,15 @@ public class DaemonService {
 		fakeTime++;
 	    }
 	}
-	key.setCoord(0, "5.5.5.5");
-	key.setCoord(1, "otherthing");
-	fakeData.put(key, fullMatrix);
+	GenericPoint<String> key2 = new GenericPoint(2);
+	key2.setCoord(0, "5.5.5.5");
+	key2.setCoord(1, "otherthing");
+	fakeData.put(key2, fullMatrix);
 	output.append("Key: 5.5.5.5, otherthing (" + fullMatrix.size() + ")\n");
 
-	// override this since we don't use the
-	HistoTuple.setDimensions(2);
+	// generate some fake HistoTuples. these are unused but the code would crash without them
+	HistoTuple foo = new HistoTuple(1, "fake1");
+	HistoTuple foo2 = new HistoTuple(2, "fake2");
 
 	allHistogramsMap.put(nextHistogramMapID, fakeData);
 	nextHistogramMapID++;
