@@ -25,7 +25,7 @@ public class DataIOCassandraDB implements DataIO {
 	_dataFieldsList = new ArrayList<String>();
 	// this part isn't quite implemented but we want to make the code similar to the key stuff
 	_dataFieldsList.add("time_stamp"); // timestamp must be first
-	_dataFieldsList.add("text_values.maessagetype");
+	_dataFieldsList.add("text_values.messagetype");
 	//	_dataFieldsList.add("dest_addr");
     }
 
@@ -36,6 +36,13 @@ public class DataIOCassandraDB implements DataIO {
 	for (int ii = 0; ii < sParts.length; ii++) {
 	    _keyFieldsList.add(sParts[ii]);
 	}
+    }
+
+    public void setValueFields(String dataField) {
+	_dataFieldsList = new ArrayList<String>();
+
+	_dataFieldsList.add("time_stamp");
+	_dataFieldsList.add(dataField);
     }
 
     public HashMap<GenericPoint<String>, ArrayList<HistoTuple>> getData() {

@@ -83,13 +83,17 @@ public class DaemonService {
     @Path("/getdb")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDb(@QueryParam("hostname") String hostname,
-			  @QueryParam("keyCSV") String keyCSV) {
+			  @QueryParam("keyCSV") String keyCSV,
+			  @QueryParam("value") String value) {
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 	    
 	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, "demo");
 
 	if (keyCSV != null) {
 	    dbHandle.setKeyFields(keyCSV);
+	}
+	if (value != null) {
+	    dbHandle.setValueFields(value);
 	}
 
 	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(dbHandle.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
