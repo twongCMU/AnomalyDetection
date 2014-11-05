@@ -5,7 +5,7 @@ import libsvm.*;
 public class AnomalyDetectionConfiguration {
 
     // number of CPU threads to use when doing parallel computation
-    static final int NUM_THREADS = 4;
+    static final int NUM_THREADS = 1;
 
     // The width of time in which we count datapoints - can be changed via REST call
     static int SAMPLE_WINDOW_SECS = 1800;
@@ -14,9 +14,10 @@ public class AnomalyDetectionConfiguration {
 
     static final int CALC_TYPE_KDTREE = 0;
     static final int CALC_TYPE_SVM = 1;
-    static final String[] CALC_TYPE_NAMES = {"KDTree", "SVM"}; // the index into this array's names should line up with the CALC_TYPE_<type> ints
+    static final int CALC_TYPE_SVM_RANDOM = 3;
+    static final String[] CALC_TYPE_NAMES = {"KDTree", "SVM", "SVMRandom"}; // the index into this array's names should line up with the CALC_TYPE_<type> ints
 
-    static int CALC_TYPE_TO_USE = CALC_TYPE_KDTREE;
+    static int CALC_TYPE_TO_USE = CALC_TYPE_SVM_RANDOM;
 
     static final int NU_START_POW_HIGH = -1;
     static int NU_START_POW_LOW = -5;
@@ -26,7 +27,8 @@ public class AnomalyDetectionConfiguration {
 
     static final int SVM_CACHE_SIZE = 28000;
     static final double SVM_EPS = .001; // README says "eps is the stopping criterion. (we usually use 0.00001 in nu-SVC, 0.001 in others)"
-    static final double SVM_GAMMA = 1; // For the RBF Kernel, we need the additional gamma = 1/(2*variance) factor. 
+    static final double SVM_GAMMA = 1; // For the RBF Kernel, we need the additional gamma = 1/(2*variance) factor.
+    static final int SVM_D = 300;//Number of random Fourier features 
 
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_NONE = 0;
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_CHI_SQUARED = 1;
@@ -37,7 +39,8 @@ public class AnomalyDetectionConfiguration {
     //static final int SVM_TYPE_PRECOMPUTED_KERNEL_TYPE = SVM_PRECOMPUTED_KERNEL_TYPE_LINEAR;
 
     //static final int SVM_KERNEL_TYPE = svm_parameter.PRECOMPUTED;
-    static final int SVM_KERNEL_TYPE = svm_parameter.RBF;
+    //static final int SVM_KERNEL_TYPE = svm_parameter.RBF;
+    static final int SVM_KERNEL_TYPE = svm_parameter.LINEAR;
 
     public static String printCalcTypeNameLinksHTML(String prefix) {
 	String output = "<br><br>Set new calc type:<ul>\n";

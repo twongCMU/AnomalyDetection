@@ -21,11 +21,11 @@ import org.javatuples.*; //Tuples, Pair
 // also, NU_START_POW_LOW is modified
 public class SVMRandomCalc {
 	// cache of processed models. This is shared across concurrent accesses so we need to protect it with a lock
-	static volatile HashMap<Integer, HashMap<GenericPoint<String>, svm_model>> _svmModelsCache = new HashMap();
+	static volatile HashMap<Integer, HashMap<GenericPoint<String>, svm_model>> _svmModelsCache = new HashMap<Integer, HashMap<GenericPoint<String>, svm_model>>();
 	static volatile Lock _svmModelsCacheLock = new ReentrantLock();
 
 	public static HashMap<GenericPoint<String>, svm_model> makeSVMModel(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> histograms, StringBuilder output, double targetAccuracy) {
-		HashMap<GenericPoint<String>, svm_model> newMap = new HashMap();
+		HashMap<GenericPoint<String>, svm_model> newMap = new HashMap<GenericPoint<String>, svm_model>();
 
 		ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
 		if (DaemonService.anomalyID >= 0) {
@@ -40,7 +40,7 @@ public class SVMRandomCalc {
 	}
 
 	private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
-		TreeMap<Double, Double> nuValues = new TreeMap();
+		TreeMap<Double, Double> nuValues = new TreeMap<Double,Double>();
 		System.out.println("YYY -------------------------");
 		// generate a list of nu values to try (we can add to this later)
 		for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
@@ -54,7 +54,7 @@ public class SVMRandomCalc {
 		svmProblem.l = histograms.size();
 		svmProblem.y = new double[histograms.size()];
 		Arrays.fill(svmProblem.y, 1.0); // all of our training data is non-anomalous
-		svmProblem.x =  (new SVMKernel(histograms, histograms, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+		svmProblem.x = (new GaussianFourierFeatures(histograms, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 
 		svm_problem svmProblemAnomaly = null;
 		// TODO: Wouldn't you want to add this to the same svmProblem as before?
@@ -63,7 +63,7 @@ public class SVMRandomCalc {
 			svmProblemAnomaly.l = histogramsAnomaly.size();
 			svmProblemAnomaly.y = new double[histogramsAnomaly.size()];
 			Arrays.fill(svmProblemAnomaly.y, -1.0); // set all of this data to anomalous
-			svmProblemAnomaly.x =  (new SVMKernel(histogramsAnomaly, histograms, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+			svmProblemAnomaly.x = (new GaussianFourierFeatures(histogramsAnomaly, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 		}
 
 		svm_parameter svmParameter = new svm_parameter();
@@ -205,7 +205,7 @@ public class SVMRandomCalc {
 				nuValues.put(nu, accuracy * accuracyAnomaly / 2);
 			}
 		}
-
+		
 		return closestNU;
 	}
 
@@ -223,6 +223,7 @@ public class SVMRandomCalc {
 		StringBuilder output = new StringBuilder();
 
 		HashMap<GenericPoint<String>, svm_model> allModels;
+		
 
 		if (DaemonService.allHistogramsMap.get(trainID) == null) {
 			output.append("Error: trainID " + trainID + " not found");
@@ -243,6 +244,7 @@ public class SVMRandomCalc {
 			return output;
 		}
 
+		
 		boolean changed = HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testKey));
 
 		_svmModelsCacheLock.lock();
@@ -271,20 +273,22 @@ public class SVMRandomCalc {
 		// If we're running many instances of similar test data against the same training data
 		// we might want to implement a cache that's per-training set and save it externally
 		// rather than the current scheme of only caching within an instance of SVMKernel
-		SVMKernel svmKernel = new SVMKernel(DaemonService.allHistogramsMap.get(testID).get(testKey), DaemonService.allHistogramsMap.get(trainID).get(trainKey), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
-		svm_node[][] bar = svmKernel.getData();
+		GaussianFourierFeatures GFSTest = new GaussianFourierFeatures(DaemonService.allHistogramsMap.get(testID).get(testKey), AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.NUM_THREADS);
+		svm_node[][] testFeatures = GFSTest.getData();
 
 		svm_model oneModel = allModels.get(trainKey);
 		int index = 0;
+
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testKey)) {
 			double[] values = new double[1];
-			svm.svm_predict_values(oneModel, bar[index], values);
+			svm.svm_predict_values(oneModel, testFeatures[index], values);
 			double prediction = values[0];
 
 			// this code returns a lower score for more anomalous so we flip it to match kdtree
 			prediction *= -1;
 
-			output.append("predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data " + bar[index][0].value + "\n");
+
+			output.append("predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data " + testFeatures[index][0].value + "\n");
 
 			if (results != null) {
 				results.put(prediction, onePoint.getValue0());

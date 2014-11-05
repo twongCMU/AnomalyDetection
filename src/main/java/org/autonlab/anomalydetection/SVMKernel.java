@@ -72,7 +72,7 @@ public class SVMKernel implements Runnable {
 			_rowSize = _histogramsB.get(0).getValue1().getDimensions();
 		}
 
-		_retNodeRowCache = new HashMap();
+		_retNodeRowCache = new HashMap<GenericPoint<Integer>, Integer>();
 
 		/* 
 		 * for non-precomputed kernels, we're just copying the data

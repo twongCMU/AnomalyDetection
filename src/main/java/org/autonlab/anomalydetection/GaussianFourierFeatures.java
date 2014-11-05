@@ -1,5 +1,6 @@
 package org.autonlab.anomalydetection;
 
+import java.util.Scanner;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.locks.Lock;
@@ -36,9 +37,22 @@ public class GaussianFourierFeatures implements Runnable {
 	// These are used by all related threads. Volatile variables are modified by threads
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> _histograms = null;
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> _histogramsB = null;
+	int _n = 0; // The length of histogram element
 	int _D = 0; // The number of random features 
 	volatile svm_node _retNode[][] = null;
 	volatile Lock _retNodeLock = null;
+	
+	// Mean and covariance of Gaussian distribution
+	double[] _mu;
+	double[][] _cov;
+	MultivariateNormalDistribution _mnd;
+	
+	// Uniform distribution
+	double _lb;
+	double _ub;
+	UniformRealDistribution _urd;
+	
+
 
 	// cache a GenericPoint histogram to its pre-computed feature map as an Integer index into _retNode
 	// We want to ensure that each histogram gets mapped to the same feature vector -- I think.
@@ -58,29 +72,51 @@ public class GaussianFourierFeatures implements Runnable {
 		_threadArray = new Thread[_threadCount];
 		_histograms = histograms;
 		_D = D;
+		_n = _histograms.get(0).getValue1().getDimensions();
 		_retNode = new svm_node[histograms.size()][];
-		_retNodeRowCache = new HashMap();
-
-//		if (_svm_type != svm_parameter.PRECOMPUTED) {
-//			_threadCount = 1;
-//		}
-
-		for (svm_node[] svmNodeArr : _retNode) {
-			svmNodeArr = null;
+		_retNodeRowCache = new HashMap<GenericPoint<Integer>,Integer>();
+		
+		// Initialize mnd
+		_cov = new double[_n][_n];
+		_mu = new double[_n];
+		for(int i = 0; i < _n; i++) {
+			_mu[i] = 0;
+			for(int j = 0; j < _n; j++)
+				_cov[i][j] = (i == j) ? 1 : 0;
 		}
+		_mnd = new MultivariateNormalDistribution(_mu, _cov);
+		
+		// Initialize urd
+		_lb = 0;
+		_ub = 2*Math.PI;
+		_urd = new UniformRealDistribution (_lb, _ub);
+
+		//		if (_svm_type != svm_parameter.PRECOMPUTED) {
+		//			_threadCount = 1;
+		//		}
+
+		for (svm_node[] svmNodeArr : _retNode)
+			svmNodeArr = null;
+
 		_retNodeLock = new ReentrantLock();
 
 		for (int i = 0; i < _threadCount; i++) {
-			_threadArray[i] = new Thread(new GaussianFourierFeatures(_retNodeLock, _retNode, _histograms, _D, _retNodeRowCache));
+			_threadArray[i] = new Thread(new GaussianFourierFeatures(_retNodeLock, _retNode, _histograms, _retNodeRowCache, _D, _n, _mnd, _urd));
 			_threadArray[i].start();
 		}   
 	}
 
-	public GaussianFourierFeatures(Lock retNodeLock, svm_node[][] retNode, ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, int _D, HashMap<GenericPoint<Integer>, Integer> rowCache) {
+	public GaussianFourierFeatures(Lock retNodeLock, svm_node[][] retNode, ArrayList<Pair<Integer, 
+								   GenericPoint<Integer>>> histograms, HashMap<GenericPoint<Integer>, Integer> rowCache,
+								   int D, int n, MultivariateNormalDistribution mnd, UniformRealDistribution urd) {
 		_retNodeLock = retNodeLock;
 		_retNode = retNode;
 		_histograms = histograms;
 		_retNodeRowCache = rowCache;
+		_D = D;
+		_n = n;
+		_mnd = mnd;
+		_urd = urd;
 	}
 
 	/**
@@ -128,11 +164,13 @@ public class GaussianFourierFeatures implements Runnable {
 				break;
 			}
 
+			double[] f = computeGaussianFourierFeatures(oneHist);
+			
 			// TODO: create random fourier features
-			for (int j = 0; j < oneHist.getDimensions(); j++) {
+			for (int j = 0; j < _D; j++) {
 				_retNode[index][j] = new svm_node();
 				_retNode[index][j].index = j+1;
-				_retNode[index][j].value = oneHist.getCoord(j);
+				_retNode[index][j].value = f[j];
 			}
 
 			index++;
@@ -159,25 +197,33 @@ public class GaussianFourierFeatures implements Runnable {
 		return _retNode;
 	}
 
-	
+
 	/**
 	 * Generate the random Fourier features to approximate the Gaussian Kernel
 	 * For approximating with low-dim features: http://www.eecs.berkeley.edu/~brecht/papers/07.rah.rec.nips.pdf
 	 *
 	 * Assuming the Gaussian kernel has gamma=1.
 	 *
-	 * @param histX the histogram
-	 * @param D the number of features
+	 * @param hist the histogram
 	 * 
-	 * @return the feature array
+	 * @return the feature array f = sqrt(2/D)*[cos(w_1 T x + b_1) ... cos(w_D T x + b_D)]  
 	 */
-	public double gaussianFourierFeatures(GenericPoint<Integer> hist, int D) {
-		double res = 0.0;
+	public double[] computeGaussianFourierFeatures(GenericPoint<Integer> hist) {
 
-		for (int i = 0; i < hist.getDimensions(); i++) {
-			res += Math.pow(hist.getCoord(i) - hist.getCoord(i), 2);
+		double[] f = new double[_D];
+		
+		for (int i = 0; i < _D; i++) {
+			double[] w = _mnd.sample();
+			double b = _urd.sample();
+
+			double t = 0.0;	// t = wTx	
+			for (int j = 0; j < _n; j++)
+				t += hist.getCoord(j)*w[j];
+			
+			f[i] = Math.cos(t + b)*Math.sqrt(2.0/_D);
 		}
-		return Math.exp(-D*res);
+	
+		return f;
 	}
 
 }
