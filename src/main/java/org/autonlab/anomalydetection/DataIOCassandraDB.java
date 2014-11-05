@@ -20,12 +20,13 @@ public class DataIOCassandraDB implements DataIO {
 	_counter = 0;
 	_keyFieldsList = new ArrayList<String>();
 	_keyFieldsList.add("source_addr");
-	_keyFieldsList.add("text_values.messagetype");
+	_keyFieldsList.add("text_values.endpoint");
 
 	_dataFieldsList = new ArrayList<String>();
 	// this part isn't quite implemented but we want to make the code similar to the key stuff
-	_dataFieldsList.add("time_stamp");
-	_dataFieldsList.add("text_values.endpoint");
+	_dataFieldsList.add("time_stamp"); // timestamp must be first
+	_dataFieldsList.add("text_values.maessagetype");
+	//	_dataFieldsList.add("dest_addr");
     }
 
     public void setKeyFields(String keyFieldsCSV) {
@@ -102,14 +103,33 @@ public class DataIOCassandraDB implements DataIO {
 		ii++;
 	    }
 	   
-	    String messageType = fieldMap.get("messagetype");
+	    if (_dataFieldsList.size() != 2) {
+		throw new RuntimeException("Data field list did not have exactly two elements");
+	    }
+	    if (!_dataFieldsList.get(0).equals("time_stamp")) {
+		throw new RuntimeException("First data field was not time_stamp");
+	    }
 	    double dateSecs = (row.getDate("time_stamp").getTime() / 1000);
-
+	    String value = "";
+	    if (_dataFieldsList.get(1).matches("^text_values.*$")) {
+		int oneFieldStart = _dataFieldsList.get(1).indexOf(".");
+		if (oneFieldStart == -1) {
+		    throw new RuntimeException("did not find a period in field " + _dataFieldsList.get(1));
+		}
+		String oneFieldTrailing = _dataFieldsList.get(1).substring(oneFieldStart + 1, _dataFieldsList.get(1).length());
+		value = fieldMap.get(oneFieldTrailing);
+	    }
+	    else {
+		value = row.getString(_dataFieldsList.get(1));
+	    }
+	    if (value == null) {
+		throw new RuntimeException("Failed to get value for column " + _dataFieldsList.get(1));
+	    }
 	    // When we get to the point where we can customize the values we save, we might need to overwrite this cached value
 	    if (!trainMap.containsKey(key)) {
 		trainMap.put(key, new ArrayList<HistoTuple>());
 	    }
-	    trainMap.get(key).add(new HistoTuple(dateSecs, messageType));
+	    trainMap.get(key).add(new HistoTuple(dateSecs, value));
 	}
 	results = null;
 
