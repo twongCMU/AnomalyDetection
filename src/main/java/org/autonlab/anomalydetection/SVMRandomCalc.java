@@ -274,7 +274,7 @@ public class SVMRandomCalc {
 		// we might want to implement a cache that's per-training set and save it externally
 		// rather than the current scheme of only caching within an instance of SVMKernel
 		GaussianFourierFeatures GFSTest = new GaussianFourierFeatures(DaemonService.allHistogramsMap.get(testID).get(testKey), AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.NUM_THREADS);
-		svm_node[][] testFeatures = GFSTest.getData();
+		svm_node[][] testFeatures = GFSTest.getData(); 
 
 		svm_model oneModel = allModels.get(trainKey);
 		int index = 0;
