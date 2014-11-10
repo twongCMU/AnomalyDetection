@@ -4,8 +4,6 @@ import com.datastax.driver.core.*; //cassandra
 import com.savarese.spatial.*;
 import java.util.*;
 
-//import org.javatuples.*; //Tuples, Pair
-
 public class DataIOCassandraDB implements DataIO {
     private Session _session;
     private String _keyspace;
@@ -45,8 +43,9 @@ public class DataIOCassandraDB implements DataIO {
 	_dataFieldsList.add(dataField);
     }
 
-    public HashMap<GenericPoint<String>, ArrayList<HistoTuple>> getData() {
-	HashMap<GenericPoint<String>, ArrayList<HistoTuple>> trainMap = new HashMap();
+    /* histogram data name -> key names -> histograms */
+    public HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData() {
+	HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
 
 	// build a SELECT statement that pulls out all of the database columns that we want
 	String selectStatement = "SELECT ";
@@ -80,7 +79,7 @@ public class DataIOCassandraDB implements DataIO {
 	    }
 	}
 
-	selectStatement = selectStatement.substring(0, selectStatement.length() - 1); // drop the trailing comma
+	selectStatement = selectStatement.substring(0, selectStatement.length() - 1); // drop the trailing comma from above
 	selectStatement += " FROM " + _keyspace + ".packet";
 	System.out.println("Statement is " + selectStatement);
 	ResultSet results = _session.execute(selectStatement);
@@ -117,26 +116,35 @@ public class DataIOCassandraDB implements DataIO {
 		throw new RuntimeException("First data field was not time_stamp");
 	    }
 	    double dateSecs = (row.getDate("time_stamp").getTime() / 1000);
-	    String value = "";
-	    if (_dataFieldsList.get(1).matches("^text_values.*$")) {
-		int oneFieldStart = _dataFieldsList.get(1).indexOf(".");
-		if (oneFieldStart == -1) {
-		    throw new RuntimeException("did not find a period in field " + _dataFieldsList.get(1));
+	    for (String valueName : _dataFieldsList) {
+		String value = "";
+		if (valueName.equals("time_stamp")) {
+		    continue;
 		}
-		String oneFieldTrailing = _dataFieldsList.get(1).substring(oneFieldStart + 1, _dataFieldsList.get(1).length());
+		if (valueName.matches("^text_values.*$")) {
+		int oneFieldStart = valueName.indexOf(".");
+		if (oneFieldStart == -1) {
+		    throw new RuntimeException("did not find a period in field " + valueName);
+		}
+		String oneFieldTrailing = valueName.substring(oneFieldStart + 1, valueName.length());
 		value = fieldMap.get(oneFieldTrailing);
+		}
+		else {
+		    value = row.getString(valueName);
+		}
+		if (value == null) {
+		    throw new RuntimeException("Failed to get value for column " + valueName);
+		}
+		// When we get to the point where we can customize the values we save, we might need to overwrite this cached value
+		
+		if (!trainMap.containsKey(valueName)) {
+		    trainMap.put(valueName, new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());
+		}
+		if (!trainMap.get(valueName).containsKey(key)) {
+		    trainMap.get(valueName).put(key, new ArrayList<HistoTuple>());
+		}
+		trainMap.get(valueName).get(key).add(new HistoTuple(dateSecs, value));
 	    }
-	    else {
-		value = row.getString(_dataFieldsList.get(1));
-	    }
-	    if (value == null) {
-		throw new RuntimeException("Failed to get value for column " + _dataFieldsList.get(1));
-	    }
-	    // When we get to the point where we can customize the values we save, we might need to overwrite this cached value
-	    if (!trainMap.containsKey(key)) {
-		trainMap.put(key, new ArrayList<HistoTuple>());
-	    }
-	    trainMap.get(key).add(new HistoTuple(dateSecs, value));
 	}
 	results = null;
 

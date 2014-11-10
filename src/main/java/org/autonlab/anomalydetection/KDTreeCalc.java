@@ -23,7 +23,7 @@ public class KDTreeCalc {
 	    }
 	    newMap.put(keyAddr, GetKDTree(trainHashMap.get(keyAddr)));
 	}
-
+	
 	return newMap;
     }
 
@@ -43,15 +43,15 @@ public class KDTreeCalc {
      * @param testKey Key index for the test set histograms
      * @param results If not null, every result will be recorded here as score->timestamp. We use a MultiValueMap so duplicate scores will still be recorded
      */
-    public static String runOneTestKDTree(Integer trainID, GenericPoint<String> trainKey, Integer testID, GenericPoint<String> testKey, MultiValueMap results) {
+    public static String runOneTestKDTree(Integer trainID, GenericPoint<String> trainKey, String trainValue, Integer testID, GenericPoint<String> testKey, String testValue, MultiValueMap results) {
 	NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer> neighbor = new NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer>();
 
 	String output = new String();
 
-	HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testKey));
+	HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));
 
-	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(DaemonService.allHistogramsMap.get(trainID).get(trainKey));
-	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> testTree = KDTreeCalc.GetKDTree(DaemonService.allHistogramsMap.get(testID).get(testKey));
+	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey));
+	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> testTree = KDTreeCalc.GetKDTree(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));
 
 	for (GenericPoint<Integer> myPoint : testTree.keySet()) {
 	    // Note that the kdtree only stores unique points so if there are duplicate histograms, only one will be displayed here
@@ -70,13 +70,17 @@ public class KDTreeCalc {
     /**
      * Test every combination against every other combinatino
      */
-    public static StringBuilder runAllTestKDTree() {
+    public static StringBuilder runAllTestKDTree(String valueType) {
 	StringBuilder output = new StringBuilder();
 
 	for (Integer keyID : DaemonService.allHistogramsMap.keySet()) {
 	    for (Integer keyIDInner : DaemonService.allHistogramsMap.keySet()) {
-		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyID), null);
-		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMapInner = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyIDInner), null);
+		if (!DaemonService.allHistogramsMap.get(keyID).containsKey(valueType) ||
+		    !DaemonService.allHistogramsMap.get(keyIDInner).containsKey(valueType)) {
+		    continue;
+		}
+		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyID).get(valueType), null);
+		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMapInner = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyIDInner).get(valueType), null);
 
 		// iterate through all combinations of <IP, App names>
 		for (GenericPoint<String> key : newMap.keySet()) {
@@ -87,7 +91,7 @@ public class KDTreeCalc {
 
 			output.append("Highest 3 scores for ID " + keyID + " : <" + key.toString() + "> vs ID " + keyIDInner + " : <" + keyInner.toString() + ">\n");
 			// intentionally ignore the return string since we're generating our own display info later
-			KDTreeCalc.runOneTestKDTree(keyID, key, keyIDInner, keyInner, resultsHash);
+			KDTreeCalc.runOneTestKDTree(keyID, key, valueType, keyIDInner, keyInner, valueType, resultsHash);
 
 			List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 			Collections.sort(resultsHashList);

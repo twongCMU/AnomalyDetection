@@ -9,12 +9,13 @@ import org.javatuples.*;
 
 @Path("/")
 public class DaemonService {
-    static HashMap<Integer, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> allHistogramsMap = new HashMap();
+    static HashMap<Integer, HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
 
     static int nextHistogramMapID = 0;
 
     static int anomalyID = -1;
     static GenericPoint<String> anomalyKey;
+    static String anomalyValue;
 
     /**
      * Get the histogram's number of dimensions and their names. This is so that calls to /evaluate can be constructed properly
@@ -42,15 +43,17 @@ public class DaemonService {
 
 	for (Integer id : allHistogramsMap.keySet()) {
 	    output += "ID " + id + "<ul>";
-	    for (GenericPoint<String> keyFields : allHistogramsMap.get(id).keySet()) {
-		output += "<li>";
-		for (int ii = 0; ii < keyFields.getDimensions(); ii++) {
-		    output += keyFields.getCoord(ii);
-		    if (ii != keyFields.getDimensions() - 1) {
-			output += ",";
+	    for (String valueName : allHistogramsMap.get(id).keySet()) {
+		for (GenericPoint<String> keyFields : allHistogramsMap.get(id).get(valueName).keySet()) {
+		    output += "<li>";
+		    for (int ii = 0; ii < keyFields.getDimensions(); ii++) {
+			output += keyFields.getCoord(ii);
+			if (ii != keyFields.getDimensions() - 1) {
+			    output += "(" + valueName + ",";
+			}
 		    }
+		    output += "</li>";
 		}
-		output += "</li>";
 	    }
 	    output += "</ul>";
 	}
@@ -68,9 +71,11 @@ public class DaemonService {
 
 	DataIOFile foo = new DataIOFile(filename);
 	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
-	for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).keySet()) {
-	    output.append("Key: " + key.toString());
-	    output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(key).size() + ")\n");
+	for (String valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
+	    for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
+		output.append("Key: " + key.toString() + ", Value: " + valueName);
+		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(key).size() + ")\n");
+	    }
 	}
 	nextHistogramMapID++;
 	return Response.status(200).entity(output.toString()).build();
@@ -97,9 +102,11 @@ public class DaemonService {
 	}
 
 	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(dbHandle.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
-	for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).keySet()) {
-	    output.append("Key: " + key.toString());
-	    output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(key).size() + ")\n");
+	for (String valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
+	    for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
+		output.append("Key: " + key.toString() + ", Value: " + valueName);
+		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(key).size() + ")\n");
+	    }
 	}
 	nextHistogramMapID++;
 	return Response.status(200).entity(output.toString()).build();
@@ -151,7 +158,9 @@ public class DaemonService {
 	HistoTuple foo = new HistoTuple(1, "fake1");
 	HistoTuple foo2 = new HistoTuple(2, "fake2");
 
-	allHistogramsMap.put(nextHistogramMapID, fakeData);
+	HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> fakeDataFinal = new HashMap();
+	fakeDataFinal.put("messagetype", fakeData);
+	allHistogramsMap.put(nextHistogramMapID, fakeDataFinal);
 	nextHistogramMapID++;
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -181,13 +190,15 @@ public class DaemonService {
     @Produces(MediaType.TEXT_PLAIN)
     public Response getData(@QueryParam("trainID") Integer trainID,
 			    @QueryParam("trainKeyCSV") String trainKey,
+			    @QueryParam("trainValue") String trainValue,
 			    @QueryParam("testID") Integer testID,
-			    @QueryParam("testKeyCSV") String testKey) {
+			    @QueryParam("testKeyCSV") String testKey,
+			    @QueryParam("testValue") String testValue) {
 	if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
-	    return getDataKDTree(trainID, trainKey, testID, testKey);
+	    return getDataKDTree(trainID, trainKey, trainValue, testID, testKey, testValue);
 	}
 	else if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
-	    return getDataSVM(trainID, trainKey, testID, testKey);
+	    return getDataSVM(trainID, trainKey, trainValue, testID, testKey, testValue);
 	}
 	else {
 	    throw new RuntimeException("unknown calculation type");
@@ -198,12 +209,14 @@ public class DaemonService {
     @Path("/testKDTree")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDataKDTree(@QueryParam("trainID") Integer trainID,
-			    @QueryParam("trainKeyCSV") String trainKey,
-			    @QueryParam("testID") Integer testID,
-  	                    @QueryParam("testKeyCSV") String testKey) {
+				  @QueryParam("trainKeyCSV") String trainKey,
+				  @QueryParam("trainValue") String trainValue,
+				  @QueryParam("testID") Integer testID,
+				  @QueryParam("testKeyCSV") String testKey,
+				  @QueryParam("testValue") String testValue) {
 	String output = "Calculation method: KDTree\n";
 
-	output += KDTreeCalc.runOneTestKDTree(trainID, getPointFromCSV(trainKey), testID, getPointFromCSV(testKey), null);
+	output += KDTreeCalc.runOneTestKDTree(trainID, getPointFromCSV(trainKey), trainValue, testID, getPointFromCSV(testKey), testValue, null);
 	return Response.status(200).entity(output).build();
     }
 
@@ -223,23 +236,25 @@ public class DaemonService {
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDataSVM(@QueryParam("trainID") Integer trainID,
 			       @QueryParam("trainKeyCSV") String trainKey,
+			       @QueryParam("trainValue") String trainValue,
 			       @QueryParam("testID") Integer testID,
-			       @QueryParam("testKeyCSV") String testKey) {
+			       @QueryParam("testKeyCSV") String testKey,
+			       @QueryParam("testValue") String testValue) {
 	StringBuilder output = new StringBuilder("Calculation method: SVM\n");
 
-	output.append(SVMCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), testID, getPointFromCSV(testKey), null));
+	output.append(SVMCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), trainValue, testID, getPointFromCSV(testKey), testValue, null));
 	return Response.status(200).entity(output.toString()).build();
     }
 
     @GET
-    @Path("/testall")
+    @Path("/testall/{value}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDataAll() {
+    public Response getDataAll(@PathParam("value") String value) {
 	if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
-	    return getDataAllKDTree();
+	    return getDataAllKDTree(value);
 	}
 	else if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
-	    return getDataAllSVM();
+	    return getDataAllSVM(value);
 	}
 	else {
 	    throw new RuntimeException("unknown calculation type");
@@ -247,20 +262,20 @@ public class DaemonService {
     }
 
     @GET
-    @Path("/testallKDTree")
+    @Path("/testallKDTree/{value}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDataAllKDTree() {
+    public Response getDataAllKDTree(@PathParam("value") String value) {
 	StringBuilder output = new StringBuilder("Calculation method: KDTree\n");
-	output.append(KDTreeCalc.runAllTestKDTree());
+	output.append(KDTreeCalc.runAllTestKDTree(value));
 	return Response.status(200).entity(output.toString()).build();
     }
 
     @GET
-    @Path("/testallSVM")
+    @Path("/testallSVM/{value}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDataAllSVM() {
+    public Response getDataAllSVM(@PathParam("value") String value) {
 	StringBuilder output = new StringBuilder("Calculation method: SVM\n");
-	output.append(SVMCalc.runAllTestSVM());
+	output.append(SVMCalc.runAllTestSVM(value));
 	return Response.status(200).entity(output.toString()).build();
     }
 
@@ -330,6 +345,17 @@ public class DaemonService {
 	
 	anomalyID = id;
 	anomalyKey = getPointFromCSV(csvKey);
+
+	return Response.status(200).entity(output).build();
+    }
+
+    @GET
+    @Path("/setAnomalyValue")
+    @Produces(MediaType.TEXT_HTML)
+    public Response setAnomalyValue(@QueryParam("value") String value) {
+	String output = "ok";
+	
+	anomalyValue = value;
 
 	return Response.status(200).entity(output).build();
     }

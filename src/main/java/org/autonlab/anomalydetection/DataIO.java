@@ -6,10 +6,10 @@ import java.util.*;
 public interface DataIO {
     /**
      * Import the data from the source and assemble it into a HashMap of 
-     * <GenericPoint key> -> ArrayList<timestamp, message type>
+     * histogram type name -> indexing key -> histograms
      * This data will need to be processed using HistoTuple.mergeWindows
      */
-    public HashMap<GenericPoint<String>, ArrayList<HistoTuple>> getData();
+    public HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData();
 
     /**
      * Write one record to the data store. Not implemented by all subclasses

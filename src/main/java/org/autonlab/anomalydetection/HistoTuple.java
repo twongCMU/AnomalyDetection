@@ -108,138 +108,146 @@ public class HistoTuple {
      * This code works for any number of dimensions
      * This code assumes that the input file is ordered by time
      */
-    public static HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> mergeWindows(HashMap<GenericPoint<String>, ArrayList<HistoTuple>> listMap, int windowSecs, int slideSecs) {
+    public static HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> mergeWindows(HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> listMap, int windowSecs, int slideSecs) {
 	// The code will probably work if this restriction is removed. It was written to handle this case.
 	if (slideSecs > windowSecs) {
 	    throw new RuntimeException("slideSecs is higher than windowSecs. This is not permitted as it might skip training data");
 	}
 
-	HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> ret = new HashMap();
+	HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> ret = new HashMap();
 
 	// if a different REST thread is also loading data we don't want to have the dimensions change while we're using or changing it
+	// if there are performance problems with holding a lock this long it might be ok to do it inside the outer for loop
 	_histoTupleDataLock.lock();
 
-	double startTime = Double.MAX_VALUE;
-	double endTime = 0;
-	for (GenericPoint<String> mapKey : listMap.keySet()) {
-	    ArrayList<HistoTuple> list = listMap.get(mapKey);
-	    for (HistoTuple oneTuple : list) {
-		if (oneTuple._timeStamp < startTime) {
-		    startTime = oneTuple._timeStamp;
-		}
-		if (oneTuple._timeStamp > endTime) {
-		    endTime = oneTuple._timeStamp;
-		}
-	    }
-	}
+	for (String valueName : listMap.keySet()) {
 
-	for (GenericPoint<String> mapKey : listMap.keySet()) {
-	    ArrayList<HistoTuple> list = listMap.get(mapKey);
-
-	    // the highest index that has not yet been processed
-	    int headIndex = 0;
-	    HistoTuple headTuple = null;
-	    // the lowest index that has been processed already
-	    int tailIndex = 0;
-	    HistoTuple tailTuple = null;
-	    // the beginning of the current window
-	    int currentSecs = (int)startTime;
-
-	    // this check also allows us to safely do list.get(0) later on
-	    if (list.size() == 0) {
-		_histoTupleDataLock.unlock();
-		throw new RuntimeException("Got no tuples from arraylist");
+	    if (!ret.containsKey(valueName)) {
+		ret.put(valueName, new HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>());
 	    }
 
-	    ArrayList<Pair<Integer, GenericPoint<Integer>>> data = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
-	    int[] histogram = new int[HistoTuple.getDimensions()];
-
-	    headTuple = list.get(0);
-	    tailTuple = list.get(0);
-
-	    int windowCount = 0;
-	    int addCount = 0;
-	    slidingWindow:
-	    // headTuple points to the newest tuple within the sliding window
-	    // tailTuple the oldest
-	    //while (headTuple != null && tailTuple != null) {
-	    while (currentSecs < endTime) {
-		addCount = 0;
-		// System.out.print("Window is " + currentSecs + " to " + (currentSecs+windowSecs) + ". Histogram: ");
-		// add to the histogram tuples that have entered the window
-		while (headTuple != null && headTuple.getTimeStamp() < (currentSecs + windowSecs)) {
-		    
-		    // incase the sliding window skips values
-		    if (headTuple.getTimeStamp() >= currentSecs) {
-			//System.out.println(headTuple.getTimeStamp() + " compared to " + currentSecs);
-			addCount++;
-			histogram[headTuple.getMsgType()]++;
-			headTuple.setWasCounted(true);
-			//		    System.out.println("Added" + headTuple.getTimeStamp() + " " + headTuple.getMsgType());
+	    double startTime = Double.MAX_VALUE;
+	    double endTime = 0;
+	    for (GenericPoint<String> mapKey : listMap.get(valueName).keySet()) {
+		ArrayList<HistoTuple> list = listMap.get(valueName).get(mapKey);
+		for (HistoTuple oneTuple : list) {
+		    if (oneTuple._timeStamp < startTime) {
+			startTime = oneTuple._timeStamp;
 		    }
-
-		    headIndex++;
-		    if (headIndex < list.size()) {
-			headTuple = list.get(headIndex);
-		    }
-		    else {
-			System.out.println("head is done " + tailIndex);
-			headTuple = null;
-			//break slidingWindow;
+		    if (oneTuple._timeStamp > endTime) {
+			endTime = oneTuple._timeStamp;
 		    }
 		}
+	    }
 
-		// remove from the histogram tuples that have fallen out of the window
-		while (tailTuple != null && tailTuple.getTimeStamp() < currentSecs) {
-		    if (tailTuple.getWasCounted() == true) {
-			histogram[tailTuple.getMsgType()]--;
-			tailTuple.setWasCounted(false);
-			//   System.out.println("removed");
-		    }
-		    
-		    tailIndex++;
-		    if (tailIndex < list.size()) {
-			tailTuple = list.get(tailIndex);
-		    }
-		    else {
-			System.out.println("Tail is done " + tailIndex);
-			tailTuple = null;
-			//break slidingWindow;
-		    }
-		}
+	    for (GenericPoint<String> mapKey : listMap.get(valueName).keySet()) {
+		ArrayList<HistoTuple> list = listMap.get(valueName).get(mapKey);
 
-		if (tailIndex > headIndex) {
+		// the highest index that has not yet been processed
+		int headIndex = 0;
+		HistoTuple headTuple = null;
+		// the lowest index that has been processed already
+		int tailIndex = 0;
+		HistoTuple tailTuple = null;
+		// the beginning of the current window
+		int currentSecs = (int)startTime;
+
+		// this check also allows us to safely do list.get(0) later on
+		if (list.size() == 0) {
 		    _histoTupleDataLock.unlock();
-		    throw new RuntimeException("tailIndex (" + tailIndex + ") is higher than headIndex (" + headIndex + ")");
+		    throw new RuntimeException("Got no tuples from arraylist");
 		}
 
-		GenericPoint<Integer> myPoint = new GenericPoint<Integer>(HistoTuple.getDimensions());
-		for (int i = 0; i < HistoTuple.getDimensions(); i++) {
-		    //System.out.print(histogram[i] + " ");
-		    myPoint.setCoord(i, histogram[i]);
-		}
-		
-		Pair<Integer, GenericPoint<Integer>> temp = new Pair<Integer, GenericPoint<Integer>>(currentSecs, myPoint);
-		data.add(temp);
-		//System.out.println("");
-		// Slide the window forward for the next iteration
-		currentSecs += slideSecs;
-		windowCount++;
-		// System.out.println("slide");
-	    }
+		ArrayList<Pair<Integer, GenericPoint<Integer>>> data = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+		int[] histogram = new int[HistoTuple.getDimensions()];
 
-	    int remainderCount = 0;
-	    for (int i = 0; i < HistoTuple.getDimensions(); i++) {
-		remainderCount += histogram[i];
-	    }
-	    if (remainderCount > 0) {
-		System.out.println("Warning: the final " + addCount + " rows did not fill a full window period and that histogram was dropped:");
-		for (int i = 0; i < HistoTuple.getDimensions(); i++) {
-		    System.out.print(histogram[i] + " ");
+		headTuple = list.get(0);
+		tailTuple = list.get(0);
+
+		int windowCount = 0;
+		int addCount = 0;
+		slidingWindow:
+		// headTuple points to the newest tuple within the sliding window
+		// tailTuple the oldest
+		//while (headTuple != null && tailTuple != null) {
+		while (currentSecs < endTime) {
+		    addCount = 0;
+		    // System.out.print("Window is " + currentSecs + " to " + (currentSecs+windowSecs) + ". Histogram: ");
+		    // add to the histogram tuples that have entered the window
+		    while (headTuple != null && headTuple.getTimeStamp() < (currentSecs + windowSecs)) {
+
+			// incase the sliding window skips values
+			if (headTuple.getTimeStamp() >= currentSecs) {
+			    //System.out.println(headTuple.getTimeStamp() + " compared to " + currentSecs);
+			    addCount++;
+			    histogram[headTuple.getMsgType()]++;
+			    headTuple.setWasCounted(true);
+			    //		    System.out.println("Added" + headTuple.getTimeStamp() + " " + headTuple.getMsgType());
+			}
+
+			headIndex++;
+			if (headIndex < list.size()) {
+			    headTuple = list.get(headIndex);
+			}
+			else {
+			    System.out.println("head is done " + tailIndex);
+			    headTuple = null;
+			    //break slidingWindow;
+			}
+		    }
+
+		    // remove from the histogram tuples that have fallen out of the window
+		    while (tailTuple != null && tailTuple.getTimeStamp() < currentSecs) {
+			if (tailTuple.getWasCounted() == true) {
+			    histogram[tailTuple.getMsgType()]--;
+			    tailTuple.setWasCounted(false);
+			    //   System.out.println("removed");
+			}
+		    
+			tailIndex++;
+			if (tailIndex < list.size()) {
+			    tailTuple = list.get(tailIndex);
+			}
+			else {
+			    System.out.println("Tail is done " + tailIndex);
+			    tailTuple = null;
+			    //break slidingWindow;
+			}
+		    }
+
+		    if (tailIndex > headIndex) {
+			_histoTupleDataLock.unlock();
+			throw new RuntimeException("tailIndex (" + tailIndex + ") is higher than headIndex (" + headIndex + ")");
+		    }
+
+		    GenericPoint<Integer> myPoint = new GenericPoint<Integer>(HistoTuple.getDimensions());
+		    for (int i = 0; i < HistoTuple.getDimensions(); i++) {
+			//System.out.print(histogram[i] + " ");
+			myPoint.setCoord(i, histogram[i]);
+		    }
+
+		    Pair<Integer, GenericPoint<Integer>> temp = new Pair<Integer, GenericPoint<Integer>>(currentSecs, myPoint);
+		    data.add(temp);
+		    //System.out.println("");
+		    // Slide the window forward for the next iteration
+		    currentSecs += slideSecs;
+		    windowCount++;
+		    // System.out.println("slide");
 		}
-		System.out.println("");
+
+		int remainderCount = 0;
+		for (int i = 0; i < HistoTuple.getDimensions(); i++) {
+		    remainderCount += histogram[i];
+		}
+		if (remainderCount > 0) {
+		    System.out.println("Warning: the final " + addCount + " rows did not fill a full window period and that histogram was dropped:");
+		    for (int i = 0; i < HistoTuple.getDimensions(); i++) {
+			System.out.print(histogram[i] + " ");
+		    }
+		    System.out.println("");
+		}
+		ret.get(valueName).put(mapKey, data);
 	    }
-	    ret.put(mapKey, data);
 	}
 
 	_histoTupleDataLock.unlock();
