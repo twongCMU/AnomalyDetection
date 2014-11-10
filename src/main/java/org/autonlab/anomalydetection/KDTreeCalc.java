@@ -14,21 +14,21 @@ public class KDTreeCalc {
      * @return HashMap of <GenericPoint>  to KDTree
      * 
      */
-    public static HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> makeKDTree(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> trainHashMap, StringBuilder output) {
+    public static HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> makeKDTree(String valueType, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> trainHashMap, StringBuilder output) {
 	HashMap<GenericPoint<String>, KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = new HashMap();
 
 	for (GenericPoint<String> keyAddr : trainHashMap.keySet()) {
 	    if (output != null) {
 		output.append(keyAddr.toString());
 	    }
-	    newMap.put(keyAddr, GetKDTree(trainHashMap.get(keyAddr)));
+	    newMap.put(keyAddr, GetKDTree(valueType, trainHashMap.get(keyAddr)));
 	}
 	
 	return newMap;
     }
 
-    public static KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> GetKDTree(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms) {
-	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> treeKD = new KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>(HistoTuple.getDimensions());
+    public static KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> GetKDTree(String valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms) {
+	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> treeKD = new KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>(HistoTuple.getDimensions(valueType));
 
 	for (Pair<Integer, GenericPoint<Integer>> dataPair : histograms) {
 	    treeKD.put(dataPair.getValue1(), dataPair.getValue0());
@@ -48,10 +48,10 @@ public class KDTreeCalc {
 
 	String output = new String();
 
-	HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));
+	HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));
 
-	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey));
-	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> testTree = KDTreeCalc.GetKDTree(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));
+	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey));
+	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> testTree = KDTreeCalc.GetKDTree(trainValue, DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));
 
 	for (GenericPoint<Integer> myPoint : testTree.keySet()) {
 	    // Note that the kdtree only stores unique points so if there are duplicate histograms, only one will be displayed here
@@ -79,8 +79,8 @@ public class KDTreeCalc {
 		    !DaemonService.allHistogramsMap.get(keyIDInner).containsKey(valueType)) {
 		    continue;
 		}
-		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyID).get(valueType), null);
-		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMapInner = KDTreeCalc.makeKDTree(DaemonService.allHistogramsMap.get(keyIDInner).get(valueType), null);
+		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = KDTreeCalc.makeKDTree(valueType, DaemonService.allHistogramsMap.get(keyID).get(valueType), null);
+		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMapInner = KDTreeCalc.makeKDTree(valueType, DaemonService.allHistogramsMap.get(keyIDInner).get(valueType), null);
 
 		// iterate through all combinations of <IP, App names>
 		for (GenericPoint<String> key : newMap.keySet()) {

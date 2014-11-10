@@ -28,7 +28,7 @@ public class DaemonService {
     public Response getDimensions() {
 	String output = new String("-1");
 
-	output = "" + HistoTuple.getDimensions() + "\n";
+	output = "";
 	output += "" + HistoTuple.getDimensionNames();
 
 	return Response.status(200).entity(output).build();
@@ -116,6 +116,8 @@ public class DaemonService {
     @Path("/getfakedata")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getFakeData() {
+	String valueType = "messagetype";
+
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 
 	HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> fakeData = new HashMap();
@@ -155,11 +157,11 @@ public class DaemonService {
 	output.append("Key: 5.5.5.5, otherthing (" + fullMatrix.size() + ")\n");
 
 	// generate some fake HistoTuples. these are unused but the code would crash without them
-	HistoTuple foo = new HistoTuple(1, "fake1");
-	HistoTuple foo2 = new HistoTuple(2, "fake2");
+	HistoTuple foo = new HistoTuple(1, "fake1", valueType);
+	HistoTuple foo2 = new HistoTuple(2, "fake2", valueType);
 
 	HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> fakeDataFinal = new HashMap();
-	fakeDataFinal.put("messagetype", fakeData);
+	fakeDataFinal.put(valueType, fakeData);
 	allHistogramsMap.put(nextHistogramMapID, fakeDataFinal);
 	nextHistogramMapID++;
 	return Response.status(200).entity(output.toString()).build();

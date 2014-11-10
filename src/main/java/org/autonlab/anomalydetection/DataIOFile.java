@@ -21,8 +21,9 @@ public class DataIOFile implements DataIO {
      *
      */
     public HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData() {
+	String valueType = "text_values.messagetype";
 	HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
-	trainMap.put("text_values.messagetype", new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());
+	trainMap.put(valueType, new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());
 
 	int count = 0;
 
@@ -56,10 +57,10 @@ public class DataIOFile implements DataIO {
 		key.setCoord(0, ipAddress);
 		key.setCoord(1, applicationName);
 
-		if (!trainMap.get("text_values.messagetype").containsKey(key)) {
-		    trainMap.get("text_values.messagetype").put(key, new ArrayList<HistoTuple>());
+		if (!trainMap.get(valueType).containsKey(key)) {
+		    trainMap.get(valueType).put(key, new ArrayList<HistoTuple>());
 		}
-		trainMap.get("text_values.messagetype").get(key).add(new HistoTuple(timeStamp, messageType));
+		trainMap.get(valueType).get(key).add(new HistoTuple(timeStamp, messageType, valueType));
 
 		count++;
 	    }

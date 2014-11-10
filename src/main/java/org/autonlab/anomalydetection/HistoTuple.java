@@ -12,8 +12,9 @@ public class HistoTuple {
     /*
      * There are few unique strings so to save memory we map the string
      * to an Integer and store with each record instead
+     * The mappings are first categorized by the type of value
      */
-    static volatile HashMap<String, Integer> _msgTypeMap = new HashMap<String, Integer>();
+    static volatile HashMap<String, HashMap<String, Integer>> _valueMap = new HashMap();
 
     static volatile Lock _histoTupleDataLock = new ReentrantLock(); //this protects all above static data
     /*
@@ -22,7 +23,7 @@ public class HistoTuple {
      */
 
     double _timeStamp;
-    int _msgIndex; // This HistoTuple's message type as an index into the _msgTypeMap mapping
+    int _msgIndex; // This HistoTuple's message type as an index into the _valueMap mapping
 
     // if this HistoTuple is in the current sliding window or not
     // we need this so we don't remove it if it was never in it in the first place
@@ -32,21 +33,26 @@ public class HistoTuple {
      * Make a new histoTuple
      *
      * @param timeStamp the time from epoch
-     * @param msgType the message type
+     * @param value the message type
+     * @param valueType type of value
      */
-    public HistoTuple(double timeStamp, String msgType) {
+    public HistoTuple(double timeStamp, String value, String valueType) {
 	// the timestamp could be stored as an int to save memory
 	_timeStamp = timeStamp;
 	_msgIndex = -1;
 	_wasCounted = false; 
 
 	_histoTupleDataLock.lock();
-	if (_msgTypeMap.containsKey(msgType)) {
-	    _msgIndex = _msgTypeMap.get(msgType).intValue();
+
+	if (!_valueMap.containsKey(valueType)) {
+	    _valueMap.put(valueType, new HashMap());
+	}
+	if (_valueMap.get(valueType).containsKey(value)) {
+	    _msgIndex = _valueMap.get(valueType).get(value).intValue();
 	}
 	else {
-	    _msgTypeMap.put(msgType, _msgTypeMap.size());
-	    _msgIndex = _msgTypeMap.size() - 1; // -1 because _msgTypeMap.size() increased in the previous line
+	    _valueMap.get(valueType).put(value, _valueMap.get(valueType).size());
+	    _msgIndex = _valueMap.size() - 1; // -1 because _valueMap.size() increased in the previous line
 	}
 
 	_histoTupleDataLock.unlock();
@@ -83,10 +89,10 @@ public class HistoTuple {
     }
 
     /**
-     * @return the number of unique msgType seen
+     * @return the number of unique value seen
      */
-    public static int getDimensions() {
-	return _msgTypeMap.size();
+    public static int getDimensions(String valueType) {
+	return _valueMap.get(valueType).size();
     }
 
     /**
@@ -96,8 +102,10 @@ public class HistoTuple {
 	String output = new String();
 
 	_histoTupleDataLock.lock();
-	for (String keyVal : _msgTypeMap.keySet()) {
-	    output += "" +  _msgTypeMap.get(keyVal) + " " + keyVal + "\n";
+	for (String valueType : _valueMap.keySet()) {
+	    for (String keyVal : _valueMap.get(valueType).keySet()) {
+		output += valueType + " : " +  _valueMap.get(valueType).get(keyVal) + " " + keyVal + "\n";
+	    }
 	}
 	_histoTupleDataLock.unlock();
 
@@ -159,7 +167,7 @@ public class HistoTuple {
 		}
 
 		ArrayList<Pair<Integer, GenericPoint<Integer>>> data = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
-		int[] histogram = new int[HistoTuple.getDimensions()];
+		int[] histogram = new int[HistoTuple.getDimensions(valueName)];
 
 		headTuple = list.get(0);
 		tailTuple = list.get(0);
@@ -220,8 +228,8 @@ public class HistoTuple {
 			throw new RuntimeException("tailIndex (" + tailIndex + ") is higher than headIndex (" + headIndex + ")");
 		    }
 
-		    GenericPoint<Integer> myPoint = new GenericPoint<Integer>(HistoTuple.getDimensions());
-		    for (int i = 0; i < HistoTuple.getDimensions(); i++) {
+		    GenericPoint<Integer> myPoint = new GenericPoint<Integer>(HistoTuple.getDimensions(valueName));
+		    for (int i = 0; i < HistoTuple.getDimensions(valueName); i++) {
 			//System.out.print(histogram[i] + " ");
 			myPoint.setCoord(i, histogram[i]);
 		    }
@@ -236,12 +244,12 @@ public class HistoTuple {
 		}
 
 		int remainderCount = 0;
-		for (int i = 0; i < HistoTuple.getDimensions(); i++) {
+		for (int i = 0; i < HistoTuple.getDimensions(valueName); i++) {
 		    remainderCount += histogram[i];
 		}
 		if (remainderCount > 0) {
 		    System.out.println("Warning: the final " + addCount + " rows did not fill a full window period and that histogram was dropped:");
-		    for (int i = 0; i < HistoTuple.getDimensions(); i++) {
+		    for (int i = 0; i < HistoTuple.getDimensions(valueName); i++) {
 			System.out.print(histogram[i] + " ");
 		    }
 		    System.out.println("");
@@ -255,13 +263,13 @@ public class HistoTuple {
 	return ret;
     }
 
-    public static boolean upgradeWindowsDimensions(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramA, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramB) {
+    public static boolean upgradeWindowsDimensions(String valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramA, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramB) {
 	boolean retA;
 	boolean retB;
 
 	_histoTupleDataLock.lock();	
-	retA = upgradeWindowsDimensionsOne(histogramA);
-	retB = upgradeWindowsDimensionsOne(histogramB);
+	retA = upgradeWindowsDimensionsOne(valueType, histogramA);
+	retB = upgradeWindowsDimensionsOne(valueType, histogramB);
 	_histoTupleDataLock.unlock();
 
 	if (retA == true || retB == true) {
@@ -271,14 +279,14 @@ public class HistoTuple {
     }
 
     // do this in here so we can handle the locking better
-    private static boolean upgradeWindowsDimensionsOne(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
-	if (histogram.get(0).getValue1().getDimensions() == _msgTypeMap.size()) {
+    private static boolean upgradeWindowsDimensionsOne(String valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
+	if (histogram.get(0).getValue1().getDimensions() == _valueMap.get(valueType).size()) {
 	    return false;
 	}
 	for (int ii = 0; ii < histogram.size(); ii++) {
 	    GenericPoint oldPoint = histogram.get(ii).getValue1();
-	    GenericPoint newPoint = new GenericPoint(_msgTypeMap.size());
-	    for (int jj = 0; jj < _msgTypeMap.size(); jj++) {
+	    GenericPoint newPoint = new GenericPoint(_valueMap.get(valueType).size());
+	    for (int jj = 0; jj < _valueMap.get(valueType).size(); jj++) {
 		if (jj < oldPoint.getDimensions()) {
 		    newPoint.setCoord(jj, oldPoint.getCoord(jj));
 		}

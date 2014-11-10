@@ -143,7 +143,7 @@ public class DataIOCassandraDB implements DataIO {
 		if (!trainMap.get(valueName).containsKey(key)) {
 		    trainMap.get(valueName).put(key, new ArrayList<HistoTuple>());
 		}
-		trainMap.get(valueName).get(key).add(new HistoTuple(dateSecs, value));
+		trainMap.get(valueName).get(key).add(new HistoTuple(dateSecs, value, valueName));
 	    }
 	}
 	results = null;
