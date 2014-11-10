@@ -3,15 +3,17 @@ package org.autonlab.anomalydetection;
 import com.datastax.driver.core.*;
 import com.savarese.spatial.*;
 import java.util.*; 
+import java.util.concurrent.locks.*;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
 import org.javatuples.*;
 
 @Path("/")
 public class DaemonService {
-    static HashMap<Integer, HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
+    static volatile HashMap<Integer, HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
 
-    static int nextHistogramMapID = 0;
+    static volatile int nextHistogramMapID = 0;
+    static volatile Lock allHistogramsMapLock = new ReentrantLock();
 
     static int anomalyID = -1;
     static GenericPoint<String> anomalyKey;
@@ -67,6 +69,7 @@ public class DaemonService {
     @Path("/getfile")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getFile(@QueryParam("filename") String filename) {
+	allHistogramsMapLock.lock();
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 
 	DataIOFile foo = new DataIOFile(filename);
@@ -78,6 +81,7 @@ public class DaemonService {
 	    }
 	}
 	nextHistogramMapID++;
+	allHistogramsMapLock.unlock();
 	return Response.status(200).entity(output.toString()).build();
     }
 
@@ -90,6 +94,8 @@ public class DaemonService {
     public Response getDb(@QueryParam("hostname") String hostname,
 			  @QueryParam("keyCSV") String keyCSV,
 			  @QueryParam("value") String value) {
+	allHistogramsMapLock.lock();
+
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 	    
 	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, "demo");
@@ -109,6 +115,7 @@ public class DaemonService {
 	    }
 	}
 	nextHistogramMapID++;
+	allHistogramsMapLock.unlock();
 	return Response.status(200).entity(output.toString()).build();
     }
 
@@ -117,6 +124,8 @@ public class DaemonService {
     @Produces(MediaType.TEXT_PLAIN)
     public Response getFakeData() {
 	String valueType = "messagetype";
+
+	allHistogramsMapLock.lock();
 
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 
@@ -164,6 +173,7 @@ public class DaemonService {
 	fakeDataFinal.put(valueType, fakeData);
 	allHistogramsMap.put(nextHistogramMapID, fakeDataFinal);
 	nextHistogramMapID++;
+	allHistogramsMapLock.unlock();
 	return Response.status(200).entity(output.toString()).build();
     }
 
