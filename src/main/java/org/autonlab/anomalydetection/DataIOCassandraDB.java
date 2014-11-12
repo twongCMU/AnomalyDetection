@@ -47,6 +47,8 @@ public class DataIOCassandraDB implements DataIO {
     public HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData() {
 	HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
 
+	int getTextValues = 0;
+
 	// build a SELECT statement that pulls out all of the database columns that we want
 	String selectStatement = "SELECT ";
 	HashMap<String, Integer> fieldsSeen = new HashMap();
@@ -55,6 +57,9 @@ public class DataIOCassandraDB implements DataIO {
 	    int oneFieldEnd = oneField.indexOf(".");
 	    if (oneFieldEnd == -1) {
 		oneFieldEnd = oneField.length();
+	    }
+	    else {
+		getTextValues = 1;
 	    }
 	    String oneFieldName = oneField.substring(0, oneFieldEnd);
 
@@ -70,6 +75,9 @@ public class DataIOCassandraDB implements DataIO {
 	    if (oneFieldEnd == -1) {
 		oneFieldEnd = oneField.length();
 	    }
+	    else {
+		getTextValues = 1;
+	    }
 	    String oneFieldName = oneField.substring(0, oneFieldEnd);
 
 	    // XML fields are all stored as a hash inside one DB column so we want to be sure not to request duplicate column names
@@ -83,11 +91,17 @@ public class DataIOCassandraDB implements DataIO {
 	selectStatement += " FROM " + _keyspace + ".packet";
 	System.out.println("Statement is " + selectStatement);
 	ResultSet results = _session.execute(selectStatement);
+
 	// get the data we want out of what the database returned
-	// some of the db columns are hashses of more values, so we have to be smart about pulling those out too
+	// some of the db columns are hashses of more values, so we have to be smart about pulling those out too 
+	int rowCount = 0;
+	int keyFieldsListSize = _keyFieldsList.size();
 	for (Row row: results) {
-	    GenericPoint<String> key = new GenericPoint<String>(_keyFieldsList.size());
-	    Map<String, String> fieldMap = row.getMap("text_values", String.class, String.class);
+	    GenericPoint<String> key = new GenericPoint<String>(keyFieldsListSize);
+	    Map<String, String> fieldMap = new HashMap(); // initializing this isn't needed but Java complains
+	    if (getTextValues == 1) {
+		fieldMap = row.getMap("text_values", String.class, String.class);
+	    }
 
 	    int ii = 0;
 	    for (String oneField : _keyFieldsList) {
@@ -95,6 +109,9 @@ public class DataIOCassandraDB implements DataIO {
 		    key.setCoord(ii, "" + (row.getDate("time_stamp").getTime() / 1000));
 		}
 		else if (oneField.matches("^text_values.*$")) {
+		    if (getTextValues == 0) {
+			throw new RuntimeException("didn't retrieve text_values from DB but need it");
+		    }
 		    int oneFieldStart = oneField.indexOf(".");
 		    if (oneFieldStart == -1) {
 			throw new RuntimeException("did not find a period in field " + oneField);
@@ -122,12 +139,15 @@ public class DataIOCassandraDB implements DataIO {
 		    continue;
 		}
 		if (valueName.matches("^text_values.*$")) {
-		int oneFieldStart = valueName.indexOf(".");
-		if (oneFieldStart == -1) {
-		    throw new RuntimeException("did not find a period in field " + valueName);
-		}
-		String oneFieldTrailing = valueName.substring(oneFieldStart + 1, valueName.length());
-		value = fieldMap.get(oneFieldTrailing);
+		    if (getTextValues == 0) {
+			throw new RuntimeException("didn't retrieve text_values from DB but need it");
+		    }
+		    int oneFieldStart = valueName.indexOf(".");
+		    if (oneFieldStart == -1) {
+			throw new RuntimeException("did not find a period in field " + valueName);
+		    }
+		    String oneFieldTrailing = valueName.substring(oneFieldStart + 1, valueName.length());
+		    value = fieldMap.get(oneFieldTrailing);
 		}
 		else {
 		    value = row.getString(valueName);
@@ -144,6 +164,10 @@ public class DataIOCassandraDB implements DataIO {
 		    trainMap.get(valueName).put(key, new ArrayList<HistoTuple>());
 		}
 		trainMap.get(valueName).get(key).add(new HistoTuple(dateSecs, value, valueName));
+	    }
+	    rowCount++;
+	    if ((rowCount % 1000) == 0) {
+		System.out.println("Read in " + rowCount + " rows");
 	    }
 	}
 	results = null;
