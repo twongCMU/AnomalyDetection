@@ -27,7 +27,7 @@ public class SVMCalc {
 	}
 	for (GenericPoint<String> keyAddr : histograms.keySet()) {
 	    // change 99.9 to be a parameter or maybe input to the rest call that sets the other anomaly key info
-	    newMap.put(keyAddr, generateModel(histograms.get(keyAddr), targetAccuracy, anomalyData, 99.9));
+	    newMap.put(keyAddr, generateModel(histograms.get(keyAddr), targetAccuracy, anomalyData, .9));
 	}
 
 	return newMap;
@@ -255,7 +255,7 @@ public class SVMCalc {
 	    _svmModelsCacheLock.unlock();
 
 	    // this calculation can take some time so we unlock
-	    allModels = SVMCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue), output, 1.0);
+	    allModels = SVMCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue), output, 0.9);
 
 	    _svmModelsCacheLock.lock();
 	    _svmModelsCache.put(trainID, allModels);

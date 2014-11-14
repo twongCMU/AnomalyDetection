@@ -51,17 +51,18 @@ public class KDTreeCalc {
 	HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));
 
 	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey));
-	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> testTree = KDTreeCalc.GetKDTree(trainValue, DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));
 
-	for (GenericPoint<Integer> myPoint : testTree.keySet()) {
-	    // Note that the kdtree only stores unique points so if there are duplicate histograms, only one will be displayed here
-	    // this tells us the anomolies but if we want to display a nice ordering of time windows we'll need to do something else
-	    NearestNeighbors.Entry<Integer, GenericPoint<Integer>, java.lang.Integer>[] vals = neighbor.get(trainTree, myPoint, 1, false);
+	// The GenericPoints are often duplicated so we could add a cache here but I'm not sure if performace would improve by that much. KDTrees are already log time
+	for (Pair<Integer, GenericPoint<Integer>> tempPair : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey)) {
+	    Integer histogramTime = (Integer)tempPair.getValue(0);
+	    GenericPoint<Integer> histogramData = (GenericPoint<Integer>)tempPair.getValue(1);
+
+	    NearestNeighbors.Entry<Integer, GenericPoint<Integer>, java.lang.Integer>[] vals = neighbor.get(trainTree, histogramData, 1, false);
 
 	    if (results != null) {
-		results.put(vals[0].getDistance(), testTree.get(myPoint));
+		results.put(vals[0].getDistance(), histogramTime);
 	    }
-	    output += "distance for " + myPoint.toString() + " is " + vals[0].getDistance() + " at time " + testTree.get(myPoint) + "\n";
+	    output += "time " + histogramTime + " distance for " + histogramData.toString() + " is " + vals[0].getDistance() + "\n";
 	}
 
 	return output;

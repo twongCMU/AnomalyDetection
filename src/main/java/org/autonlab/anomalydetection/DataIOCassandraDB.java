@@ -36,11 +36,15 @@ public class DataIOCassandraDB implements DataIO {
 	}
     }
 
-    public void setValueFields(String dataField) {
+    public void setValueFields(String dataFieldsCSV) {
+	String[] sParts = dataFieldsCSV.split(",");
 	_dataFieldsList = new ArrayList<String>();
 
 	_dataFieldsList.add("time_stamp");
-	_dataFieldsList.add(dataField);
+
+	for (int ii = 0; ii < sParts.length; ii++) {
+	    _dataFieldsList.add(sParts[ii]);
+	}
     }
 
     /* histogram data name -> key names -> histograms */
@@ -96,6 +100,15 @@ public class DataIOCassandraDB implements DataIO {
 	// some of the db columns are hashses of more values, so we have to be smart about pulling those out too 
 	int rowCount = 0;
 	int keyFieldsListSize = _keyFieldsList.size();
+	String valueNameString = new String();
+	for (String valueName : _dataFieldsList) {
+	    if (valueName.equals("time_stamp")) {
+		continue;
+	    }
+	    valueNameString += valueName + ",";
+	}
+	valueNameString = valueNameString.substring(0, valueNameString.length()-1);
+
 	for (Row row: results) {
 	    GenericPoint<String> key = new GenericPoint<String>(keyFieldsListSize);
 	    Map<String, String> fieldMap = new HashMap(); // initializing this isn't needed but Java complains
@@ -126,15 +139,15 @@ public class DataIOCassandraDB implements DataIO {
 		ii++;
 	    }
 	   
-	    if (_dataFieldsList.size() != 2) {
-		throw new RuntimeException("Data field list did not have exactly two elements");
-	    }
+	    //	    if (_dataFieldsList.size() != 2) {
+	    //		throw new RuntimeException("Data field list did not have exactly two elements");
+	    //}
 	    if (!_dataFieldsList.get(0).equals("time_stamp")) {
 		throw new RuntimeException("First data field was not time_stamp");
 	    }
 	    double dateSecs = (row.getDate("time_stamp").getTime() / 1000);
+	    String value = "";
 	    for (String valueName : _dataFieldsList) {
-		String value = "";
 		if (valueName.equals("time_stamp")) {
 		    continue;
 		}
@@ -147,24 +160,25 @@ public class DataIOCassandraDB implements DataIO {
 			throw new RuntimeException("did not find a period in field " + valueName);
 		    }
 		    String oneFieldTrailing = valueName.substring(oneFieldStart + 1, valueName.length());
-		    value = fieldMap.get(oneFieldTrailing);
+		    value += fieldMap.get(oneFieldTrailing) + ",";
 		}
 		else {
-		    value = row.getString(valueName);
+		    value += row.getString(valueName) + ",";
 		}
 		if (value == null) {
 		    throw new RuntimeException("Failed to get value for column " + valueName);
 		}
 		// When we get to the point where we can customize the values we save, we might need to overwrite this cached value
-		
-		if (!trainMap.containsKey(valueName)) {
-		    trainMap.put(valueName, new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());
-		}
-		if (!trainMap.get(valueName).containsKey(key)) {
-		    trainMap.get(valueName).put(key, new ArrayList<HistoTuple>());
-		}
-		trainMap.get(valueName).get(key).add(new HistoTuple(dateSecs, value, valueName));
 	    }
+	    value = value.substring(0, value.length() - 1);
+
+	    if (!trainMap.containsKey(valueNameString)) {
+		trainMap.put(valueNameString, new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());
+	    }
+	    if (!trainMap.get(valueNameString).containsKey(key)) {
+		trainMap.get(valueNameString).put(key, new ArrayList<HistoTuple>());
+	    }
+	    trainMap.get(valueNameString).get(key).add(new HistoTuple(dateSecs, value, valueNameString));
 	    rowCount++;
 	    if ((rowCount % 1000) == 0) {
 		System.out.println("Read in " + rowCount + " rows");

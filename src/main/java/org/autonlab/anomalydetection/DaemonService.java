@@ -11,6 +11,7 @@ import org.javatuples.*;
 @Path("/")
 public class DaemonService {
     static volatile HashMap<Integer, HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
+    // XYZ the lock should also protect reads/deletes to allHistogramsMap!
 
     static volatile int nextHistogramMapID = 0;
     static volatile Lock allHistogramsMapLock = new ReentrantLock();
@@ -62,6 +63,22 @@ public class DaemonService {
 	return Response.status(200).entity(output).build();
     }
 
+    @GET
+    @Path("/getHistograms")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response getHistograms(@QueryParam("id") Integer id,
+				  @QueryParam("keyCSV") String key,
+				  @QueryParam("valueCSV") String value) {
+    
+	String output = new String();
+
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(value).get(getPointFromCSV(key));
+	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
+	    output += tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n";
+	}
+	return Response.status(200).entity(output).build();
+    }
+	
     /**
      * 
      */
@@ -93,18 +110,18 @@ public class DaemonService {
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDb(@QueryParam("hostname") String hostname,
 			  @QueryParam("keyCSV") String keyCSV,
-			  @QueryParam("value") String value) {
+			  @QueryParam("value") String valueCSV) {
 	allHistogramsMapLock.lock();
 
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 	    
-	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, "demo");
+	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, "demo2");
 
 	if (keyCSV != null) {
 	    dbHandle.setKeyFields(keyCSV);
 	}
-	if (value != null) {
-	    dbHandle.setValueFields(value);
+	if (valueCSV != null) {
+	    dbHandle.setValueFields(valueCSV);
 	}
 
 	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(dbHandle.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
