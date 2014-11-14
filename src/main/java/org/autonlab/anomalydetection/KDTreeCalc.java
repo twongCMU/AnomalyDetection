@@ -14,7 +14,7 @@ public class KDTreeCalc {
      * @return HashMap of <GenericPoint>  to KDTree
      * 
      */
-    public static HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> makeKDTree(String valueType, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> trainHashMap, StringBuilder output) {
+    public static HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> makeKDTree(GenericPoint<String> valueType, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> trainHashMap, StringBuilder output) {
 	HashMap<GenericPoint<String>, KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = new HashMap();
 
 	for (GenericPoint<String> keyAddr : trainHashMap.keySet()) {
@@ -27,7 +27,7 @@ public class KDTreeCalc {
 	return newMap;
     }
 
-    public static KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> GetKDTree(String valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms) {
+    public static KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> GetKDTree(GenericPoint<String> valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms) {
 	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> treeKD = new KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>(HistoTuple.getDimensions(valueType));
 
 	for (Pair<Integer, GenericPoint<Integer>> dataPair : histograms) {
@@ -43,7 +43,7 @@ public class KDTreeCalc {
      * @param testKey Key index for the test set histograms
      * @param results If not null, every result will be recorded here as score->timestamp. We use a MultiValueMap so duplicate scores will still be recorded
      */
-    public static String runOneTestKDTree(Integer trainID, GenericPoint<String> trainKey, String trainValue, Integer testID, GenericPoint<String> testKey, String testValue, MultiValueMap results) {
+    public static String runOneTestKDTree(Integer trainID, GenericPoint<String> trainKey, GenericPoint<String> trainValue, Integer testID, GenericPoint<String> testKey, GenericPoint<String> testValue, MultiValueMap results) {
 	NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer> neighbor = new NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer>();
 
 	String output = new String();
@@ -71,7 +71,7 @@ public class KDTreeCalc {
     /**
      * Test every combination against every other combinatino
      */
-    public static StringBuilder runAllTestKDTree(String valueType) {
+    public static StringBuilder runAllTestKDTree(GenericPoint<String> valueType) {
 	StringBuilder output = new StringBuilder();
 
 	for (Integer keyID : DaemonService.allHistogramsMap.keySet()) {

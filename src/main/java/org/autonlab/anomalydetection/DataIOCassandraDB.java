@@ -29,6 +29,7 @@ public class DataIOCassandraDB implements DataIO {
 
     public void setKeyFields(String keyFieldsCSV) {
 	String[] sParts = keyFieldsCSV.split(",");
+	Arrays.sort(sParts);
 	_keyFieldsList = new ArrayList<String>();
 
 	for (int ii = 0; ii < sParts.length; ii++) {
@@ -38,6 +39,7 @@ public class DataIOCassandraDB implements DataIO {
 
     public void setValueFields(String dataFieldsCSV) {
 	String[] sParts = dataFieldsCSV.split(",");
+	Arrays.sort(sParts);
 	_dataFieldsList = new ArrayList<String>();
 
 	_dataFieldsList.add("time_stamp");
@@ -47,9 +49,9 @@ public class DataIOCassandraDB implements DataIO {
 	}
     }
 
-    /* histogram data name -> key names -> histograms */
-    public HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData() {
-	HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
+    /* histogram data names -> key names -> histograms */
+    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData() {
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
 
 	int getTextValues = 0;
 
@@ -99,15 +101,8 @@ public class DataIOCassandraDB implements DataIO {
 	// get the data we want out of what the database returned
 	// some of the db columns are hashses of more values, so we have to be smart about pulling those out too 
 	int rowCount = 0;
-	int keyFieldsListSize = _keyFieldsList.size();
-	String valueNameString = new String();
-	for (String valueName : _dataFieldsList) {
-	    if (valueName.equals("time_stamp")) {
-		continue;
-	    }
-	    valueNameString += valueName + ",";
-	}
-	valueNameString = valueNameString.substring(0, valueNameString.length()-1);
+	int keyFieldsListSize = _keyFieldsList.size();//cache these outside of the loops to save recalculation
+	int valueFieldsListSize = _dataFieldsList.size() - 1; // -1 because  we don't want to count time_stamp
 
 	for (Row row: results) {
 	    GenericPoint<String> key = new GenericPoint<String>(keyFieldsListSize);
@@ -139,18 +134,18 @@ public class DataIOCassandraDB implements DataIO {
 		ii++;
 	    }
 	   
-	    //	    if (_dataFieldsList.size() != 2) {
-	    //		throw new RuntimeException("Data field list did not have exactly two elements");
-	    //}
 	    if (!_dataFieldsList.get(0).equals("time_stamp")) {
 		throw new RuntimeException("First data field was not time_stamp");
 	    }
 	    double dateSecs = (row.getDate("time_stamp").getTime() / 1000);
 	    String value = "";
+	    GenericPoint<String> valueNamePoint = new GenericPoint<String>(valueFieldsListSize);
+	    ii = 0;
 	    for (String valueName : _dataFieldsList) {
 		if (valueName.equals("time_stamp")) {
 		    continue;
 		}
+		valueNamePoint.setCoord(ii, valueName);
 		if (valueName.matches("^text_values.*$")) {
 		    if (getTextValues == 0) {
 			throw new RuntimeException("didn't retrieve text_values from DB but need it");
@@ -169,16 +164,17 @@ public class DataIOCassandraDB implements DataIO {
 		    throw new RuntimeException("Failed to get value for column " + valueName);
 		}
 		// When we get to the point where we can customize the values we save, we might need to overwrite this cached value
+		ii++;
 	    }
 	    value = value.substring(0, value.length() - 1);
 
-	    if (!trainMap.containsKey(valueNameString)) {
-		trainMap.put(valueNameString, new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());
+	    if (!trainMap.containsKey(valueNamePoint)) {
+		trainMap.put(valueNamePoint, new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());
 	    }
-	    if (!trainMap.get(valueNameString).containsKey(key)) {
-		trainMap.get(valueNameString).put(key, new ArrayList<HistoTuple>());
+	    if (!trainMap.get(valueNamePoint).containsKey(key)) {
+		trainMap.get(valueNamePoint).put(key, new ArrayList<HistoTuple>());
 	    }
-	    trainMap.get(valueNameString).get(key).add(new HistoTuple(dateSecs, value, valueNameString));
+	    trainMap.get(valueNamePoint).get(key).add(new HistoTuple(dateSecs, value, valueNamePoint));
 	    rowCount++;
 	    if ((rowCount % 1000) == 0) {
 		System.out.println("Read in " + rowCount + " rows");

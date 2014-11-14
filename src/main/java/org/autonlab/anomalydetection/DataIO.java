@@ -9,7 +9,7 @@ public interface DataIO {
      * histogram type name -> indexing key -> histograms
      * This data will need to be processed using HistoTuple.mergeWindows
      */
-    public HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData();
+    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData();
 
     /**
      * Write one record to the data store. Not implemented by all subclasses

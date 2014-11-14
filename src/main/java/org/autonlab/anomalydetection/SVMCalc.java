@@ -210,7 +210,7 @@ public class SVMCalc {
      *
      * @return some text that can be displayed to the user
      */
-    public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, String trainValue, Integer testID, GenericPoint<String> testKey, String testValue, MultiValueMap results) {
+    public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, GenericPoint<String> trainValue, Integer testID, GenericPoint<String> testKey, GenericPoint<String> testValue, MultiValueMap results) {
 
 	StringBuilder output = new StringBuilder();
 
@@ -301,7 +301,7 @@ public class SVMCalc {
     /**
      * Test every combination against every other combinatino
      */
-    public static StringBuilder runAllTestSVM(String valueType) {
+    public static StringBuilder runAllTestSVM(GenericPoint<String> valueType) {
 	StringBuilder output = new StringBuilder();
 
 	for (Integer keyID : DaemonService.allHistogramsMap.keySet()) {

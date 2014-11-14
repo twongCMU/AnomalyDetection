@@ -14,7 +14,7 @@ public class HistoTuple {
      * to an Integer and store with each record instead
      * The mappings are first categorized by the type of value
      */
-    static volatile HashMap<String, HashMap<String, Integer>> _valueMap = new HashMap();
+    static volatile HashMap<GenericPoint<String>, HashMap<String, Integer>> _valueMap = new HashMap();
 
     static volatile Lock _histoTupleDataLock = new ReentrantLock(); //this protects all above static data
     /*
@@ -36,7 +36,7 @@ public class HistoTuple {
      * @param value the message type
      * @param valueType type of value
      */
-    public HistoTuple(double timeStamp, String value, String valueType) {
+    public HistoTuple(double timeStamp, String value, GenericPoint<String> valueType) {
 	// the timestamp could be stored as an int to save memory
 	_timeStamp = timeStamp;
 	_msgIndex = -1;
@@ -91,7 +91,7 @@ public class HistoTuple {
     /**
      * @return the number of unique value seen
      */
-    public static int getDimensions(String valueType) {
+    public static int getDimensions(GenericPoint<String> valueType) {
 	return _valueMap.get(valueType).size();
     }
 
@@ -102,7 +102,7 @@ public class HistoTuple {
 	String output = new String();
 
 	_histoTupleDataLock.lock();
-	for (String valueType : _valueMap.keySet()) {
+	for (GenericPoint<String> valueType : _valueMap.keySet()) {
 	    for (String keyVal : _valueMap.get(valueType).keySet()) {
 		output += valueType + " : " +  _valueMap.get(valueType).get(keyVal) + " " + keyVal + "\n";
 	    }
@@ -116,19 +116,19 @@ public class HistoTuple {
      * This code works for any number of dimensions
      * This code assumes that the input file is ordered by time
      */
-    public static HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> mergeWindows(HashMap<String, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> listMap, int windowSecs, int slideSecs) {
+    public static HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> mergeWindows(HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> listMap, int windowSecs, int slideSecs) {
 	// The code will probably work if this restriction is removed. It was written to handle this case.
 	if (slideSecs > windowSecs) {
 	    throw new RuntimeException("slideSecs is higher than windowSecs. This is not permitted as it might skip training data");
 	}
 
-	HashMap<String, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> ret = new HashMap();
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> ret = new HashMap();
 
 	// if a different REST thread is also loading data we don't want to have the dimensions change while we're using or changing it
 	// if there are performance problems with holding a lock this long it might be ok to do it inside the outer for loop
 	_histoTupleDataLock.lock();
 
-	for (String valueName : listMap.keySet()) {
+	for (GenericPoint<String> valueName : listMap.keySet()) {
 
 	    if (!ret.containsKey(valueName)) {
 		ret.put(valueName, new HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>());
@@ -263,7 +263,7 @@ public class HistoTuple {
 	return ret;
     }
 
-    public static boolean upgradeWindowsDimensions(String valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramA, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramB) {
+    public static boolean upgradeWindowsDimensions(GenericPoint<String> valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramA, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramB) {
 	boolean retA;
 	boolean retB;
 
@@ -279,7 +279,7 @@ public class HistoTuple {
     }
 
     // do this in here so we can handle the locking better
-    private static boolean upgradeWindowsDimensionsOne(String valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
+    private static boolean upgradeWindowsDimensionsOne(GenericPoint<String> valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
 	if (histogram.get(0).getValue1().getDimensions() == _valueMap.get(valueType).size()) {
 	    return false;
 	}
