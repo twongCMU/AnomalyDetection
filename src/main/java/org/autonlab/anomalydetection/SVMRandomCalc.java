@@ -54,7 +54,7 @@ public class SVMRandomCalc {
 		svmProblem.l = histograms.size();
 		svmProblem.y = new double[histograms.size()];
 		Arrays.fill(svmProblem.y, 1.0); // all of our training data is non-anomalous
-		svmProblem.x = (new GaussianFourierFeatures(histograms, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+		svmProblem.x = (new GaussianFourierFeatures(histograms, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 
 		svm_problem svmProblemAnomaly = null;
 		// TODO: Wouldn't you want to add this to the same svmProblem as before?
@@ -63,7 +63,7 @@ public class SVMRandomCalc {
 			svmProblemAnomaly.l = histogramsAnomaly.size();
 			svmProblemAnomaly.y = new double[histogramsAnomaly.size()];
 			Arrays.fill(svmProblemAnomaly.y, -1.0); // set all of this data to anomalous
-			svmProblemAnomaly.x = (new GaussianFourierFeatures(histogramsAnomaly, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+			svmProblemAnomaly.x = (new GaussianFourierFeatures(histogramsAnomaly, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 		}
 
 		svm_parameter svmParameter = new svm_parameter();
@@ -273,7 +273,7 @@ public class SVMRandomCalc {
 		// If we're running many instances of similar test data against the same training data
 		// we might want to implement a cache that's per-training set and save it externally
 		// rather than the current scheme of only caching within an instance of SVMKernel
-		GaussianFourierFeatures GFSTest = new GaussianFourierFeatures(DaemonService.allHistogramsMap.get(testID).get(testKey), AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.NUM_THREADS);
+		GaussianFourierFeatures GFSTest = new GaussianFourierFeatures(DaemonService.allHistogramsMap.get(testID).get(testKey), AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS);
 		svm_node[][] testFeatures = GFSTest.getData(); 
 
 		svm_model oneModel = allModels.get(trainKey);

@@ -19,6 +19,9 @@ public class SVMKernel implements Runnable {
 	int _svm_type;
 	int _svm_type_precomputed_kernel_type;
 	int _rowSize;
+	
+	// sigma for gaussian kernel
+	double _sigmak;
 
 	// These are used by all related threads. Volatile variables are modified by threads
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> _histogramsA = null;
@@ -63,6 +66,7 @@ public class SVMKernel implements Runnable {
 		_retNode = new svm_node[histogramsA.size()][];
 		_svm_type = svm_type;
 		_svm_type_precomputed_kernel_type = svm_type_precomputed_kernel_type;
+		_sigmak = 1.0;
 
 		// the PRECOMPUTED format requires an initial node per row that looks like (0:index)
 		if (_svm_type == svm_parameter.PRECOMPUTED) {
@@ -95,6 +99,50 @@ public class SVMKernel implements Runnable {
 			_threadArray[i].start();
 		}   
 	}
+	
+	public SVMKernel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsA, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsB, 
+					 int svm_type, int svm_type_precomputed_kernel_type, double gammak, int threadCount) {
+		_threadCount = threadCount;
+		_threadArray = new Thread[_threadCount];
+		_histogramsA = histogramsA;
+		_histogramsB = histogramsB;
+		_retNode = new svm_node[histogramsA.size()][];
+		_svm_type = svm_type;
+		_svm_type_precomputed_kernel_type = svm_type_precomputed_kernel_type;
+		_sigmak = 1.0/Math.pow(2*gammak,0.5);
+
+		// the PRECOMPUTED format requires an initial node per row that looks like (0:index)
+		if (_svm_type == svm_parameter.PRECOMPUTED) {
+			_rowSize = _histogramsB.size() + 1;
+		}
+		else {
+			_rowSize = _histogramsB.get(0).getValue1().getDimensions();
+		}
+
+		_retNodeRowCache = new HashMap<GenericPoint<Integer>, Integer>();
+
+		/* 
+		 * for non-precomputed kernels, we're just copying the data
+		 * without processing it so don't incur the overhead of
+		 * spawning too many threads. To simplify the code we will
+		 * spawn one thread rather than special casing it and doing
+		 * the work here
+		 */
+		if (_svm_type != svm_parameter.PRECOMPUTED) {
+			_threadCount = 1;
+		}
+
+		for (svm_node[] svmNodeArr : _retNode) {
+			svmNodeArr = null;
+		}
+		_retNodeLock = new ReentrantLock();
+
+		for (int i = 0; i < _threadCount; i++) {
+			_threadArray[i] = new Thread(new SVMKernel(_retNodeLock, _retNode, _svm_type, _svm_type_precomputed_kernel_type, _histogramsA, _histogramsB, _rowSize, _retNodeRowCache));
+			_threadArray[i].start();
+		}   
+	}
+
 
 	public SVMKernel(Lock retNodeLock, svm_node[][] retNode, int svm_type, int svm_type_precomputed_kernel_type, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsA, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsB, int rowSize, HashMap<GenericPoint<Integer>, Integer> rowCache) {
 		_retNodeLock = retNodeLock;
@@ -276,7 +324,6 @@ public class SVMKernel implements Runnable {
 	 *
 	 * @param histX the first histogram
 	 * @param histY the second histogram
-	 * @param gamma is one over (2*variance) -- only in the second overloaded function
 	 *
 	 * @return the kernel value of two histograms x and y
 	 */
@@ -286,15 +333,7 @@ public class SVMKernel implements Runnable {
 		for (int i = 0; i < histX.getDimensions(); i++) {
 			res += Math.pow(histX.getCoord(i) - histY.getCoord(i), 2);
 		}
-		return Math.exp(-res);
+		return Math.exp(-res/(2*Math.pow(_sigmak,2)));
 	}
 
-	public double gaussianKernel(GenericPoint<Integer> histX, GenericPoint<Integer> histY, double gamma) {
-		double res = 0.0;
-
-		for (int i = 0; i < histX.getDimensions(); i++) {
-			res += Math.pow(histX.getCoord(i) - histY.getCoord(i), 2);
-		}
-		return Math.exp(-gamma*res);
-	}
 }

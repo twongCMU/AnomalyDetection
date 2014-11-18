@@ -36,7 +36,6 @@ public class GaussianFourierFeatures implements Runnable {
 
 	// These are used by all related threads. Volatile variables are modified by threads
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> _histograms = null;
-	ArrayList<Pair<Integer, GenericPoint<Integer>>> _histogramsB = null;
 	int _n = 0; // The length of histogram element
 	int _D = 0; // The number of random features 
 	volatile svm_node _retNode[][] = null;
@@ -46,11 +45,15 @@ public class GaussianFourierFeatures implements Runnable {
 	double[] _mu;
 	double[][] _cov;
 	MultivariateNormalDistribution _mnd;
+	// Our w vectors in order to generate the random features 
+	double[][] _ws; 
 	
 	// Uniform distribution
 	double _lb;
 	double _ub;
 	UniformRealDistribution _urd;
+	// Our w vectors in order to generate the random features
+	double[] _bs;
 	
 
 
@@ -65,9 +68,10 @@ public class GaussianFourierFeatures implements Runnable {
 	 * @param histograms The ArrayList of histograms that we're 
 	 * @param threadCount The number of threads to use to perform the computation
 	 * @param D The number of random fourier features
+	 * @param sigmak A measure of the bandwidth of the RBF kernel; gamma = 1/(2*sigmak^2)   
 	 * @param threadCount if svm_type is svm_parameter.PRECOMPUTED, use this many threads to apply kernel. Otherwise ignore value
 	 */
-	public GaussianFourierFeatures(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, int D, int threadCount) {
+	public GaussianFourierFeatures(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, int D, double gammak, int threadCount) {
 		_threadCount = threadCount;
 		_threadArray = new Thread[_threadCount];
 		_histograms = histograms;
@@ -77,19 +81,26 @@ public class GaussianFourierFeatures implements Runnable {
 		_retNodeRowCache = new HashMap<GenericPoint<Integer>,Integer>();
 		
 		// Initialize mnd
+		// The value for the variances are taken from: http://www.eecs.berkeley.edu/~brecht/papers/07.rah.rec.nips.pdf
 		_cov = new double[_n][_n];
 		_mu = new double[_n];
 		for(int i = 0; i < _n; i++) {
 			_mu[i] = 0;
 			for(int j = 0; j < _n; j++)
-				_cov[i][j] = (i == j) ? 1 : 0;
+				_cov[i][j] = (i == j) ? 2*gammak : 0;
 		}
 		_mnd = new MultivariateNormalDistribution(_mu, _cov);
+		_ws = new double[_D][];
+		for (int i = 0; i < _D; i ++)
+			_ws[i] = _mnd.sample();
 		
 		// Initialize urd
 		_lb = 0;
 		_ub = 2*Math.PI;
 		_urd = new UniformRealDistribution (_lb, _ub);
+		_bs = new double[_D];
+		for (int i = 0; i < _D; i ++)
+			_bs[i] = _urd.sample();
 
 		//		if (_svm_type != svm_parameter.PRECOMPUTED) {
 		//			_threadCount = 1;
@@ -101,22 +112,22 @@ public class GaussianFourierFeatures implements Runnable {
 		_retNodeLock = new ReentrantLock();
 
 		for (int i = 0; i < _threadCount; i++) {
-			_threadArray[i] = new Thread(new GaussianFourierFeatures(_retNodeLock, _retNode, _histograms, _retNodeRowCache, _D, _n, _mnd, _urd));
+			_threadArray[i] = new Thread(new GaussianFourierFeatures(_retNodeLock, _retNode, _histograms, _retNodeRowCache, _D, _n, _ws, _bs));
 			_threadArray[i].start();
 		}   
 	}
 
 	public GaussianFourierFeatures(Lock retNodeLock, svm_node[][] retNode, ArrayList<Pair<Integer, 
 								   GenericPoint<Integer>>> histograms, HashMap<GenericPoint<Integer>, Integer> rowCache,
-								   int D, int n, MultivariateNormalDistribution mnd, UniformRealDistribution urd) {
+								   int D, int n, double[][] ws, double[] bs) {
 		_retNodeLock = retNodeLock;
 		_retNode = retNode;
 		_histograms = histograms;
 		_retNodeRowCache = rowCache;
 		_D = D;
 		_n = n;
-		_mnd = mnd;
-		_urd = urd;
+		_ws = ws;
+		_bs = bs;
 	}
 
 	/**
@@ -213,8 +224,8 @@ public class GaussianFourierFeatures implements Runnable {
 		double[] f = new double[_D];
 		
 		for (int i = 0; i < _D; i++) {
-			double[] w = _mnd.sample();
-			double b = _urd.sample();
+			double[] w = _ws[i];
+			double b = _bs[i];
 
 			double t = 0.0;	// t = wTx	
 			for (int j = 0; j < _n; j++)
