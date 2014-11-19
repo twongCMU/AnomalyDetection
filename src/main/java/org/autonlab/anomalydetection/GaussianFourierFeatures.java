@@ -176,8 +176,6 @@ public class GaussianFourierFeatures implements Runnable {
 			}
 
 			double[] f = computeGaussianFourierFeatures(oneHist);
-			
-			// TODO: create random fourier features
 			for (int j = 0; j < _D; j++) {
 				_retNode[index][j] = new svm_node();
 				_retNode[index][j].index = j+1;

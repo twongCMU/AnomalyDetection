@@ -64,6 +64,7 @@ public class SVMCalc {
 	svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_KERNEL_TYPE;
 	svmParameter.cache_size = AnomalyDetectionConfiguration.SVM_CACHE_SIZE;
 	svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
+	svmParameter.gamma = AnomalyDetectionConfiguration.SVM_GAMMA;
 	// the library uses kfold
 	svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, targetAnomalyAccuracy);
 	if (svmParameter.nu == -1) {

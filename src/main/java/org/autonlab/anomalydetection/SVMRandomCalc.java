@@ -68,7 +68,7 @@ public class SVMRandomCalc {
 
 		svm_parameter svmParameter = new svm_parameter();
 		svmParameter.svm_type = svm_parameter.ONE_CLASS;
-		svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_KERNEL_TYPE;
+		svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_RANDOM_KERNEL_TYPE;
 		svmParameter.cache_size = AnomalyDetectionConfiguration.SVM_CACHE_SIZE;
 		svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
 		svmParameter.gamma = AnomalyDetectionConfiguration.SVM_GAMMA;

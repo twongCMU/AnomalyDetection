@@ -38,6 +38,7 @@ public class AnomalyDetectionConfiguration {
     static final int SVM_TYPE_PRECOMPUTED_KERNEL_TYPE = SVM_PRECOMPUTED_KERNEL_TYPE_CHI_SQUARED;
     //static final int SVM_TYPE_PRECOMPUTED_KERNEL_TYPE = SVM_PRECOMPUTED_KERNEL_TYPE_LINEAR;
 
+    static final int SVM_RANDOM_KERNEL_TYPE = svm_parameter.LINEAR;
     //static final int SVM_KERNEL_TYPE = svm_parameter.PRECOMPUTED;
     static final int SVM_KERNEL_TYPE = svm_parameter.RBF;
     //static final int SVM_KERNEL_TYPE = svm_parameter.LINEAR;
