@@ -14,7 +14,7 @@ public class AnomalyDetectionConfiguration {
 
     static final int CALC_TYPE_KDTREE = 0;
     static final int CALC_TYPE_SVM = 1;
-    static final int CALC_TYPE_SVM_RANDOM = 3;
+    static final int CALC_TYPE_SVM_RANDOM = 2;
     static final String[] CALC_TYPE_NAMES = {"KDTree", "SVM", "SVMRandom"}; // the index into this array's names should line up with the CALC_TYPE_<type> ints
 
     static int CALC_TYPE_TO_USE = CALC_TYPE_SVM_RANDOM;

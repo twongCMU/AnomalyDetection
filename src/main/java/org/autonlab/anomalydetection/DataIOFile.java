@@ -17,11 +17,14 @@ public class DataIOFile implements DataIO {
     }
 
     /**
-     * Read a csv file and return a HashMap of <GenericPoint<String> -> <timestamp, histogram>>
+     * Read a csv file and return a HashMap
      *
      */
-    public HashMap<GenericPoint<String>, ArrayList<HistoTuple>> getData() {
-	HashMap<GenericPoint<String>, ArrayList<HistoTuple>> trainMap = new HashMap();
+    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData() {
+	GenericPoint<String> valueType = new GenericPoint(1);
+	valueType.setCoord(0, "text_values.messagetype");
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
+	trainMap.put(valueType, new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());
 
 	int count = 0;
 
@@ -55,10 +58,10 @@ public class DataIOFile implements DataIO {
 		key.setCoord(0, ipAddress);
 		key.setCoord(1, applicationName);
 
-		if (!trainMap.containsKey(key)) {
-		    trainMap.put(key, new ArrayList<HistoTuple>());
+		if (!trainMap.get(valueType).containsKey(key)) {
+		    trainMap.get(valueType).put(key, new ArrayList<HistoTuple>());
 		}
-		trainMap.get(key).add(new HistoTuple(timeStamp, messageType));
+		trainMap.get(valueType).get(key).add(new HistoTuple(timeStamp, messageType, valueType));
 
 		count++;
 	    }
