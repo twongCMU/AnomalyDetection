@@ -1,9 +1,12 @@
 package org.autonlab.anomalydetection;
 
 import com.savarese.spatial.*;
+
 import java.util.*;
 import java.util.concurrent.locks.*;
+
 import libsvm.*;
+
 import org.apache.commons.collections.map.*;
 import org.javatuples.*; //Tuples, Pair
 
@@ -12,10 +15,6 @@ import org.javatuples.*; //Tuples, Pair
  * http://www.eecs.berkeley.edu/~brecht/papers/07.rah.rec.nips.pdf
  * 
  * Using a Gaussian Kernel --> draw features from the D-dimensional standard normal.
- * 
- * A few points:
- * 1. Add points to existing dot-product of histograms?
- * 2. Make new dot-product entirely? --> going with this first.
  */
 // MultiValueMap is not thread safe
 // also, NU_START_POW_LOW is modified
@@ -29,7 +28,7 @@ public class SVMRandomCalc {
 
 		ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
 		if (DaemonService.anomalyID >= 0) {
-			anomalyData = DaemonService.allHistogramsMap.get(DaemonService.anomalyID).get(DaemonService.anomalyKey);
+			anomalyData = DaemonService.allHistogramsMap.get(DaemonService.anomalyID).get(DaemonService.anomalyValue).get(DaemonService.anomalyKey);
 		}
 		for (GenericPoint<String> keyAddr : histograms.keySet()) {
 			// change 99.9 to be a parameter or maybe input to the rest call that sets the other anomaly key info
@@ -205,7 +204,7 @@ public class SVMRandomCalc {
 				nuValues.put(nu, accuracy * accuracyAnomaly / 2);
 			}
 		}
-		
+
 		return closestNU;
 	}
 
@@ -218,12 +217,12 @@ public class SVMRandomCalc {
 	 *
 	 * @return some text that can be displayed to the user
 	 */
-	public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, Integer testID, GenericPoint<String> testKey, MultiValueMap results) {
+	public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, GenericPoint<String> trainValue, Integer testID, GenericPoint<String> testKey, GenericPoint<String> testValue, MultiValueMap results) {
 
 		StringBuilder output = new StringBuilder();
 
 		HashMap<GenericPoint<String>, svm_model> allModels;
-		
+
 
 		if (DaemonService.allHistogramsMap.get(trainID) == null) {
 			output.append("Error: trainID " + trainID + " not found");
@@ -244,8 +243,7 @@ public class SVMRandomCalc {
 			return output;
 		}
 
-		
-		boolean changed = HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testKey));
+		boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));		
 
 		_svmModelsCacheLock.lock();
 
@@ -259,7 +257,7 @@ public class SVMRandomCalc {
 			_svmModelsCacheLock.unlock();
 
 			// this calculation can take some time so we unlock
-			allModels = SVMCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID), output, 1.0);
+			allModels = SVMRandomCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue), output, 0.9);
 
 			_svmModelsCacheLock.lock();
 			_svmModelsCache.put(trainID, allModels);
@@ -273,13 +271,13 @@ public class SVMRandomCalc {
 		// If we're running many instances of similar test data against the same training data
 		// we might want to implement a cache that's per-training set and save it externally
 		// rather than the current scheme of only caching within an instance of SVMKernel
-		GaussianFourierFeatures GFSTest = new GaussianFourierFeatures(DaemonService.allHistogramsMap.get(testID).get(testKey), AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS);
+		GaussianFourierFeatures GFSTest = new GaussianFourierFeatures(DaemonService.allHistogramsMap.get(testID).get(trainValue).get(testKey), AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS);
 		svm_node[][] testFeatures = GFSTest.getData(); 
 
 		svm_model oneModel = allModels.get(trainKey);
 		int index = 0;
 
-		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testKey)) {
+		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey)) {
 			double[] values = new double[1];
 			svm.svm_predict_values(oneModel, testFeatures[index], values);
 			double prediction = values[0];
@@ -307,18 +305,22 @@ public class SVMRandomCalc {
 	/**
 	 * Test every combination against every other combination
 	 */
-	public static StringBuilder runAllTestSVM() {
+	public static StringBuilder runAllTestSVM(GenericPoint<String> valueType) {
 		StringBuilder output = new StringBuilder();
 
 		for (Integer keyID : DaemonService.allHistogramsMap.keySet()) {
 			for (Integer keyIDInner : DaemonService.allHistogramsMap.keySet()) {
+				if (!DaemonService.allHistogramsMap.get(keyID).containsKey(valueType) ||
+						!DaemonService.allHistogramsMap.get(keyIDInner).containsKey(valueType)) {
+					continue;
+				}
 				for (GenericPoint<String> key : DaemonService.allHistogramsMap.get(keyID).keySet()) {
 					for (GenericPoint<String> keyInner : DaemonService.allHistogramsMap.get(keyIDInner).keySet()) {
 						// A MultiValueMap is a HashMap where the value is an Collection of values (to handle duplicate keys)
 						MultiValueMap resultsHash = new MultiValueMap();
 
 						output.append("Highest 5 scores for ID " + keyID + " : <" + key.toString() + "> vs ID " + keyIDInner + " : <" + keyInner.toString() + ">\n");
-						runOneTestSVM(keyID, key, keyIDInner, keyInner, resultsHash);
+						runOneTestSVM(keyID, key, valueType, keyIDInner, keyInner, valueType, resultsHash);
 
 						List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 						Collections.sort(resultsHashList); // ascending order
@@ -344,4 +346,5 @@ public class SVMRandomCalc {
 		}
 		return output;
 	}
+
 }

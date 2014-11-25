@@ -300,7 +300,7 @@ public class SVMCalc {
     }
 
     /**
-     * Test every combination against every other combinatino
+     * Test every combination against every other combination
      */
     public static StringBuilder runAllTestSVM(GenericPoint<String> valueType) {
 	StringBuilder output = new StringBuilder();

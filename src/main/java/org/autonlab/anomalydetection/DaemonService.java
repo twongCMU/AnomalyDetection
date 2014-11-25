@@ -10,6 +10,7 @@ import org.javatuples.*;
 
 @Path("/")
 public class DaemonService {
+
 	static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
 	// XYZ the lock should also protect reads/deletes to allHistogramsMap!
 
@@ -285,11 +286,13 @@ public class DaemonService {
 	@Produces(MediaType.TEXT_PLAIN)
 	public Response getDataSVMRandom(@QueryParam("trainID") Integer trainID,
 			@QueryParam("trainKeyCSV") String trainKey,
+			@QueryParam("trainValue") String trainValue,
 			@QueryParam("testID") Integer testID,
-			@QueryParam("testKeyCSV") String testKey) {
+			@QueryParam("testKeyCSV") String testKey,
+			@QueryParam("testValue") String testValue) {
 		StringBuilder output = new StringBuilder("Calculation method: SVM\n");
 
-		output.append(SVMRandomCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), testID, getPointFromCSV(testKey), null));
+		output.append(SVMRandomCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), getPointFromCSV(trainValue), testID, getPointFromCSV(testKey), getPointFromCSV(testValue), null));
 		return Response.status(200).entity(output.toString()).build();
 	}
 
@@ -327,11 +330,11 @@ public class DaemonService {
 	}
 
 	@GET
-	@Path("/testallSVMRandom")
+	@Path("/testallSVMRandom/{valueCSV}")
 	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDataAllSVMRandom() {
+	public Response getDataAllSVMRandom(@PathParam("valueCSV") String value) {
 		StringBuilder output = new StringBuilder("Calculation method: SVM\n");
-		output.append(SVMRandomCalc.runAllTestSVM());
+		output.append(SVMRandomCalc.runAllTestSVM(getPointFromCSV(value)));
 		return Response.status(200).entity(output.toString()).build();
 	}
 
