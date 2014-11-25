@@ -21,12 +21,14 @@ public class DataIOCassandraDB implements DataIO {
 	_keyFieldsList.add("text_values.endpoint");
 
 	_dataFieldsList = new ArrayList<String>();
-	// this part isn't quite implemented but we want to make the code similar to the key stuff
 	_dataFieldsList.add("time_stamp"); // timestamp must be first
 	_dataFieldsList.add("text_values.messagetype");
-	//	_dataFieldsList.add("dest_addr");
+	_dataFieldsList.add("dest_addr");
     }
 
+    /*
+     * @param keyFieldsCSV a CSV of DB column names to categorize the histograms by
+     */
     public void setKeyFields(String keyFieldsCSV) {
 	String[] sParts = keyFieldsCSV.split(",");
 	Arrays.sort(sParts);
@@ -37,6 +39,9 @@ public class DataIOCassandraDB implements DataIO {
 	}
     }
 
+    /*
+     * @param dataFieldsCSV a CSV of DB column names to generate histograms on
+     */
     public void setValueFields(String dataFieldsCSV) {
 	String[] sParts = dataFieldsCSV.split(",");
 	Arrays.sort(sParts);
@@ -113,8 +118,9 @@ public class DataIOCassandraDB implements DataIO {
 
 	    int ii = 0;
 	    for (String oneField : _keyFieldsList) {
+		String keyString = oneField + ";";
 		if (oneField.equals("time_stamp")) {
-		    key.setCoord(ii, "" + (row.getDate("time_stamp").getTime() / 1000));
+		    keyString += (row.getDate("time_stamp").getTime() / 1000);
 		}
 		else if (oneField.matches("^text_values.*$")) {
 		    if (getTextValues == 0) {
@@ -125,12 +131,13 @@ public class DataIOCassandraDB implements DataIO {
 			throw new RuntimeException("did not find a period in field " + oneField);
 		    }
 		    String oneFieldTrailing = oneField.substring(oneFieldStart + 1, oneField.length());
-		    key.setCoord(ii, fieldMap.get(oneFieldTrailing));
+		    keyString += (fieldMap.get(oneFieldTrailing));
 		}
 		else {
 		    String fieldValue = row.getString(oneField);
-		    key.setCoord(ii, fieldValue == null ? "" : fieldValue);
+		    keyString += (fieldValue == null ? "" : fieldValue);
 		}
+		key.setCoord(ii, keyString);
 		ii++;
 	    }
 	   
@@ -166,7 +173,7 @@ public class DataIOCassandraDB implements DataIO {
 		// When we get to the point where we can customize the values we save, we might need to overwrite this cached value
 		ii++;
 	    }
-	    value = value.substring(0, value.length() - 1);
+	    value = value.substring(0, value.length() - 1); // to drop the trailing comma appended above
 
 	    if (!trainMap.containsKey(valueNamePoint)) {
 		trainMap.put(valueNamePoint, new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());

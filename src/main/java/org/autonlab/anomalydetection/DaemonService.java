@@ -73,6 +73,7 @@ public class DaemonService {
 	String output = new String();
 
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(getPointFromCSV(value)).get(getPointFromCSV(key));
+	output += "Number of datapoints: " + histograms.size() + " \n";
 	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
 	    output += tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n";
 	}
@@ -246,6 +247,41 @@ public class DaemonService {
 				  @QueryParam("testValue") String testValue) {
 	String output = "Calculation method: KDTree\n";
 
+	int error = 0;
+	if (trainID == null) {
+	    System.out.println("train ID not set");
+	    error++;
+	}
+
+	if (testID == null) {
+	    System.out.println("test ID not set");
+	    error++;
+	}
+
+	if (trainKey == null) {
+	    System.out.println("train Key not set");
+	    error++;
+	}
+
+	if (testKey == null) {
+	    System.out.println("test Key not set");
+	    error++;
+	}
+
+	if (trainValue == null) {
+	    System.out.println("train Value not set");
+	    error++;
+	}
+
+	if (testValue == null) {
+	    System.out.println("test Value not set");
+	    error++;
+	}
+
+	if (error > 0) {
+	    throw new RuntimeException("error in inputs");
+	}
+
 	output += KDTreeCalc.runOneTestKDTree(trainID, getPointFromCSV(trainKey), getPointFromCSV(trainValue), testID, getPointFromCSV(testKey), getPointFromCSV(testValue), null);
 	return Response.status(200).entity(output).build();
     }
@@ -262,6 +298,108 @@ public class DaemonService {
 	return point;
     }
 
+    /**
+     * @param id The data index ID returned when the data was read in
+     * @param trainKeyCSV a CSV of keys
+     * @param valueKeyCSV a CSV of histogram values
+     *
+     * @return the ID that contains the data with indexes valueKeyCSV and trainKeyCSV (which may be different from the input id) or -1 if none
+     */
+    public int recalculateByKey(Integer id, String trainKeyCSV, String valueKeyCSV) {
+	GenericPoint<String> newKey = getPointFromCSV(trainKeyCSV);
+	GenericPoint<String> valueKey = getPointFromCSV(valueKeyCSV);
+
+	if (allHistogramsMap.get(id) == null) {
+	    throw new RuntimeException("Error: id " + id + " not found");
+	}
+	if (allHistogramsMap.get(id).get(valueKey) == null) {
+	    throw new RuntimeException("Error: value key '" + valueKey + "' not found");
+	}
+	if (allHistogramsMap.get(id).get(valueKey).get(newKey) != null) {
+	    return id;
+	}
+
+	allHistogramsMapLock.lock();
+
+	allHistogramsMap.put(nextHistogramMapID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
+
+	allHistogramsMap.get(nextHistogramMapID).put(valueKey, new HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>());
+	allHistogramsMap.get(nextHistogramMapID).get(valueKey).put(newKey, new ArrayList<Pair<Integer, GenericPoint<Integer>>>());
+
+	int subsetsFound = 0;
+	// the histograms are in an arraylist so it's hard to add them together. Sum them in a hashmap then convert it to an arraymap
+	TreeMap<Integer, GenericPoint<Integer>> newDataSum = new TreeMap(); //use TreeMap not HashMap so we get keys back in sorted orders
+	for (GenericPoint<String> oneKey : allHistogramsMap.get(id).get(valueKey).keySet()) {
+	    System.out.println("XYZ " + oneKey.toString() + " compare to " + newKey.toString());
+
+	    if (isPointSubset(newKey, oneKey)) {
+		System.out.println("counting " + newKey.toString() + " as subset as " + oneKey.toString() + "\n");
+		subsetsFound++;
+		for (Pair<Integer, GenericPoint<Integer>> oneHist : allHistogramsMap.get(id).get(valueKey).get(oneKey)) {
+
+		    GenericPoint<Integer> sumData = newDataSum.get(oneHist.getValue0());
+		    if (sumData == null) {
+			sumData = new GenericPoint<Integer>(oneHist.getValue1().getDimensions());
+		    }
+		    int copyIndex = 0;
+		    for (copyIndex = 0; copyIndex < oneHist.getValue1().getDimensions(); copyIndex++) {
+			if (sumData.getCoord(copyIndex) == null) {
+			    sumData.setCoord(copyIndex, oneHist.getValue1().getCoord(copyIndex));
+			}
+			else {
+			    sumData.setCoord(copyIndex, sumData.getCoord(copyIndex) + oneHist.getValue1().getCoord(copyIndex));
+			}
+		    }
+		    newDataSum.put(oneHist.getValue0(), sumData);
+		}
+	    }
+	}
+
+	// convert the newdataSum TreeMap to an ArrayList
+	for (Integer timeSec : newDataSum.keySet()) {
+	    allHistogramsMap.get(nextHistogramMapID).get(valueKey).get(newKey).add(new Pair<Integer, GenericPoint<Integer>>(timeSec, newDataSum.get(timeSec)));
+	}
+
+	int newID = -1;
+	if (subsetsFound > 0) {
+	    newID = nextHistogramMapID;
+	    nextHistogramMapID++;
+	}
+	allHistogramsMapLock.unlock();
+
+	return newID;
+    }
+
+    /**
+     * @param testPoint the point that may be a subset
+     * @param bigPoint the point that may be a superset
+     *
+     * @return true if every coord in testPoint also exists in bigPoint, false otherwise
+     */
+    public Boolean isPointSubset(GenericPoint<String> testPoint, GenericPoint<String> bigPoint) {
+	if (bigPoint.getDimensions() <  testPoint.getDimensions()) {
+	    return false;
+	}
+
+	int bigPointCoord = 0;
+	int testPointCoord = 0;
+
+	while (bigPointCoord < bigPoint.getDimensions() && testPointCoord < testPoint.getDimensions()) {
+	    if (testPoint.getCoord(testPointCoord).equals(bigPoint.getCoord(bigPointCoord))) {
+		bigPointCoord++;
+		testPointCoord++;
+	    }
+	    else {
+		bigPointCoord++;
+	    }
+	}
+	if (testPointCoord == testPoint.getDimensions()) {
+	    return true;
+	}
+
+	return false;
+    }
+
     @GET
     @Path("/testSVM")
     @Produces(MediaType.TEXT_PLAIN)
@@ -273,7 +411,26 @@ public class DaemonService {
 			       @QueryParam("testValue") String testValue) {
 	StringBuilder output = new StringBuilder("Calculation method: SVM\n");
 
+	trainID = recalculateByKey(trainID, trainKey, trainValue);
+	if (trainID == -1) {
+	    output.append("ERROR: trainKeyCSV (" + trainKey + ") was not found and could not be calculated from existing data\n");
+	    return Response.status(200).entity(output.toString()).build();
+	}
+	else {
+	    output.append("NOTE: trainKeyCSV (" + trainKey + ") was not found but was calculated from existing data and stored at ID " + trainID + "\n");
+	}
+	testID = recalculateByKey(testID, testKey, testValue);
+	if (testID == -1) {
+	    output.append("ERROR: testKeyCSV  (" + testKey + ") was not found and could not be calculated from existing data\n");
+	    return Response.status(200).entity(output.toString()).build();
+	}
+	else {
+	    output.append("NOTE: testKeyCSV  (" + testKey + ") was not found but was calculated from existing data and stored at ID " + testID + "\n");
+	}
+
 	output.append(SVMCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), getPointFromCSV(trainValue), testID, getPointFromCSV(testKey), getPointFromCSV(testValue), null));
+
+
 	return Response.status(200).entity(output.toString()).build();
     }
 
