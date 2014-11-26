@@ -6,20 +6,11 @@ import java.util.HashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
 import org.javatuples.Pair;
 
 import com.savarese.spatial.GenericPoint;
 
-@Path("/")
-public class DaemonService {
+public class Testing {
 
 	static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
 	// XYZ the lock should also protect reads/deletes to allHistogramsMap!
@@ -36,23 +27,17 @@ public class DaemonService {
 	 *
 	 * @return the number of dimensions in the histogram, -1 if there's no matching IP, 0 if there's no data for that IP then a list of <index> <name> pairs, one per line
 	 */
-	@GET
-	@Path("/getdimensions")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDimensions() {
+	public String getDimensions() {
 		String output = new String("-1");
 
 		output = "";
 		output += "" + HistoTuple.getDimensionNames();
-
-		return Response.status(200).entity(output).build();
+		
+		return output;
 	}
 
-
-	@GET
-	@Path("/getDatasetKeys")
-	@Produces(MediaType.TEXT_HTML)
-	public Response getDatasetKeys() {
+	
+	public String getDatasetKeys() {
 		String output = new String();
 
 		for (Integer id : allHistogramsMap.keySet()) {
@@ -71,15 +56,10 @@ public class DaemonService {
 			}
 			output += "</ul>";
 		}
-		return Response.status(200).entity(output).build();
+		return output;
 	}
 
-	@GET
-	@Path("/getHistograms")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getHistograms(@QueryParam("id") Integer id,
-			@QueryParam("keyCSV") String key,
-			@QueryParam("valueCSV") String value) {
+	public String getHistograms(Integer id, String key, String value) {
 
 		String output = new String();
 
@@ -87,16 +67,13 @@ public class DaemonService {
 		for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
 			output += tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n";
 		}
-		return Response.status(200).entity(output).build();
+		return output;
 	}
 
 	/**
 	 * 
 	 */
-	@GET
-	@Path("/getfile")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getFile(@QueryParam("filename") String filename) {
+	public void getFile(String filename) {
 		allHistogramsMapLock.lock();
 		StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 
@@ -110,18 +87,10 @@ public class DaemonService {
 		}
 		nextHistogramMapID++;
 		allHistogramsMapLock.unlock();
-		return Response.status(200).entity(output.toString()).build();
+		System.out.print(output.toString());
 	}
 
-	/**
-	 *
-	 */
-	@GET
-	@Path("/getdb")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDb(@QueryParam("hostname") String hostname,
-			@QueryParam("keyCSV") String keyCSV,
-			@QueryParam("value") String valueCSV) {
+	public void getDb(String hostname, String keyCSV, String valueCSV) {
 		allHistogramsMapLock.lock();
 
 		StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
@@ -144,13 +113,10 @@ public class DaemonService {
 		}
 		nextHistogramMapID++;
 		allHistogramsMapLock.unlock();
-		return Response.status(200).entity(output.toString()).build();
+		System.out.print(output.toString());
 	}
 
-	@GET
-	@Path("/getfakedata")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getFakeData() {
+	public void getFakeData() {
 		GenericPoint<String> valueType = new GenericPoint(1);
 		valueType.setCoord(0, "messagetype");
 
@@ -203,7 +169,7 @@ public class DaemonService {
 		allHistogramsMap.put(nextHistogramMapID, fakeDataFinal);
 		nextHistogramMapID++;
 		allHistogramsMapLock.unlock();
-		return Response.status(200).entity(output.toString()).build();
+		System.out.print(output.toString());
 	}
 
 	/**
@@ -211,10 +177,7 @@ public class DaemonService {
 	 *
 	 * Return "ok" on success, something else on error
 	 */
-	@GET
-	@Path("/deleteone/{id}")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response deleteOne(@PathParam("id") Integer id) {
+	public String deleteOne(Integer id) {
 		String output = "ok";
 		if (!allHistogramsMap.containsKey(id)) {
 			output = "No data matching id " + id;
@@ -224,18 +187,11 @@ public class DaemonService {
 		}
 		SVMCalc.removeModelFromCache(id);
 		SVMRandomCalc.removeModelFromCache(id);
-		return Response.status(200).entity(output).build();
+		return output;
 	}	    
 
-	@GET
-	@Path("/test")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getData(@QueryParam("trainID") Integer trainID,
-			@QueryParam("trainKeyCSV") String trainKey,
-			@QueryParam("trainValue") String trainValue,
-			@QueryParam("testID") Integer testID,
-			@QueryParam("testKeyCSV") String testKey,
-			@QueryParam("testValue") String testValue) {
+	public String getData(Integer trainID, String trainKey, String trainValue,
+						  Integer testID, String testKey, String testValue) {
 		if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
 			return getDataKDTree(trainID, trainKey, trainValue, testID, testKey, testValue);
 		}
@@ -250,25 +206,19 @@ public class DaemonService {
 		}
 	}
 
-	@GET
-	@Path("/testKDTree")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDataKDTree(@QueryParam("trainID") Integer trainID,
-			@QueryParam("trainKeyCSV") String trainKey,
-			@QueryParam("trainValue") String trainValue,
-			@QueryParam("testID") Integer testID,
-			@QueryParam("testKeyCSV") String testKey,
-			@QueryParam("testValue") String testValue) {
+
+	public String getDataKDTree(Integer trainID, String trainKey, String trainValue,
+								Integer testID, String testKey, String testValue) {
 		String output = "Calculation method: KDTree\n";
 
 		output += KDTreeCalc.runOneTestKDTree(trainID, getPointFromCSV(trainKey), getPointFromCSV(trainValue), testID, getPointFromCSV(testKey), getPointFromCSV(testValue), null);
-		return Response.status(200).entity(output).build();
+		return output;
 	}
 
 	public GenericPoint<String> getPointFromCSV(String csv) {
 		String[] sParts = csv.split(",");
-		Arrays.sort(sParts);
-		GenericPoint<String> point = new GenericPoint(sParts.length);
+		Arrays.sort(sParts); // Why is there sorting going on here?
+		GenericPoint<String> point = new GenericPoint<String>(sParts.length);
 
 		for (int ii = 0; ii < sParts.length; ii++) {
 			point.setCoord(ii, sParts[ii]);
@@ -277,40 +227,24 @@ public class DaemonService {
 		return point;
 	}
 
-	@GET
-	@Path("/testSVM")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDataSVM(@QueryParam("trainID") Integer trainID,
-			@QueryParam("trainKeyCSV") String trainKey,
-			@QueryParam("trainValue") String trainValue,
-			@QueryParam("testID") Integer testID,
-			@QueryParam("testKeyCSV") String testKey,
-			@QueryParam("testValue") String testValue) {
+	public String getDataSVM(Integer trainID, String trainKey, String trainValue,
+			  				   Integer testID, String testKey, String testValue) {
 		StringBuilder output = new StringBuilder("Calculation method: SVM\n");
 
 		output.append(SVMCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), getPointFromCSV(trainValue), testID, getPointFromCSV(testKey), getPointFromCSV(testValue), null));
-		return Response.status(200).entity(output.toString()).build();
+		return output.toString();
 	}
 
-	@GET
-	@Path("/testSVMRandom")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDataSVMRandom(@QueryParam("trainID") Integer trainID,
-			@QueryParam("trainKeyCSV") String trainKey,
-			@QueryParam("trainValue") String trainValue,
-			@QueryParam("testID") Integer testID,
-			@QueryParam("testKeyCSV") String testKey,
-			@QueryParam("testValue") String testValue) {
-		StringBuilder output = new StringBuilder("Calculation method: SVM\n");
+	public String getDataSVMRandom(Integer trainID, String trainKey, String trainValue,
+			  						 Integer testID, String testKey, String testValue) {
+		StringBuilder output = new StringBuilder("Calculation method: SVM Random\n");
 
 		output.append(SVMRandomCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), getPointFromCSV(trainValue), testID, getPointFromCSV(testKey), getPointFromCSV(testValue), null));
-		return Response.status(200).entity(output.toString()).build();
+		return output.toString();
 	}
 
-	@GET
-	@Path("/testall/{valueCSV}")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDataAll(@PathParam("valueCSV") String value) {
+
+	public String getDataAll(String value) {
 		if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
 			return getDataAllKDTree(value);
 		}
@@ -325,69 +259,43 @@ public class DaemonService {
 		}
 	}
 
-	@GET
-	@Path("/testallKDTree/{valueCSV}")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDataAllKDTree(@PathParam("valueCSV") String value) {
+	public String getDataAllKDTree(String value) {
 		StringBuilder output = new StringBuilder("Calculation method: KDTree\n");
 		output.append(KDTreeCalc.runAllTestKDTree(getPointFromCSV(value)));
-		return Response.status(200).entity(output.toString()).build();
+		return output.toString();
 	}
 
-	@GET
-	@Path("/testallSVM/{valueCSV}")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDataAllSVM(@PathParam("valueCSV") String value) {
+	public String getDataAllSVM(String value) {
 		StringBuilder output = new StringBuilder("Calculation method: SVM\n");
 		output.append(SVMCalc.runAllTestSVM(getPointFromCSV(value)));
-		return Response.status(200).entity(output.toString()).build();
+		return output.toString();
 	}
 
-	@GET
-	@Path("/testallSVMRandom/{valueCSV}")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getDataAllSVMRandom(@PathParam("valueCSV") String value) {
-		StringBuilder output = new StringBuilder("Calculation method: SVM Random");
+	public String getDataAllSVMRandom(String value) {
+		StringBuilder output = new StringBuilder("Calculation method: SVM\n");
 		output.append(SVMRandomCalc.runAllTestSVM(getPointFromCSV(value)));
-		return Response.status(200).entity(output.toString()).build();
+		return output.toString();
 	}
 
-	@GET
-	@Path("/setSampleWindowSecs/{newVal}")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response setSampleWindowSecs(@PathParam("newVal") int newValue) {
+	public void setSampleWindowSecs(int newValue) {
 		AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS = newValue;
-		return Response.status(200).entity("ok").build();
+		System.out.println("ok");
 	}
 
-	@GET
-	@Path("/getSampleWindowSecs")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getSampleWindowSecs() {
-		String output = "" + AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS;
-		return Response.status(200).entity(output).build();
+	public int getSampleWindowSecs() {
+		return AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS;
 	}
 
-	@GET
-	@Path("/setSlideWindowSecs/{newVal}")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response setSlideWindowSecs(@PathParam("newVal") int newValue) {
+	public void setSlideWindowSecs(int newValue) {
 		AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS = newValue;
-		return Response.status(200).entity("ok").build();
+		System.out.println("ok");
 	}
 
-	@GET
-	@Path("/getSlideWindowSecs")
-	@Produces(MediaType.TEXT_PLAIN)
-	public Response getSlideWindowSecs() {
-		String output = "" + AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS;
-		return Response.status(200).entity(output).build();
+	public int getSlideWindowSecs() {
+		return AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS;
 	}
 
-	@GET
-	@Path("/setCalcType/{newVal}")
-	@Produces(MediaType.TEXT_HTML)
-	public Response setCalcType(@PathParam("newVal") String newValue) {
+	public String setCalcType(String newValue) {
 		String output = "Ok. Calc type set to " + newValue;
 		int newIndex = Arrays.asList(AnomalyDetectionConfiguration.CALC_TYPE_NAMES).indexOf(newValue);
 		if (newIndex >= 0) {
@@ -397,28 +305,21 @@ public class DaemonService {
 			output = "Invalid type<br>\n";
 		}
 		output += AnomalyDetectionConfiguration.printCalcTypeNameLinksHTML("");
-		return Response.status(200).entity(output).build();
+		return output;
 	}
 
-	@GET
-	@Path("/getCalcType")
-	@Produces(MediaType.TEXT_HTML)
-	public Response getCalcType() {
+	public String getCalcType() {
 		String output = "Calc type is " + AnomalyDetectionConfiguration.CALC_TYPE_NAMES[AnomalyDetectionConfiguration.CALC_TYPE_TO_USE];
-		output += "<br>" + AnomalyDetectionConfiguration.printCalcTypeNameLinksHTML("setCalcType/");
-		return Response.status(200).entity(output).build();
+		output += "\n" + AnomalyDetectionConfiguration.printCalcTypeNameLinksHTML("setCalcType/");
+		return output;
 	}
 
-	@GET
-	@Path("/setAnomalyKey")
-	@Produces(MediaType.TEXT_HTML)
-	public Response setAnomalyKey(@QueryParam("id") Integer id,
-			@QueryParam("csvKey") String csvKey) {
-		String output = "ok";
+	public void setAnomalyKey(Integer id, String csvKey) {
 
 		anomalyID = id;
 		anomalyKey = getPointFromCSV(csvKey);
 
-		return Response.status(200).entity(output).build();
+		System.out.println("ok");
 	}
+	
 }
