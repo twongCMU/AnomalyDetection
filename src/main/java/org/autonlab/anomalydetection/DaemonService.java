@@ -341,7 +341,8 @@ public class DaemonService {
 
 		StringBuilder output = new StringBuilder("Custom Test\n\n");
 		
-		output.append(getFakeData2(n,s,rn).getEntity());
+		//output.append(getFakeData2(n,s,rn).getEntity());
+		getFakeData2(n,s,rn);
 //		String filename="/usr0/home/sibiv/Research/Data/GRE.out";
 //		DataIOFile foo = new DataIOFile(filename);
 //		allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
@@ -352,14 +353,22 @@ public class DaemonService {
 		String csvKey2 = "a2,b2";
 		
 		GenericPoint<String> trainKey = getPointFromCSV(csvKey1);
-		GenericPoint<String> testKey = getPointFromCSV(csvKey2);
+		GenericPoint<String> testKey = getPointFromCSV(csvKey1);
 
 		output.append("\n\nSVM RANDOM:\n");
-		output.append(SVMRandomCalc.runOneTestSVM(id, trainKey, id, testKey, null).toString());
+		long startTime1 = System.nanoTime();
+		//output.append(SVMRandomCalc.runOneTestSVM(id, trainKey, id, testKey, null).toString());
+		SVMRandomCalc.runOneTestSVM(id, trainKey, id, testKey, null).toString();
+		long endTime1 = System.nanoTime();
+		double duration = (double)(endTime1 - startTime1)/1000000000;
+		output.append("\n\nTime taken:\n" + (duration));
 		output.append("\n\nSVM:\n");
-		output.append(SVMCalc.runOneTestSVM(id, trainKey, id, testKey, null));
-		
-		Response r = Response.status(200).entity(output.toString()).build();
+		long startTime2 = System.nanoTime();
+		//output.append(SVMCalc.runOneTestSVM(id, trainKey, id, testKey, null));
+		SVMCalc.runOneTestSVM(id, trainKey, id, testKey, null);
+		long endTime2 = System.nanoTime();
+		duration = (double)(endTime2 - startTime2)/1000000000;
+		output.append("\n\nTime taken:\n" + (duration));
 		
 		return Response.status(200).entity(output.toString()).build();
 	}
@@ -368,21 +377,52 @@ public class DaemonService {
 	@Path("/getfakedata2")
 	@Produces(MediaType.TEXT_PLAIN)
 	public Response getFakeData2(@QueryParam("n") Integer n, @QueryParam("size") Integer s, @QueryParam("rn") Integer rn) {
+		
+		//allHistogramsMap.clear();
+		
 		StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
-		
-		HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> fakeData = new HashMap();
-		
+	
 		UniformRealDistribution urd = new UniformRealDistribution (0.0, 1.0);
 
-		// generate a sparse-ish lower half of a matrix. This will be our training data
-		ArrayList<Pair<Integer, GenericPoint<Integer>>> training = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
 		
+		output.append("Anomaly data:\n\n");
 		int hs = (int) s/2; // half size
 		int qs = (int) s/2; // quarter size
 		
-		output.append("Train data:\n\n");
-		
+		HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalyData = new HashMap();
+		ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyTraining = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
 		int fakeTime = 1;
+		for (int i = 0; i < n; i += 1) {
+			GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
+			for (int j = 0; j < s; j += 1) { // Randomly fill first quarter with 0s and 1s (anomalies)
+				if (j < qs && urd.sample() > 0.5)
+					fakePoint.setCoord(j, 1);
+				else
+					fakePoint.setCoord(j, 0);
+				
+			}
+			output.append(fakePoint.toString() + "\n");
+			Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
+			anomalyTraining.add(fakePair);
+			fakeTime++;
+		}
+		GenericPoint<String> aKey = new GenericPoint<String>(2);
+		aKey.setCoord(0, "a");
+		aKey.setCoord(1, "b");
+		anomalyData.put(aKey, anomalyTraining);
+		output.append("Key: a, b (" + anomalyTraining.size() + ")\n\n");
+		anomalyID = -1;//nextHistogramMapID;
+		anomalyKey = aKey;
+		
+		allHistogramsMap.put(nextHistogramMapID, anomalyData);
+		nextHistogramMapID++;
+		
+		
+		output.append("Train data:\n\n");
+		HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> fakeData = new HashMap();
+		ArrayList<Pair<Integer, GenericPoint<Integer>>> training = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+		
+		fakeTime = 1;
 		for (int i = 0; i < n; i += 1) {
 			GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
 			for (int j = 0; j < s; j += 1) { // Randomly fill second half with 1s and 0s
@@ -441,7 +481,6 @@ public class DaemonService {
 
 		// override this since we don't use the ?????????????????????
 		HistoTuple.setDimensions(s);
-
 		
 		allHistogramsMap.put(nextHistogramMapID, fakeData);
 		nextHistogramMapID++;

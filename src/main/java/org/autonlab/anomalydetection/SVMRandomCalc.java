@@ -24,11 +24,16 @@ import org.javatuples.*; //Tuples, Pair
 // also, NU_START_POW_LOW is modified
 public class SVMRandomCalc {
 	// cache of processed models. This is shared across concurrent accesses so we need to protect it with a lock
-	static volatile HashMap<Integer, HashMap<GenericPoint<String>, svm_model>> _svmModelsCache = new HashMap<Integer, HashMap<GenericPoint<String>, svm_model>>();
+	static volatile HashMap<Integer, HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>>> _svmModelsCache = 
+			new HashMap<Integer, HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>>>();
 	static volatile Lock _svmModelsCacheLock = new ReentrantLock();
 
-	public static HashMap<GenericPoint<String>, svm_model> makeSVMModel(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> histograms, StringBuilder output, double targetAccuracy) {
-		HashMap<GenericPoint<String>, svm_model> newMap = new HashMap<GenericPoint<String>, svm_model>();
+	public static HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>> 
+	makeSVMModel(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> histograms, 
+			StringBuilder output, double targetAccuracy) {
+
+		HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>> newMap = 
+				new HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>>();
 
 		ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
 		if (DaemonService.anomalyID >= 0) {
@@ -42,13 +47,16 @@ public class SVMRandomCalc {
 		return newMap;
 	}
 
-	private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
-		
+	private static Pair<GaussianRandomFeatures, svm_model> 
+	generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, 
+				  double targetCrossTrainAccuracy, ArrayList<Pair<Integer, 
+				  GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
+
 		// For quiet SVM
 		svm.svm_set_print_string_function(new QuietPrint());
-		
+
 		System.out.println("YYY -------------------------");
-		
+
 		TreeMap<Double, Double> nuValues = new TreeMap<Double,Double>();
 		System.out.println("YYY -------------------------");
 		// generate a list of nu values to try (we can add to this later)
@@ -58,12 +66,16 @@ public class SVMRandomCalc {
 			}
 		}
 
+		//Initialize before so we can pull out coefficiencts.
+		SVMRandomGaussian svmrg = new SVMRandomGaussian(histograms, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS);
+		GaussianRandomFeatures gff = svmrg.getRandomFeatures();
+
 		// fill in the svm_problem with the histogram data points
 		svm_problem svmProblem = new svm_problem();
 		svmProblem.l = histograms.size();
 		svmProblem.y = new double[histograms.size()];
 		Arrays.fill(svmProblem.y, 1.0); // all of our training data is non-anomalous
-		svmProblem.x = (new GaussianFourierFeatures(histograms, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+		svmProblem.x = (svmrg.getData());
 
 		svm_problem svmProblemAnomaly = null;
 		// TODO: Wouldn't you want to add this to the same svmProblem as before?
@@ -72,7 +84,7 @@ public class SVMRandomCalc {
 			svmProblemAnomaly.l = histogramsAnomaly.size();
 			svmProblemAnomaly.y = new double[histogramsAnomaly.size()];
 			Arrays.fill(svmProblemAnomaly.y, -1.0); // set all of this data to anomalous
-			svmProblemAnomaly.x = (new GaussianFourierFeatures(histogramsAnomaly, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+			svmProblemAnomaly.x = (new SVMRandomGaussian(histogramsAnomaly, AnomalyDetectionConfiguration.SVM_D, gff, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 		}
 
 		svm_parameter svmParameter = new svm_parameter();
@@ -110,7 +122,8 @@ public class SVMRandomCalc {
 		}
 
 		System.out.println("YYY selected nu of " + svmParameter.nu);
-		return svm.svm_train(svmProblem, svmParameter);
+		Pair <GaussianRandomFeatures, svm_model> gffSVMPair = new Pair<GaussianRandomFeatures, svm_model> (gff, svm.svm_train(svmProblem, svmParameter));
+		return gffSVMPair;
 	}
 
 	/**
@@ -126,7 +139,10 @@ public class SVMRandomCalc {
 	 *
 	 * @return a nu that generates the accuracy closest (absolute value) to the targetCrossTrainAccuracy parameter
 	 */
-	private static double allCrossValidate(svm_problem svmProblem, svm_parameter svmParameter, TreeMap<Double, Double> nuValues, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, svm_problem svmProblemAnomaly, double targetAnomalyAccuracy) {
+	private static double allCrossValidate(svm_problem svmProblem, svm_parameter svmParameter, 
+										   TreeMap<Double, Double> nuValues, double targetCrossTrainAccuracy, 
+										   ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, 
+										   svm_problem svmProblemAnomaly, double targetAnomalyAccuracy) {
 		double closestNUAccuracyDiff = Integer.MAX_VALUE;
 		double closestNU = -1;
 
@@ -214,7 +230,7 @@ public class SVMRandomCalc {
 				nuValues.put(nu, accuracy * accuracyAnomaly / 2);
 			}
 		}
-		
+
 		return closestNU;
 	}
 
@@ -227,12 +243,12 @@ public class SVMRandomCalc {
 	 *
 	 * @return some text that can be displayed to the user
 	 */
+	
 	public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, Integer testID, GenericPoint<String> testKey, MultiValueMap results) {
-
 		StringBuilder output = new StringBuilder();
 
-		HashMap<GenericPoint<String>, svm_model> allModels;
-		
+		HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>> allModels;
+
 
 		if (DaemonService.allHistogramsMap.get(trainID) == null) {
 			output.append("Error: trainID " + trainID + " not found");
@@ -267,7 +283,11 @@ public class SVMRandomCalc {
 			_svmModelsCacheLock.unlock();
 
 			// this calculation can take some time so we unlock
-			allModels = SVMCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID), output, 1.0);
+			long st = System.nanoTime();
+			allModels = SVMRandomCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID), output, 1.0);
+			long et = System.nanoTime();
+			double dur = (double)(et-st)/1000000000;
+			System.out.println("Time to create model: " + dur);
 
 			_svmModelsCacheLock.lock();
 			_svmModelsCache.put(trainID, allModels);
@@ -281,13 +301,27 @@ public class SVMRandomCalc {
 		// If we're running many instances of similar test data against the same training data
 		// we might want to implement a cache that's per-training set and save it externally
 		// rather than the current scheme of only caching within an instance of SVMKernel
-		GaussianFourierFeatures GFSTest = new GaussianFourierFeatures(DaemonService.allHistogramsMap.get(testID).get(testKey), AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS);
+		
+		Pair<GaussianRandomFeatures, svm_model> gffSVMPair = allModels.get(trainKey);
+		GaussianRandomFeatures gff = gffSVMPair.getValue0();
+		
+		long st2 = System.nanoTime();
+		SVMRandomGaussian GFSTest = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(testID).get(testKey), AnomalyDetectionConfiguration.SVM_D, gff, AnomalyDetectionConfiguration.NUM_THREADS);
 		svm_node[][] testFeatures = GFSTest.getData(); 
-
-		svm_model oneModel = allModels.get(trainKey);
+ 
+		svm_model oneModel = gffSVMPair.getValue1();
 		int index = 0;
 
-		
+//		System.out.println("QUICK TESTS: -------------------");
+//		
+//		GenericPoint<Integer> p1 = DaemonService.allHistogramsMap.get(testID).get(testKey).get(2).getValue1();
+//		GenericPoint<Integer> p2 = DaemonService.allHistogramsMap.get(testID).get(testKey).get(15).getValue1();
+//
+//		System.out.println("RBF Kernel: " +gff.gaussianKernel(p1, p2));
+//		System.out.println("Linear Kernel: " + gff.linearKernel(gff.computeGaussianFourierFeatures(p1), gff.computeGaussianFourierFeatures(p2)));
+//		
+//		System.out.println("--------------------------------");
+
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testKey)) {
 			double[] values = new double[1];
 			svm.svm_predict_values(oneModel, testFeatures[index], values);
@@ -304,6 +338,11 @@ public class SVMRandomCalc {
 			}
 			index++;
 		}
+		
+		long et2 = System.nanoTime();
+		double dur2 = (double)(et2-st2)/1000000000;
+		System.out.println("Time to test: " + dur2);
+		
 		return output;
 	}
 
