@@ -13,6 +13,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.javatuples.Pair;
+import org.apache.commons.math3.distribution.UniformRealDistribution;
 
 import com.savarese.spatial.GenericPoint;
 
@@ -183,7 +184,7 @@ public class DaemonService {
 	public GenericPoint<String> getPointFromCSV(String csv) {
 		String[] sParts = csv.split(",");
 		GenericPoint<String> point = new GenericPoint(sParts.length);
-
+		
 		for (int ii = 0; ii < sParts.length; ii++) {
 			point.setCoord(ii, sParts[ii]);
 		}
@@ -203,7 +204,7 @@ public class DaemonService {
 		output.append(SVMCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), testID, getPointFromCSV(testKey), null));
 		return Response.status(200).entity(output.toString()).build();
 	}
-	
+
 	@GET
 	@Path("/testSVMRandom")
 	@Produces(MediaType.TEXT_PLAIN)
@@ -252,7 +253,7 @@ public class DaemonService {
 		output.append(SVMCalc.runAllTestSVM());
 		return Response.status(200).entity(output.toString()).build();
 	}
-	
+
 	@GET
 	@Path("/testallSVMRandom")
 	@Produces(MediaType.TEXT_PLAIN)
@@ -329,6 +330,148 @@ public class DaemonService {
 		anomalyID = id;
 		anomalyKey = getPointFromCSV(csvKey);
 
+		return Response.status(200).entity(output).build();
+	}
+
+	@GET
+	@Path("/customTest")
+	@Produces(MediaType.TEXT_PLAIN)
+	public Response customTest(@QueryParam("n") Integer n, @QueryParam("size") Integer s, @QueryParam("rn") Integer rn){//@QueryParam("id") Integer id,
+		//@QueryParam("csvKey") String csvKey) {
+
+		StringBuilder output = new StringBuilder("Custom Test\n\n");
+		
+		output.append(getFakeData2(n,s,rn).getEntity());
+//		String filename="/usr0/home/sibiv/Research/Data/GRE.out";
+//		DataIOFile foo = new DataIOFile(filename);
+//		allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
+//		System.out.println("Opened file.");
+
+		int id = nextHistogramMapID-1;
+		String csvKey1 = "a1,b1";
+		String csvKey2 = "a2,b2";
+		
+		GenericPoint<String> trainKey = getPointFromCSV(csvKey1);
+		GenericPoint<String> testKey = getPointFromCSV(csvKey2);
+
+		output.append("\n\nSVM RANDOM:\n");
+		output.append(SVMRandomCalc.runOneTestSVM(id, trainKey, id, testKey, null).toString());
+		output.append("\n\nSVM:\n");
+		output.append(SVMCalc.runOneTestSVM(id, trainKey, id, testKey, null));
+		
+		Response r = Response.status(200).entity(output.toString()).build();
+		
+		return Response.status(200).entity(output.toString()).build();
+	}
+
+	@GET
+	@Path("/getfakedata2")
+	@Produces(MediaType.TEXT_PLAIN)
+	public Response getFakeData2(@QueryParam("n") Integer n, @QueryParam("size") Integer s, @QueryParam("rn") Integer rn) {
+		StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
+		
+		HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> fakeData = new HashMap();
+		
+		UniformRealDistribution urd = new UniformRealDistribution (0.0, 1.0);
+
+		// generate a sparse-ish lower half of a matrix. This will be our training data
+		ArrayList<Pair<Integer, GenericPoint<Integer>>> training = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+		
+		int hs = (int) s/2; // half size
+		int qs = (int) s/2; // quarter size
+		
+		output.append("Train data:\n\n");
+		
+		int fakeTime = 1;
+		for (int i = 0; i < n; i += 1) {
+			GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
+			for (int j = 0; j < s; j += 1) { // Randomly fill second half with 1s and 0s
+				if (j < hs)
+					fakePoint.setCoord(j, 0);
+				else if (urd.sample() > 0.5)
+					fakePoint.setCoord(j, 1);
+				else
+					fakePoint.setCoord(j, 0);
+				
+			}
+			output.append(fakePoint.toString() + "\n");
+			Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
+			training.add(fakePair);
+			fakeTime++;
+		}
+		GenericPoint<String> key = new GenericPoint<String>(2);
+		key.setCoord(0, "a1");
+		key.setCoord(1, "b1");
+		fakeData.put(key, training);
+		output.append("Key: a1, b1 (" + training.size() + ")\n\n");
+
+		output.append("Test data:\n\n");
+		// generate a dense full matrix. This will be test data used to run against the lower half matrix
+		int normal_n = (int) 3*n/4;
+		fakeTime = 1;
+		ArrayList<Pair<Integer, GenericPoint<Integer>>> testing = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+		for (int i = 0; i < n; i += 1) {
+			GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
+			if (i < normal_n) {
+				for (int j = 0; j < s; j += 1) { // Randomly fill second half with 1s and 0s
+					if (j < hs || urd.sample() < 0.5)
+						fakePoint.setCoord(j, 0);
+					else
+						fakePoint.setCoord(j, 1);
+				}
+			} else {
+				for (int j = 0; j < s; j += 1) { // Randomly fill first quarter with 0s and 1s (anomalies)
+					if (j < qs && urd.sample() > 0.5)
+						fakePoint.setCoord(j, 1);
+					else
+						fakePoint.setCoord(j, 0);
+					
+				}
+			}
+			output.append(fakePoint.toString() + "\n");
+			Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
+			testing.add(fakePair);
+			fakeTime++;
+		}
+		GenericPoint<String> key2 = new GenericPoint<String>(2);
+		key2.setCoord(0, "a2");
+		key2.setCoord(1, "b2");
+		fakeData.put(key2, testing);
+		output.append("Key: a2, b2 (" + testing.size() + ")\n");
+
+		// override this since we don't use the ?????????????????????
+		HistoTuple.setDimensions(s);
+
+		
+		allHistogramsMap.put(nextHistogramMapID, fakeData);
+		nextHistogramMapID++;
+		
+		//output.append(allHistogramsMap.get(0).get(key2).get(0).toString());
+		return Response.status(200).entity(output.toString()).build();
+	}
+
+	
+	@GET
+	@Path("/getDatasetKeys")
+	@Produces(MediaType.TEXT_HTML)
+	public Response getDatasetKeys() {
+		String output = new String();
+
+		for (Integer id : allHistogramsMap.keySet()) {
+			output += "ID " + id + "<ul>";
+			for (GenericPoint<String> keyFields : allHistogramsMap.get(id).keySet()) {
+				output += "<li>";
+				for (int ii = 0; ii < keyFields.getDimensions(); ii++) {
+					output += keyFields.getCoord(ii);
+					if (ii != keyFields.getDimensions() - 1) {
+						output += ", ";
+					}
+				}
+				output += "\t\t(datapoints: " + allHistogramsMap.get(id).get(keyFields).size() + ")";
+				output += "</li>";
+			}
+			output += "</ul>";
+		}
 		return Response.status(200).entity(output).build();
 	}
 }

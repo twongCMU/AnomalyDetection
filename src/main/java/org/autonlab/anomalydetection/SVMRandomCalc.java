@@ -1,9 +1,12 @@
 package org.autonlab.anomalydetection;
 
 import com.savarese.spatial.*;
+
 import java.util.*;
 import java.util.concurrent.locks.*;
+
 import libsvm.*;
+
 import org.apache.commons.collections.map.*;
 import org.javatuples.*; //Tuples, Pair
 
@@ -40,6 +43,12 @@ public class SVMRandomCalc {
 	}
 
 	private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
+		
+		// For quiet SVM
+		svm.svm_set_print_string_function(new QuietPrint());
+		
+		System.out.println("YYY -------------------------");
+		
 		TreeMap<Double, Double> nuValues = new TreeMap<Double,Double>();
 		System.out.println("YYY -------------------------");
 		// generate a list of nu values to try (we can add to this later)
@@ -244,7 +253,6 @@ public class SVMRandomCalc {
 			return output;
 		}
 
-		
 		boolean changed = HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testKey));
 
 		_svmModelsCacheLock.lock();
@@ -279,6 +287,7 @@ public class SVMRandomCalc {
 		svm_model oneModel = allModels.get(trainKey);
 		int index = 0;
 
+		
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testKey)) {
 			double[] values = new double[1];
 			svm.svm_predict_values(oneModel, testFeatures[index], values);

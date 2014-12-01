@@ -44,6 +44,7 @@ public class GaussianFourierFeatures implements Runnable {
 	// Mean and covariance of Gaussian distribution
 	double[] _mu;
 	double[][] _cov;
+	double _gammak;
 	MultivariateNormalDistribution _mnd;
 	// Our w vectors in order to generate the random features 
 	double[][] _ws; 
@@ -68,7 +69,7 @@ public class GaussianFourierFeatures implements Runnable {
 	 * @param histograms The ArrayList of histograms that we're 
 	 * @param threadCount The number of threads to use to perform the computation
 	 * @param D The number of random fourier features
-	 * @param sigmak A measure of the bandwidth of the RBF kernel; gamma = 1/(2*sigmak^2)   
+	 * @param sigmak A measure of the bandwidth of the RBF kernel; gammak = 1/(2*sigmak^2)   
 	 * @param threadCount if svm_type is svm_parameter.PRECOMPUTED, use this many threads to apply kernel. Otherwise ignore value
 	 */
 	public GaussianFourierFeatures(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, int D, double gammak, int threadCount) {
@@ -77,6 +78,7 @@ public class GaussianFourierFeatures implements Runnable {
 		_histograms = histograms;
 		_D = D;
 		_n = _histograms.get(0).getValue1().getDimensions();
+		_gammak = gammak;
 		_retNode = new svm_node[histograms.size()][];
 		_retNodeRowCache = new HashMap<GenericPoint<Integer>,Integer>();
 		
@@ -87,7 +89,7 @@ public class GaussianFourierFeatures implements Runnable {
 		for(int i = 0; i < _n; i++) {
 			_mu[i] = 0;
 			for(int j = 0; j < _n; j++)
-				_cov[i][j] = (i == j) ? 2*gammak : 0;
+				_cov[i][j] = (i == j) ? 2*_gammak : 0;
 		}
 		_mnd = new MultivariateNormalDistribution(_mu, _cov);
 		_ws = new double[_D][];
@@ -233,6 +235,26 @@ public class GaussianFourierFeatures implements Runnable {
 		}
 	
 		return f;
+	}
+	
+	/**
+	 * Calculate the kernel between two histograms histX and histY
+	 * See gaussian (RBF) Kernel here: http://crsouza.blogspot.com/2010/03/kernel-functions-for-machine-learning.html
+	 *
+	 * This is implemented for debugging purposes since the svmlib already has an RBF option
+	 *
+	 * @param histX the first histogram
+	 * @param histY the second histogram
+	 *
+	 * @return the kernel value of two histograms x and y
+	 */
+	public double gaussianKernel(GenericPoint<Integer> histX, GenericPoint<Integer> histY) {
+		double res = 0.0;
+
+		for (int i = 0; i < histX.getDimensions(); i++) {
+			res += Math.pow(histX.getCoord(i) - histY.getCoord(i), 2);
+		}
+		return Math.exp(-_gammak*res);
 	}
 
 }
