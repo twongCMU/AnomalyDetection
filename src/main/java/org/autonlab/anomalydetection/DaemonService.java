@@ -11,6 +11,7 @@ import org.javatuples.*;
 @Path("/")
 public class DaemonService {
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
+    static volatile HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Integer>> allHistogramsMapKeyRemap = new HashMap();
     // XYZ the lock should also protect reads/deletes to allHistogramsMap!
 
     static volatile int nextHistogramMapID = 0;
@@ -302,10 +303,11 @@ public class DaemonService {
      * @param id The data index ID returned when the data was read in
      * @param trainKeyCSV a CSV of keys
      * @param valueKeyCSV a CSV of histogram values
+     * @param output function will add text to this if it makes a new mapping
      *
      * @return the ID that contains the data with indexes valueKeyCSV and trainKeyCSV (which may be different from the input id) or -1 if none
      */
-    public int recalculateByKey(Integer id, String trainKeyCSV, String valueKeyCSV) {
+    public int recalculateByKey(Integer id, String trainKeyCSV, String valueKeyCSV, StringBuilder output) {
 	GenericPoint<String> newKey = getPointFromCSV(trainKeyCSV);
 	GenericPoint<String> valueKey = getPointFromCSV(valueKeyCSV);
 
@@ -319,6 +321,12 @@ public class DaemonService {
 	    return id;
 	}
 
+	if (allHistogramsMapKeyRemap.get(valueKey) != null &&
+	    allHistogramsMapKeyRemap.get(valueKey).get(newKey) != null) {
+	    return allHistogramsMapKeyRemap.get(valueKey).get(newKey);
+	}
+
+	// XYZ probably move this lock to beginning of function
 	allHistogramsMapLock.lock();
 
 	allHistogramsMap.put(nextHistogramMapID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
@@ -364,6 +372,7 @@ public class DaemonService {
 	if (subsetsFound > 0) {
 	    newID = nextHistogramMapID;
 	    nextHistogramMapID++;
+	    output.append("Did not find appropriate data at ID " + id + " but was able to create it from existing data and put it in id " + newID + "\n");
 	}
 	allHistogramsMapLock.unlock();
 
@@ -411,24 +420,39 @@ public class DaemonService {
 			       @QueryParam("testValue") String testValue) {
 	StringBuilder output = new StringBuilder("Calculation method: SVM\n");
 
-	trainID = recalculateByKey(trainID, trainKey, trainValue);
-	if (trainID == -1) {
+	GenericPoint<String> trainKeyPoint = getPointFromCSV(trainKey);
+	GenericPoint<String> trainValuePoint = getPointFromCSV(trainValue);
+	GenericPoint<String> testKeyPoint = getPointFromCSV(testKey);
+	GenericPoint<String> testValuePoint = getPointFromCSV(testValue);
+
+	int newTrainID = recalculateByKey(trainID, trainKey, trainValue, output);
+	if (newTrainID == -1) {
 	    output.append("ERROR: trainKeyCSV (" + trainKey + ") was not found and could not be calculated from existing data\n");
 	    return Response.status(200).entity(output.toString()).build();
 	}
-	else {
-	    output.append("NOTE: trainKeyCSV (" + trainKey + ") was not found but was calculated from existing data and stored at ID " + trainID + "\n");
+	else if (newTrainID != trainID) {
+	    output.append("NOTE: trainKeyCSV (" + trainKey + ") was not found at id " + trainID + " but found it at ID " + newTrainID + "\n");
+	    trainID = newTrainID;
+	    if (allHistogramsMapKeyRemap.get(trainValuePoint) == null) {
+		allHistogramsMapKeyRemap.put(trainValuePoint, new HashMap<GenericPoint<String>, Integer>());
+	    }
+	    allHistogramsMapKeyRemap.get(trainValuePoint).put(trainKeyPoint, trainID);
 	}
-	testID = recalculateByKey(testID, testKey, testValue);
-	if (testID == -1) {
+	int newTestID = recalculateByKey(testID, testKey, testValue, output);
+	if (newTestID == -1) {
 	    output.append("ERROR: testKeyCSV  (" + testKey + ") was not found and could not be calculated from existing data\n");
 	    return Response.status(200).entity(output.toString()).build();
 	}
-	else {
-	    output.append("NOTE: testKeyCSV  (" + testKey + ") was not found but was calculated from existing data and stored at ID " + testID + "\n");
+	else if (newTestID != testID) {
+	    output.append("NOTE: testKeyCSV  (" + testKey + ") was not found at id " + testID + " but found it at ID " + newTestID + "\n");
+	    testID = newTestID;
+	    if (allHistogramsMapKeyRemap.get(testValuePoint) == null) {
+		allHistogramsMapKeyRemap.put(testValuePoint, new HashMap<GenericPoint<String>, Integer>());
+	    }
+	    allHistogramsMapKeyRemap.get(testValuePoint).put(testKeyPoint, testID);
 	}
 
-	output.append(SVMCalc.runOneTestSVM(trainID, getPointFromCSV(trainKey), getPointFromCSV(trainValue), testID, getPointFromCSV(testKey), getPointFromCSV(testValue), null));
+	output.append(SVMCalc.runOneTestSVM(trainID, trainKeyPoint, trainValuePoint, testID, testKeyPoint, testValuePoint, null));
 
 
 	return Response.status(200).entity(output.toString()).build();
