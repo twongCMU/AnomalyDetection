@@ -232,12 +232,13 @@ public class DaemonService {
 			    @QueryParam("trainValue") String trainValue,
 			    @QueryParam("testID") Integer testID,
 			    @QueryParam("testKeyCSV") String testKey,
-			    @QueryParam("testValue") String testValue) {
+			    @QueryParam("testValue") String testValue,
+			    @QueryParam("autoReload") Integer autoReloadSec) {
 	if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
 	    return getDataKDTree(trainID, trainKey, trainValue, testID, testKey, testValue);
 	}
 	else if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
-	    return getDataSVM(trainID, trainKey, trainValue, testID, testKey, testValue);
+	    return getDataSVM(trainID, trainKey, trainValue, testID, testKey, testValue, autoReloadSec);
 	}
 	else {
 	    throw new RuntimeException("unknown calculation type");
@@ -418,14 +419,20 @@ public class DaemonService {
 
     @GET
     @Path("/testSVM")
-    @Produces(MediaType.TEXT_PLAIN)
+    @Produces(MediaType.TEXT_HTML)
     public Response getDataSVM(@QueryParam("trainID") Integer trainID,
 			       @QueryParam("trainKeyCSV") String trainKey,
 			       @QueryParam("trainValue") String trainValue,
 			       @QueryParam("testID") Integer testID,
 			       @QueryParam("testKeyCSV") String testKey,
-			       @QueryParam("testValue") String testValue) {
-	StringBuilder output = new StringBuilder("Calculation method: SVM\n");
+			       @QueryParam("testValue") String testValue,
+			       @QueryParam("autoReloadSec") Integer autoReloadSec) {
+
+	StringBuilder output = new StringBuilder("<html>");
+	if (autoReloadSec != null && autoReloadSec > 0) {
+	    output.append("<head><meta http-equiv='refresh' content='" + autoReloadSec + "'></head>");
+	}
+	output.append("<body><pre>Calculation method: SVM\n");
 
 	GenericPoint<String> trainKeyPoint = getPointFromCSV(trainKey);
 	GenericPoint<String> trainValuePoint = getPointFromCSV(trainValue);
