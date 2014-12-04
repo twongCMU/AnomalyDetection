@@ -92,7 +92,7 @@ public class DaemonService {
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 
 	DataIOFile foo = new DataIOFile(filename);
-	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
+	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(0), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
 	for (GenericPoint<String> valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
 	    for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
 		output.append("Key: " + key.toString() + ", Value: " + valueName);
@@ -106,13 +106,17 @@ public class DaemonService {
 
     /**
      *
+     * @param ageMins The number of minutes into the past from the current time to include data. Everything else is excluded
+     *                 NOTE: as of this writing we're hard coding the current time to be 2014-05-12T13:54:12.000-04:00 since
+     *                       that is the most recent time of our test data and we're not using live data
      */
     @GET
     @Path("/getdb")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDb(@QueryParam("hostname") String hostname,
 			  @QueryParam("keyCSV") String keyCSV,
-			  @QueryParam("value") String valueCSV) {
+			  @QueryParam("value") String valueCSV,
+			  @QueryParam("ageMins") Integer ageMins) {
 	allHistogramsMapLock.lock();
 
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
@@ -125,8 +129,11 @@ public class DaemonService {
 	if (valueCSV != null) {
 	    dbHandle.setValueFields(valueCSV);
 	}
+	if (ageMins == null) {
+	    ageMins = 0;
+	}
 
-	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(dbHandle.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
+	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(dbHandle.getData(ageMins), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
 	for (GenericPoint<String> valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
 	    for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
 		output.append("Key: " + key.toString() + ", Value: " + valueName);

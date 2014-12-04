@@ -20,7 +20,7 @@ public class DataIOFile implements DataIO {
      * Read a csv file and return a HashMap
      *
      */
-    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData() {
+    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData(int minutesBack) {
 	GenericPoint<String> valueType = new GenericPoint(1);
 	valueType.setCoord(0, "text_values.messagetype");
 	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();

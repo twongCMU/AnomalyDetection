@@ -3,6 +3,7 @@ package org.autonlab.anomalydetection;
 import com.datastax.driver.core.*; //cassandra
 import com.savarese.spatial.*;
 import java.util.*;
+import org.joda.time.*;
 
 public class DataIOCassandraDB implements DataIO {
     private Session _session;
@@ -55,8 +56,12 @@ public class DataIOCassandraDB implements DataIO {
     }
 
     /* histogram data names -> key names -> histograms */
-    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData() {
+    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData(int minutesBack) {
 	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
+
+	// use a value relevant to the test data. In the future, use empty constructor for current time
+	DateTime endTime = new DateTime("2014-05-12T13:54:12.000-04:00");
+	DateTime startTime = endTime.minusMinutes(minutesBack);
 
 	int getTextValues = 0;
 
@@ -100,6 +105,9 @@ public class DataIOCassandraDB implements DataIO {
 
 	selectStatement = selectStatement.substring(0, selectStatement.length() - 1); // drop the trailing comma from above
 	selectStatement += " FROM " + _keyspace + ".packet";
+	if (minutesBack > 0) {
+	    selectStatement += " WHERE time_stamp > '" + startTime + "' AND time_stamp < '" + endTime + "' ALLOW FILTERING";
+	}
 	System.out.println("Statement is " + selectStatement);
 	ResultSet results = _session.execute(selectStatement);
 
