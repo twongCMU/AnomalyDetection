@@ -263,16 +263,20 @@ public class HistoTuple {
 	return ret;
     }
 
-    public static boolean upgradeWindowsDimensions(GenericPoint<String> valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramA, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramB) {
-	boolean retA;
-	boolean retB;
+    public static boolean upgradeWindowsDimensions(GenericPoint<String> valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramA, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramB, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramC) {
+	boolean retA = false;
+	boolean retB = false;
+	boolean retC = false;
 
 	_histoTupleDataLock.lock();	
 	retA = upgradeWindowsDimensionsOne(valueType, histogramA);
 	retB = upgradeWindowsDimensionsOne(valueType, histogramB);
+	if (histogramC != null) {
+	    retC = upgradeWindowsDimensionsOne(valueType, histogramC);
+	}
 	_histoTupleDataLock.unlock();
 
-	if (retA == true || retB == true) {
+	if (retA == true || retB == true || retC == true) {
 	    return true;
 	}
 	return false;

@@ -18,16 +18,15 @@ public class SVMCalc {
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, svm_model>> _svmModelsCache = new HashMap();
     static volatile Lock _svmModelsCacheLock = new ReentrantLock();
 
-    public static HashMap<GenericPoint<String>, svm_model> makeSVMModel(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> histograms, StringBuilder output, double targetAccuracy) {
+    public static HashMap<GenericPoint<String>, svm_model> makeSVMModel(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> histograms, StringBuilder output, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalyHistograms, double targetAccuracy) {
 	HashMap<GenericPoint<String>, svm_model> newMap = new HashMap();
 
-	ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
-	if (DaemonService.anomalyID >= 0) {
-	    anomalyData = DaemonService.allHistogramsMap.get(DaemonService.anomalyID).get(DaemonService.anomalyValue).get(DaemonService.anomalyKey);
-	}
 	for (GenericPoint<String> keyAddr : histograms.keySet()) {
-	    // change 99.9 to be a parameter or maybe input to the rest call that sets the other anomaly key info
-	    newMap.put(keyAddr, generateModel(histograms.get(keyAddr), targetAccuracy, anomalyData, .9));
+	    ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly = null;
+	    if (anomalyHistograms != null && anomalyHistograms.get(keyAddr) != null) {
+		histogramsAnomaly = anomalyHistograms.get(keyAddr);
+	    }
+	    newMap.put(keyAddr, generateModel(histograms.get(keyAddr), targetAccuracy, histogramsAnomaly, .9));
 	}
 
 	return newMap;
@@ -88,7 +87,7 @@ public class SVMCalc {
 	    nuValues.put(svmParameter.nu, -1.0);
 
 	    AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
-	    svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
+	    svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.9);
 	    expandTimes++;
 	}
 
@@ -150,7 +149,6 @@ public class SVMCalc {
 		    if (prediction >= 0) {
 			totalCorrectAnomaly++;
 		    }
-
 		    index++;
 		}
 	    }
@@ -206,11 +204,12 @@ public class SVMCalc {
      * @param trainKey Key index for the training set histograms
      * @param testID ID of the model to use to test on
      * @param testKey Key index for the test set histograms
+     * @param anomalyID ID for a dataset that we will consider as all anomalies when training or null
      * @param results If not null, every result will be recorded here as score->timestamp. We use a MultiValueMap so duplicate scores will still be recorded
      *
      * @return some text that can be displayed to the user
      */
-    public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, GenericPoint<String> trainValue, Integer testID, GenericPoint<String> testKey, GenericPoint<String> testValue, MultiValueMap results) {
+    public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, GenericPoint<String> trainValue, Integer testID, GenericPoint<String> testKey, GenericPoint<String> testValue, Integer anomalyID, GenericPoint<String> anomalyKey, GenericPoint<String> anomalyValue, MultiValueMap results) {
 
 	StringBuilder output = new StringBuilder();
 
@@ -240,8 +239,22 @@ public class SVMCalc {
 	    output.append("Error: testKey of " + testKey.toString() + " for testID " + testID + " not found");
 	    return output;
 	}
+	if (DaemonService.allHistogramsMap.get(anomalyID) != null) {
+	    if (DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue) == null) {
+		output.append("Error: anomalyValue " + anomalyValue + " not found");
+		return output;
+	    }
+	    if (DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey) == null) {
+		output.append("Error: anomalyKey of " + anomalyKey.toString() + " for anomalyID " + anomalyID + " not found");
+		return output;
+	    }
+	}
 
-	boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey));
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyHistogram = null;
+	if (anomalyID != null) {
+	    anomalyHistogram = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey);
+	}
+	boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey), anomalyHistogram);
 
 	_svmModelsCacheLock.lock();
 
@@ -255,7 +268,11 @@ public class SVMCalc {
 	    _svmModelsCacheLock.unlock();
 
 	    // this calculation can take some time so we unlock
-	    allModels = SVMCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue), output, 0.9);
+	    HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalyHashmap = null;
+	    if (anomalyID != null) {
+		anomalyHashmap = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue);
+	    }
+	    allModels = SVMCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue), output, anomalyHashmap, 0.9);
 
 	    _svmModelsCacheLock.lock();
 	    _svmModelsCache.put(trainID, allModels);
@@ -316,7 +333,7 @@ public class SVMCalc {
 			MultiValueMap resultsHash = new MultiValueMap();
 
 			output.append("Highest 5 scores for ID " + keyID + " : <" + key.toString() + "> vs ID " + keyIDInner + " : <" + keyInner.toString() + ">\n");
-			runOneTestSVM(keyID, key, valueType, keyIDInner, keyInner, valueType, resultsHash);
+			runOneTestSVM(keyID, key, valueType, keyIDInner, keyInner, valueType, null, null, null, resultsHash);
 
 			List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 			Collections.sort(resultsHashList); // ascending order

@@ -17,10 +17,6 @@ public class DaemonService {
     static volatile int nextHistogramMapID = 0;
     static volatile Lock allHistogramsMapLock = new ReentrantLock();
 
-    static int anomalyID = -1;
-    static GenericPoint<String> anomalyKey;
-    static String anomalyValue;
-
     /**
      * Get the histogram's number of dimensions and their names. This is so that calls to /evaluate can be constructed properly
      *
@@ -233,12 +229,15 @@ public class DaemonService {
 			    @QueryParam("testID") Integer testID,
 			    @QueryParam("testKeyCSV") String testKey,
 			    @QueryParam("testValue") String testValue,
+			    @QueryParam("anomalyTrainID") Integer anomalyTrainID,
+			    @QueryParam("anomalyTrainKeyCSV") String anomalyTrainKey,
+			    @QueryParam("anomalyTrainValue") String anomalyTrainValue,
 			    @QueryParam("autoReload") Integer autoReloadSec) {
 	if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
 	    return getDataKDTree(trainID, trainKey, trainValue, testID, testKey, testValue);
 	}
 	else if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
-	    return getDataSVM(trainID, trainKey, trainValue, testID, testKey, testValue, autoReloadSec);
+	    return getDataSVM(trainID, trainKey, trainValue, testID, testKey, testValue, anomalyTrainID, anomalyTrainKey, anomalyTrainValue, autoReloadSec);
 	}
 	else {
 	    throw new RuntimeException("unknown calculation type");
@@ -426,6 +425,9 @@ public class DaemonService {
 			       @QueryParam("testID") Integer testID,
 			       @QueryParam("testKeyCSV") String testKey,
 			       @QueryParam("testValue") String testValue,
+			       @QueryParam("anomalyTrainID") Integer anomalyTrainID,
+			       @QueryParam("anomalyTrainKeyCSV") String anomalyTrainKey,
+			       @QueryParam("anomalyTrainValue") String anomalyTrainValue,
 			       @QueryParam("autoReloadSec") Integer autoReloadSec) {
 
 	StringBuilder output = new StringBuilder("<html>");
@@ -438,6 +440,13 @@ public class DaemonService {
 	GenericPoint<String> trainValuePoint = getPointFromCSV(trainValue);
 	GenericPoint<String> testKeyPoint = getPointFromCSV(testKey);
 	GenericPoint<String> testValuePoint = getPointFromCSV(testValue);
+
+	GenericPoint<String> anomalyTrainKeyPoint = null;
+	GenericPoint<String> anomalyTrainValuePoint = null;
+	if (anomalyTrainKey != null) {
+	    anomalyTrainKeyPoint = getPointFromCSV(anomalyTrainKey);
+	    anomalyTrainValuePoint = getPointFromCSV(anomalyTrainValue);
+	}
 
 	int newTrainID = recalculateByKey(trainID, trainKey, trainValue, output);
 	if (newTrainID == -1) {
@@ -465,8 +474,22 @@ public class DaemonService {
 	    }
 	    allHistogramsMapKeyRemap.get(testValuePoint).put(testKeyPoint, testID);
 	}
-
-	output.append(SVMCalc.runOneTestSVM(trainID, trainKeyPoint, trainValuePoint, testID, testKeyPoint, testValuePoint, null));
+	if (anomalyTrainID != null) {
+	    int newAnomalyTrainID = recalculateByKey(anomalyTrainID, anomalyTrainKey, anomalyTrainValue, output);
+	    if (newAnomalyTrainID == -1) {
+		output.append("ERROR: anomalyTrainKeyCSV (" + anomalyTrainKey + ") was not found and could not be calculated from existing data\n");
+		return Response.status(200).entity(output.toString()).build();
+	    }
+	    else if (newAnomalyTrainID != anomalyTrainID) {
+		output.append("NOTE: anomalyTrainKeyCSV (" + anomalyTrainKey + ") was not found at id " + anomalyTrainID + " but found it at ID " + newAnomalyTrainID + "\n");
+		anomalyTrainID = newAnomalyTrainID;
+		if (allHistogramsMapKeyRemap.get(anomalyTrainValuePoint) == null) {
+		    allHistogramsMapKeyRemap.put(anomalyTrainValuePoint, new HashMap<GenericPoint<String>, Integer>());
+		}
+		allHistogramsMapKeyRemap.get(anomalyTrainValuePoint).put(anomalyTrainKeyPoint, anomalyTrainID);
+	    }
+	}
+	output.append(SVMCalc.runOneTestSVM(trainID, trainKeyPoint, trainValuePoint, testID, testKeyPoint, testValuePoint, anomalyTrainID, anomalyTrainKeyPoint, anomalyTrainValuePoint, null));
 
 
 	return Response.status(200).entity(output.toString()).build();
@@ -559,30 +582,6 @@ public class DaemonService {
     public Response getCalcType() {
 	String output = "Calc type is " + AnomalyDetectionConfiguration.CALC_TYPE_NAMES[AnomalyDetectionConfiguration.CALC_TYPE_TO_USE];
 	output += "<br>" + AnomalyDetectionConfiguration.printCalcTypeNameLinksHTML("setCalcType/");
-	return Response.status(200).entity(output).build();
-    }
-
-    @GET
-    @Path("/setAnomalyKey")
-    @Produces(MediaType.TEXT_HTML)
-    public Response setAnomalyKey(@QueryParam("id") Integer id,
-				  @QueryParam("csvKey") String csvKey) {
-	String output = "ok";
-	
-	anomalyID = id;
-	anomalyKey = getPointFromCSV(csvKey);
-
-	return Response.status(200).entity(output).build();
-    }
-
-    @GET
-    @Path("/setAnomalyValue")
-    @Produces(MediaType.TEXT_HTML)
-    public Response setAnomalyValue(@QueryParam("value") String value) {
-	String output = "ok";
-	
-	anomalyValue = value;
-
 	return Response.status(200).entity(output).build();
     }
 	
