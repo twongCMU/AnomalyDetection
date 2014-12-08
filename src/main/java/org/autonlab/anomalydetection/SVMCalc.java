@@ -15,23 +15,9 @@ import org.javatuples.*; //Tuples, Pair
 // also, NU_START_POW_LOW is modified
 public class SVMCalc {
      // cache of processed models. This is shared across concurrent accesses so we need to protect it with a lock
-    static volatile HashMap<Integer, HashMap<GenericPoint<String>, svm_model>> _svmModelsCache = new HashMap();
+    static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, svm_model>>> _svmModelsCache = new HashMap();
     static volatile Lock _svmModelsCacheLock = new ReentrantLock();
-
-    public static HashMap<GenericPoint<String>, svm_model> makeSVMModel(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> histograms, StringBuilder output, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalyHistograms, double targetAccuracy) {
-	HashMap<GenericPoint<String>, svm_model> newMap = new HashMap();
-
-	for (GenericPoint<String> keyAddr : histograms.keySet()) {
-	    ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly = null;
-	    if (anomalyHistograms != null && anomalyHistograms.get(keyAddr) != null) {
-		histogramsAnomaly = anomalyHistograms.get(keyAddr);
-	    }
-	    newMap.put(keyAddr, generateModel(histograms.get(keyAddr), targetAccuracy, histogramsAnomaly, .9));
-	}
-
-	return newMap;
-    }
-
+  
     private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
 	TreeMap<Double, Double> nuValues = new TreeMap();
 	System.out.println("YYY -------------------------");
@@ -213,7 +199,7 @@ public class SVMCalc {
 
 	StringBuilder output = new StringBuilder();
 
-    	HashMap<GenericPoint<String>, svm_model> allModels;
+    	svm_model svmModel = null;
 
 	if (DaemonService.allHistogramsMap.get(trainID) == null) {
 	    output.append("Error: trainID " + trainID + " not found");
@@ -263,21 +249,31 @@ public class SVMCalc {
 	    _svmModelsCache.remove(testID);
 	}
 
-	allModels = _svmModelsCache.get(trainID);
-	if (allModels == null) {
+	if (_svmModelsCache.get(trainID) == null ||
+	    _svmModelsCache.get(trainID).get(trainValue) == null ||
+	    _svmModelsCache.get(trainID).get(trainValue).get(trainKey) == null) {
 	    _svmModelsCacheLock.unlock();
 
-	    // this calculation can take some time so we unlock
-	    HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalyHashmap = null;
+	    // this calculation can take some time so we unlock the cache and we'll recheck before we save it to cache
+	    ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
 	    if (anomalyID != null) {
-		anomalyHashmap = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue);
+		anomalyData = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey);
 	    }
-	    allModels = SVMCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue), output, anomalyHashmap, 0.9);
+	    svmModel = SVMCalc.generateModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), .9, anomalyData, .9);
 
 	    _svmModelsCacheLock.lock();
-	    _svmModelsCache.put(trainID, allModels);
+	    if (_svmModelsCache.get(trainID) == null) {
+		_svmModelsCache.put(trainID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, svm_model>>());
+	    }
+	    if (_svmModelsCache.get(trainID).get(trainValue) == null) {
+		_svmModelsCache.get(trainID).put(trainValue, new HashMap<GenericPoint<String>, svm_model>());
+	    }
+	    if (_svmModelsCache.get(trainID).get(trainValue).get(trainKey) == null) {
+		_svmModelsCache.get(trainID).get(trainValue).put(trainKey, svmModel);
+	    }
 	}
 	else {
+	    svmModel = _svmModelsCache.get(trainID).get(trainValue).get(trainKey);
 	    System.out.println("SVM Model cache hit");
 
 	}
@@ -289,11 +285,10 @@ public class SVMCalc {
 	SVMKernel svmKernel = new SVMKernel(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey), DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
 	svm_node[][] bar = svmKernel.getData();
 
-	svm_model oneModel = allModels.get(trainKey);
 	int index = 0;
 	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey)) {
 	    double[] values = new double[1];
-	    svm.svm_predict_values(oneModel, bar[index], values);
+	    svm.svm_predict_values(svmModel, bar[index], values);
 	    double prediction = values[0];
 
 	    // this code returns a lower score for more anomalous so we flip it to match kdtree
