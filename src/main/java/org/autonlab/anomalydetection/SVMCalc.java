@@ -16,7 +16,7 @@ import org.javatuples.*; //Tuples, Pair
 public class SVMCalc {
      // cache of processed models. This is shared across concurrent accesses so we need to protect it with a lock
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, svm_model>>> _svmModelsCache = new HashMap();
-    static volatile Lock _svmModelsCacheLock = new ReentrantLock();
+    static volatile ReentrantLock _svmModelsCacheLock = new ReentrantLock();
   
     private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
 	TreeMap<Double, Double> nuValues = new TreeMap();
@@ -288,6 +288,7 @@ public class SVMCalc {
 	int index = 0;
 	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey)) {
 	    double[] values = new double[1];
+
 	    svm.svm_predict_values(svmModel, bar[index], values);
 	    double prediction = values[0];
 
@@ -297,7 +298,7 @@ public class SVMCalc {
 	    output.append("predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data " + bar[index][0].value + "\n");
 
 	    if (results != null) {
-		results.put(prediction, onePoint.getValue0());
+		results.put(prediction, onePoint);
 	    }
 	    index++;
 	}
@@ -342,8 +343,9 @@ public class SVMCalc {
 			    if (ii >= 5) {
 				break;
 			    }
-			    for (Integer timestamp : ((Collection<Integer>)resultsHash.getCollection(score))) {
-				output.append(score + " at time " + timestamp + "( " + ((Collection<Integer>)resultsHash.getCollection(score)).size() + " with this score)\n");
+			    for (Pair<Integer, GenericPoint<Integer>> onePoint : ((Collection<Pair<Integer, GenericPoint<Integer>>>)resultsHash.getCollection(score))) {
+				Integer timestamp = onePoint.getValue0();
+				output.append(score + " at time " + timestamp + "( " + ((Collection<Pair<Integer, GenericPoint<Integer>>>)resultsHash.getCollection(score)).size() + " with this score)\n");
 				break;
 			    }
 			    ii++;

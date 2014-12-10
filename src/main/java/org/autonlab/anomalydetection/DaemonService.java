@@ -6,16 +6,17 @@ import java.util.*;
 import java.util.concurrent.locks.*;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
+import org.apache.commons.collections.map.*;
 import org.javatuples.*;
 
 @Path("/")
 public class DaemonService {
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
-    static volatile HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Integer>> allHistogramsMapKeyRemap = new HashMap();
+    static volatile HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, HashMap<Pair<Integer, Integer>, Integer>>> allHistogramsMapKeyRemap = new HashMap();
     // XYZ the lock should also protect reads/deletes to allHistogramsMap!
 
     static volatile int nextHistogramMapID = 0;
-    static volatile Lock allHistogramsMapLock = new ReentrantLock();
+    static volatile ReentrantLock allHistogramsMapLock = new ReentrantLock();
 
     /**
      * Get the histogram's number of dimensions and their names. This is so that calls to /evaluate can be constructed properly
@@ -67,14 +68,20 @@ public class DaemonService {
 				  @QueryParam("keyCSV") String key,
 				  @QueryParam("valueCSV") String value) {
     
-	String output = new String();
+	StringBuilder output = new StringBuilder();
 
-	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(getPointFromCSV(value)).get(getPointFromCSV(key));
-	output += "Number of datapoints: " + histograms.size() + " \n";
-	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
-	    output += tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n";
+	int newID = recalculateByKey(id, key, value, output);
+	if (newID != id) {
+	    output.append("Didn't find the data at id " + id + " but found it at id " + newID);
+	    id = newID;
 	}
-	return Response.status(200).entity(output).build();
+	System.out.println("ZZZ id is now " + id + "\n");
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(getPointFromCSV(value)).get(getPointFromCSV(key));
+	output.append("Number of datapoints: " + histograms.size() + " \n");
+	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
+	    output.append(tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n");
+	}
+	return Response.status(200).entity(output.toString()).build();
     }
 	
     /**
@@ -327,12 +334,15 @@ public class DaemonService {
 	if (allHistogramsMap.get(id).get(valueKey).get(newKey) != null) {
 	    return id;
 	}
-
+	// XYZ need to calculate the time range from any existing data even if it doesn't match key and value since all data in ID has the same ranges
+	Pair<Integer, Integer> startAndEnd = getStartAndEndTime(id);
 	if (allHistogramsMapKeyRemap.get(valueKey) != null &&
-	    allHistogramsMapKeyRemap.get(valueKey).get(newKey) != null) {
-	    return allHistogramsMapKeyRemap.get(valueKey).get(newKey);
+	    allHistogramsMapKeyRemap.get(valueKey).get(newKey) != null &&
+	    startAndEnd != null &&
+	    allHistogramsMapKeyRemap.get(valueKey).get(newKey).get(startAndEnd) != null) {
+	    return allHistogramsMapKeyRemap.get(valueKey).get(newKey).get(startAndEnd);
 	}
-
+	System.out.println("ZZZ well here2\n");
 	// XYZ probably move this lock to beginning of function
 	allHistogramsMapLock.lock();
 
@@ -380,6 +390,16 @@ public class DaemonService {
 	    newID = nextHistogramMapID;
 	    nextHistogramMapID++;
 	    output.append("Did not find appropriate data at ID " + id + " but was able to create it from existing data and put it in id " + newID + "\n");
+
+	    if (allHistogramsMapKeyRemap.get(valueKey) == null) {
+		allHistogramsMapKeyRemap.put(valueKey, new HashMap<GenericPoint<String>, HashMap<Pair<Integer, Integer>, Integer>>());
+	    }
+	    if (allHistogramsMapKeyRemap.get(valueKey).get(newKey) == null) {
+		allHistogramsMapKeyRemap.get(valueKey).put(newKey, new HashMap<Pair<Integer, Integer>, Integer>());
+	    }
+	    startAndEnd = getStartAndEndTime(newID);
+	    allHistogramsMapKeyRemap.get(valueKey).get(newKey).put(startAndEnd, newID);
+	    System.out.println("ZZZ well here3\n");
 	}
 	allHistogramsMapLock.unlock();
 
@@ -447,7 +467,7 @@ public class DaemonService {
 	    anomalyTrainKeyPoint = getPointFromCSV(anomalyTrainKey);
 	    anomalyTrainValuePoint = getPointFromCSV(anomalyTrainValue);
 	}
-
+	System.out.println("ZZZ " + trainID + " : " + testID + " : " + anomalyTrainID + "\n");
 	int newTrainID = recalculateByKey(trainID, trainKey, trainValue, output);
 	if (newTrainID == -1) {
 	    output.append("ERROR: trainKeyCSV (" + trainKey + ") was not found and could not be calculated from existing data\n");
@@ -456,10 +476,6 @@ public class DaemonService {
 	else if (newTrainID != trainID) {
 	    output.append("NOTE: trainKeyCSV (" + trainKey + ") was not found at id " + trainID + " but found it at ID " + newTrainID + "\n");
 	    trainID = newTrainID;
-	    if (allHistogramsMapKeyRemap.get(trainValuePoint) == null) {
-		allHistogramsMapKeyRemap.put(trainValuePoint, new HashMap<GenericPoint<String>, Integer>());
-	    }
-	    allHistogramsMapKeyRemap.get(trainValuePoint).put(trainKeyPoint, trainID);
 	}
 	int newTestID = recalculateByKey(testID, testKey, testValue, output);
 	if (newTestID == -1) {
@@ -469,10 +485,6 @@ public class DaemonService {
 	else if (newTestID != testID) {
 	    output.append("NOTE: testKeyCSV  (" + testKey + ") was not found at id " + testID + " but found it at ID " + newTestID + "\n");
 	    testID = newTestID;
-	    if (allHistogramsMapKeyRemap.get(testValuePoint) == null) {
-		allHistogramsMapKeyRemap.put(testValuePoint, new HashMap<GenericPoint<String>, Integer>());
-	    }
-	    allHistogramsMapKeyRemap.get(testValuePoint).put(testKeyPoint, testID);
 	}
 	if (anomalyTrainID != null) {
 	    int newAnomalyTrainID = recalculateByKey(anomalyTrainID, anomalyTrainKey, anomalyTrainValue, output);
@@ -483,16 +495,95 @@ public class DaemonService {
 	    else if (newAnomalyTrainID != anomalyTrainID) {
 		output.append("NOTE: anomalyTrainKeyCSV (" + anomalyTrainKey + ") was not found at id " + anomalyTrainID + " but found it at ID " + newAnomalyTrainID + "\n");
 		anomalyTrainID = newAnomalyTrainID;
-		if (allHistogramsMapKeyRemap.get(anomalyTrainValuePoint) == null) {
-		    allHistogramsMapKeyRemap.put(anomalyTrainValuePoint, new HashMap<GenericPoint<String>, Integer>());
-		}
-		allHistogramsMapKeyRemap.get(anomalyTrainValuePoint).put(anomalyTrainKeyPoint, anomalyTrainID);
 	    }
 	}
-	output.append(SVMCalc.runOneTestSVM(trainID, trainKeyPoint, trainValuePoint, testID, testKeyPoint, testValuePoint, anomalyTrainID, anomalyTrainKeyPoint, anomalyTrainValuePoint, null));
+	System.out.println("ZZZ " + trainID + " : " + testID + " : " + anomalyTrainID + "\n");
+	MultiValueMap resultsHash = new MultiValueMap();
+	output.append(SVMCalc.runOneTestSVM(trainID, trainKeyPoint, trainValuePoint, testID, testKeyPoint, testValuePoint, anomalyTrainID, anomalyTrainKeyPoint, anomalyTrainValuePoint, resultsHash));
 
+	List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
+	Collections.sort(resultsHashList); // ascending order
+	Collections.reverse(resultsHashList); //descending order
+	int ii = 0;
+	Double score = resultsHashList.get(0);
+
+	Pair<Integer, Integer> trainTime = getStartAndEndTime(trainID);
+	Pair<Integer, Integer> anomalyTrainTime = getStartAndEndTime(anomalyTrainID);
+	Pair<Integer, Integer> testTime = getStartAndEndTime(testID);
+
+
+	for (Pair<Integer, GenericPoint<Integer>> onePoint : ((Collection<Pair<Integer, GenericPoint<Integer>>>)resultsHash.getCollection(score))) {
+	    Integer timestamp = onePoint.getValue0();
+	    output.append("\n====== Anomaly Detected Info =====\n"); //right now we just say the highest scoring point is anomaly just to make sure we can print the info
+	    output.append("Anomaly " + score + " at time " + timestamp + "( " + ((Collection<Integer>)resultsHash.getCollection(score)).size() + " with this score)\n");
+	    output.append(" * anomaly datapoint: " + onePoint.getValue1() + "\n");
+	    output.append(" * Training data: " + trainID + "," + trainKeyPoint.toString() + "," + trainValuePoint.toString() + " time range: " + trainTime.getValue0() + " to " + trainTime.getValue1() + "\n"); 
+	    output.append(" * Anomaly training data: " + anomalyTrainID + "," + anomalyTrainKeyPoint.toString() + "," + anomalyTrainValuePoint.toString() + " time range: " + anomalyTrainTime.getValue0() + " to " + anomalyTrainTime.getValue1() + "\n"); 
+	    output.append(" * Testing data: " + testID + "," + testKeyPoint.toString() + "," + testValuePoint.toString() + " time range: " + testTime.getValue0() + " to " + testTime.getValue1() + "\n");
+	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + trainID + "&keyCSV=" + trainKey + "&valueCSV=" + trainValue + ">link to training dataset</a>\n");
+	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&keyCSV=" + anomalyTrainKey + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
+	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + testID + "&keyCSV=" + testKey + "&valueCSV=" + testValue + ">link to testing dataset</a>\n");
+	    break;
+	}
 
 	return Response.status(200).entity(output.toString()).build();
+    }
+
+    /**
+     * This function does not lock the allHistogramsMap. It assumes the caller will use it and therefore
+     * will handle the locking
+     *
+     * @param id 
+     * @param key
+     * @param value
+     *
+     * @return true if there is a histogram for the input values, false if not
+     */
+    public boolean verifyHistogram(Integer id, GenericPoint<String> key, GenericPoint<String> value) {
+	boolean ret = true;
+
+	if (allHistogramsMapLock.isHeldByCurrentThread() == false) {
+	    throw new RuntimeException("verifyHistogram called without lock being held");
+	}
+	if (allHistogramsMap.get(id) == null ||
+	    allHistogramsMap.get(id).get(value) == null ||
+	    allHistogramsMap.get(id).get(value).get(key) == null) {
+	    ret = false;
+	}
+
+	return ret;
+    }
+
+    /**
+     * Get the times for the first and last histograms for a given ID. All data within one ID has the same time windows
+     *
+     * @param id
+     */
+    public Pair<Integer, Integer> getStartAndEndTime(Integer id) {
+
+	allHistogramsMapLock.lock();
+
+	if (allHistogramsMap.get(id) == null) {
+	    allHistogramsMapLock.unlock();
+	    return null;
+	}
+
+	for (GenericPoint<String> value : allHistogramsMap.get(id).keySet()) {
+	    for (GenericPoint<String> key : allHistogramsMap.get(id).get(value).keySet()) {
+		int size = allHistogramsMap.get(id).get(value).get(key).size();
+		if (size == 0) {
+		    continue;
+		}
+		Integer firstTime = allHistogramsMap.get(id).get(value).get(key).get(0).getValue0();
+		Integer lastTime = allHistogramsMap.get(id).get(value).get(key).get(size - 1).getValue0();
+		Pair<Integer, Integer> ret = new Pair(firstTime, lastTime);
+
+		allHistogramsMapLock.unlock();
+		return ret;
+	    }
+	}
+	allHistogramsMapLock.unlock();
+	return null;
     }
 
     @GET
@@ -528,6 +619,7 @@ public class DaemonService {
 	return Response.status(200).entity(output.toString()).build();
     }
 
+    // XYZ this should nullify the caches
     @GET
     @Path("/setSampleWindowSecs/{newVal}")
     @Produces(MediaType.TEXT_PLAIN)
@@ -544,6 +636,7 @@ public class DaemonService {
 	return Response.status(200).entity(output).build();
     }
 
+    // XYZ this should nullify the caches
     @GET
     @Path("/setSlideWindowSecs/{newVal}")
     @Produces(MediaType.TEXT_PLAIN)

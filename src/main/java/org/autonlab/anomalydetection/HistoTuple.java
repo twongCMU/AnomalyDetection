@@ -52,7 +52,7 @@ public class HistoTuple {
 	}
 	else {
 	    _valueMap.get(valueType).put(value, _valueMap.get(valueType).size());
-	    _msgIndex = _valueMap.size() - 1; // -1 because _valueMap.size() increased in the previous line
+	    _msgIndex = _valueMap.get(valueType).size() - 1; // -1 because _valueMap.size() increased in the previous line
 	}
 
 	_histoTupleDataLock.unlock();
@@ -115,6 +115,8 @@ public class HistoTuple {
     /**
      * This code works for any number of dimensions
      * This code assumes that the input file is ordered by time
+     *
+     * Every data subset within a given ID will have the same time ranges even if some of the windows will have all zeros
      */
     public static HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> mergeWindows(HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> listMap, int windowSecs, int slideSecs) {
 	// The code will probably work if this restriction is removed. It was written to handle this case.
