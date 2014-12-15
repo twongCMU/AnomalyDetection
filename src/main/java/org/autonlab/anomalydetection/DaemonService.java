@@ -45,11 +45,11 @@ public class DaemonService {
 	for (Integer id : allHistogramsMap.keySet()) {
 	    output += "ID " + id + "<ul>";
 	    for (GenericPoint<String> valueName : allHistogramsMap.get(id).keySet()) {
-		for (GenericPoint<String> keyFields : allHistogramsMap.get(id).get(valueName).keySet()) {
+		for (GenericPoint<String> categoryFields : allHistogramsMap.get(id).get(valueName).keySet()) {
 		    output += "<li>";
-		    for (int ii = 0; ii < keyFields.getDimensions(); ii++) {
-			output += keyFields.getCoord(ii);
-			if (ii != keyFields.getDimensions() - 1) {
+		    for (int ii = 0; ii < categoryFields.getDimensions(); ii++) {
+			output += categoryFields.getCoord(ii);
+			if (ii != categoryFields.getDimensions() - 1) {
 			    output += "(" + valueName + ",";
 			}
 		    }
@@ -65,18 +65,18 @@ public class DaemonService {
     @Path("/getHistograms")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getHistograms(@QueryParam("id") Integer id,
-				  @QueryParam("keyCSV") String key,
+				  @QueryParam("categoryCSV") String category,
 				  @QueryParam("valueCSV") String value) {
     
 	StringBuilder output = new StringBuilder();
 
-	int newID = recalculateByKey(id, key, value, output);
+	int newID = recalculateByCategory(id, category, value, output);
 	if (newID != id) {
 	    output.append("Didn't find the data at id " + id + " but found it at id " + newID);
 	    id = newID;
 	}
 	System.out.println("ZZZ id is now " + id + "\n");
-	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(getPointFromCSV(value)).get(getPointFromCSV(key));
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(getPointFromCSV(value)).get(getPointFromCSV(category));
 	output.append("Number of datapoints: " + histograms.size() + " \n");
 	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
 	    output.append(tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n");
@@ -97,9 +97,9 @@ public class DaemonService {
 	DataIOFile foo = new DataIOFile(filename);
 	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(0), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
 	for (GenericPoint<String> valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
-	    for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
-		output.append("Key: " + key.toString() + ", Value: " + valueName);
-		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(key).size() + ")\n");
+	    for (GenericPoint<String> category : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
+		output.append("Category: " + category.toString() + ", Value: " + valueName);
+		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(category).size() + ")\n");
 	    }
 	}
 	nextHistogramMapID++;
@@ -117,7 +117,7 @@ public class DaemonService {
     @Path("/getdb")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDb(@QueryParam("hostname") String hostname,
-			  @QueryParam("keyCSV") String keyCSV,
+			  @QueryParam("categoryCSV") String categoryCSV,
 			  @QueryParam("value") String valueCSV,
 			  @QueryParam("ageMins") Integer ageMins) {
 	allHistogramsMapLock.lock();
@@ -126,8 +126,8 @@ public class DaemonService {
 	    
 	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, "demo2");
 
-	if (keyCSV != null) {
-	    dbHandle.setKeyFields(keyCSV);
+	if (categoryCSV != null) {
+	    dbHandle.setCategoryFields(categoryCSV);
 	}
 	if (valueCSV != null) {
 	    dbHandle.setValueFields(valueCSV);
@@ -138,9 +138,9 @@ public class DaemonService {
 
 	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(dbHandle.getData(ageMins), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
 	for (GenericPoint<String> valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
-	    for (GenericPoint<String> key : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
-		output.append("Key: " + key.toString() + ", Value: " + valueName);
-		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(key).size() + ")\n");
+	    for (GenericPoint<String> category : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
+		output.append("Category: " + category.toString() + ", Value: " + valueName);
+		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(category).size() + ")\n");
 	    }
 	}
 	nextHistogramMapID++;
@@ -173,11 +173,11 @@ public class DaemonService {
 		fakeTime++;
 	    }
 	}
-	GenericPoint<String> key = new GenericPoint(2);
-	key.setCoord(0, "1.1.1.1");
-	key.setCoord(1, "myapp");
-	fakeData.put(key, lowerHalf);
-	output.append("Key: 1.1.1.1, myapp (" + lowerHalf.size() + ")\n");
+	GenericPoint<String> category = new GenericPoint(2);
+	category.setCoord(0, "1.1.1.1");
+	category.setCoord(1, "myapp");
+	fakeData.put(category, lowerHalf);
+	output.append("Category: 1.1.1.1, myapp (" + lowerHalf.size() + ")\n");
 
 	// generate a dense full matrix. This will be test data used to run against the lower half matrix
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> fullMatrix = new ArrayList();
@@ -189,11 +189,11 @@ public class DaemonService {
 		fakeTime++;
 	    }
 	}
-	GenericPoint<String> key2 = new GenericPoint(2);
-	key2.setCoord(0, "5.5.5.5");
-	key2.setCoord(1, "otherthing");
-	fakeData.put(key2, fullMatrix);
-	output.append("Key: 5.5.5.5, otherthing (" + fullMatrix.size() + ")\n");
+	GenericPoint<String> category2 = new GenericPoint(2);
+	category2.setCoord(0, "5.5.5.5");
+	category2.setCoord(1, "otherthing");
+	fakeData.put(category2, fullMatrix);
+	output.append("Category: 5.5.5.5, otherthing (" + fullMatrix.size() + ")\n");
 
 	// generate some fake HistoTuples. these are unused but the code would crash without them
 	HistoTuple foo = new HistoTuple(1, "fake1", valueType);
@@ -231,20 +231,20 @@ public class DaemonService {
     @Path("/test")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getData(@QueryParam("trainID") Integer trainID,
-			    @QueryParam("trainKeyCSV") String trainKey,
+			    @QueryParam("trainCategoryCSV") String trainCategory,
 			    @QueryParam("trainValue") String trainValue,
 			    @QueryParam("testID") Integer testID,
-			    @QueryParam("testKeyCSV") String testKey,
+			    @QueryParam("testCategoryCSV") String testCategory,
 			    @QueryParam("testValue") String testValue,
 			    @QueryParam("anomalyTrainID") Integer anomalyTrainID,
-			    @QueryParam("anomalyTrainKeyCSV") String anomalyTrainKey,
+			    @QueryParam("anomalyTrainCategoryCSV") String anomalyTrainCategory,
 			    @QueryParam("anomalyTrainValue") String anomalyTrainValue,
 			    @QueryParam("autoReload") Integer autoReloadSec) {
 	if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
-	    return getDataKDTree(trainID, trainKey, trainValue, testID, testKey, testValue);
+	    return getDataKDTree(trainID, trainCategory, trainValue, testID, testCategory, testValue);
 	}
 	else if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
-	    return getDataSVM(trainID, trainKey, trainValue, testID, testKey, testValue, anomalyTrainID, anomalyTrainKey, anomalyTrainValue, autoReloadSec);
+	    return getDataSVM(trainID, trainCategory, trainValue, testID, testCategory, testValue, anomalyTrainID, anomalyTrainCategory, anomalyTrainValue, autoReloadSec);
 	}
 	else {
 	    throw new RuntimeException("unknown calculation type");
@@ -255,10 +255,10 @@ public class DaemonService {
     @Path("/testKDTree")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDataKDTree(@QueryParam("trainID") Integer trainID,
-				  @QueryParam("trainKeyCSV") String trainKey,
+				  @QueryParam("trainCategoryCSV") String trainCategory,
 				  @QueryParam("trainValue") String trainValue,
 				  @QueryParam("testID") Integer testID,
-				  @QueryParam("testKeyCSV") String testKey,
+				  @QueryParam("testCategoryCSV") String testCategory,
 				  @QueryParam("testValue") String testValue) {
 	String output = "Calculation method: KDTree\n";
 
@@ -273,13 +273,13 @@ public class DaemonService {
 	    error++;
 	}
 
-	if (trainKey == null) {
-	    System.out.println("train Key not set");
+	if (trainCategory == null) {
+	    System.out.println("train Category not set");
 	    error++;
 	}
 
-	if (testKey == null) {
-	    System.out.println("test Key not set");
+	if (testCategory == null) {
+	    System.out.println("test Category not set");
 	    error++;
 	}
 
@@ -297,7 +297,7 @@ public class DaemonService {
 	    throw new RuntimeException("error in inputs");
 	}
 
-	output += KDTreeCalc.runOneTestKDTree(trainID, getPointFromCSV(trainKey), getPointFromCSV(trainValue), testID, getPointFromCSV(testKey), getPointFromCSV(testValue), null);
+	output += KDTreeCalc.runOneTestKDTree(trainID, getPointFromCSV(trainCategory), getPointFromCSV(trainValue), testID, getPointFromCSV(testCategory), getPointFromCSV(testValue), null);
 	return Response.status(200).entity(output).build();
     }
 
@@ -315,52 +315,52 @@ public class DaemonService {
 
     /**
      * @param id The data index ID returned when the data was read in
-     * @param trainKeyCSV a CSV of keys
-     * @param valueKeyCSV a CSV of histogram values
+     * @param categoryCSV a CSV of category
+     * @param valueCSV a CSV of histogram values
      * @param output function will add text to this if it makes a new mapping
      *
-     * @return the ID that contains the data with indexes valueKeyCSV and trainKeyCSV (which may be different from the input id) or -1 if none
+     * @return the ID that contains the data with indexes valueCSV and categoryCSV (which may be different from the input id) or -1 if none
      */
-    public int recalculateByKey(Integer id, String trainKeyCSV, String valueKeyCSV, StringBuilder output) {
-	GenericPoint<String> newKey = getPointFromCSV(trainKeyCSV);
-	GenericPoint<String> valueKey = getPointFromCSV(valueKeyCSV);
+    public int recalculateByCategory(Integer id, String categoryCSV, String valueCSV, StringBuilder output) {
+	GenericPoint<String> categoryPoint = getPointFromCSV(categoryCSV);
+	GenericPoint<String> valuePoint    = getPointFromCSV(valueCSV);
 
+	// If the data we want is already there
 	if (allHistogramsMap.get(id) == null) {
 	    throw new RuntimeException("Error: id " + id + " not found");
 	}
-	if (allHistogramsMap.get(id).get(valueKey) == null) {
-	    throw new RuntimeException("Error: value key '" + valueKey + "' not found");
+	if (allHistogramsMap.get(id).get(valuePoint) == null) {
+	    throw new RuntimeException("Error: value key '" + valuePoint + "' not found");
 	}
-	if (allHistogramsMap.get(id).get(valueKey).get(newKey) != null) {
+	if (allHistogramsMap.get(id).get(valuePoint).get(categoryPoint) != null) {
 	    return id;
 	}
 	// XYZ need to calculate the time range from any existing data even if it doesn't match key and value since all data in ID has the same ranges
 	Pair<Integer, Integer> startAndEnd = getStartAndEndTime(id);
-	if (allHistogramsMapKeyRemap.get(valueKey) != null &&
-	    allHistogramsMapKeyRemap.get(valueKey).get(newKey) != null &&
+	if (allHistogramsMapKeyRemap.get(valuePoint) != null &&
+	    allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint) != null &&
 	    startAndEnd != null &&
-	    allHistogramsMapKeyRemap.get(valueKey).get(newKey).get(startAndEnd) != null) {
-	    return allHistogramsMapKeyRemap.get(valueKey).get(newKey).get(startAndEnd);
+	    allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint).get(startAndEnd) != null) {
+	    return allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint).get(startAndEnd);
 	}
-	System.out.println("ZZZ well here2\n");
 	// XYZ probably move this lock to beginning of function
 	allHistogramsMapLock.lock();
 
 	allHistogramsMap.put(nextHistogramMapID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
 
-	allHistogramsMap.get(nextHistogramMapID).put(valueKey, new HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>());
-	allHistogramsMap.get(nextHistogramMapID).get(valueKey).put(newKey, new ArrayList<Pair<Integer, GenericPoint<Integer>>>());
+	allHistogramsMap.get(nextHistogramMapID).put(valuePoint, new HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>());
+	allHistogramsMap.get(nextHistogramMapID).get(valuePoint).put(categoryPoint, new ArrayList<Pair<Integer, GenericPoint<Integer>>>());
 
 	int subsetsFound = 0;
 	// the histograms are in an arraylist so it's hard to add them together. Sum them in a hashmap then convert it to an arraymap
 	TreeMap<Integer, GenericPoint<Integer>> newDataSum = new TreeMap(); //use TreeMap not HashMap so we get keys back in sorted orders
-	for (GenericPoint<String> oneKey : allHistogramsMap.get(id).get(valueKey).keySet()) {
-	    System.out.println("XYZ " + oneKey.toString() + " compare to " + newKey.toString());
+	for (GenericPoint<String> oneKey : allHistogramsMap.get(id).get(valuePoint).keySet()) {
+	    System.out.println("XYZ " + oneKey.toString() + " compare to " + categoryPoint.toString());
 
-	    if (isPointSubset(newKey, oneKey)) {
-		System.out.println("counting " + newKey.toString() + " as subset as " + oneKey.toString() + "\n");
+	    if (isPointSubset(categoryPoint, oneKey)) {
+		System.out.println("counting " + categoryPoint.toString() + " as subset as " + oneKey.toString() + "\n");
 		subsetsFound++;
-		for (Pair<Integer, GenericPoint<Integer>> oneHist : allHistogramsMap.get(id).get(valueKey).get(oneKey)) {
+		for (Pair<Integer, GenericPoint<Integer>> oneHist : allHistogramsMap.get(id).get(valuePoint).get(oneKey)) {
 
 		    GenericPoint<Integer> sumData = newDataSum.get(oneHist.getValue0());
 		    if (sumData == null) {
@@ -382,7 +382,7 @@ public class DaemonService {
 
 	// convert the newdataSum TreeMap to an ArrayList
 	for (Integer timeSec : newDataSum.keySet()) {
-	    allHistogramsMap.get(nextHistogramMapID).get(valueKey).get(newKey).add(new Pair<Integer, GenericPoint<Integer>>(timeSec, newDataSum.get(timeSec)));
+	    allHistogramsMap.get(nextHistogramMapID).get(valuePoint).get(categoryPoint).add(new Pair<Integer, GenericPoint<Integer>>(timeSec, newDataSum.get(timeSec)));
 	}
 
 	int newID = -1;
@@ -391,15 +391,14 @@ public class DaemonService {
 	    nextHistogramMapID++;
 	    output.append("Did not find appropriate data at ID " + id + " but was able to create it from existing data and put it in id " + newID + "\n");
 
-	    if (allHistogramsMapKeyRemap.get(valueKey) == null) {
-		allHistogramsMapKeyRemap.put(valueKey, new HashMap<GenericPoint<String>, HashMap<Pair<Integer, Integer>, Integer>>());
+	    if (allHistogramsMapKeyRemap.get(valuePoint) == null) {
+		allHistogramsMapKeyRemap.put(valuePoint, new HashMap<GenericPoint<String>, HashMap<Pair<Integer, Integer>, Integer>>());
 	    }
-	    if (allHistogramsMapKeyRemap.get(valueKey).get(newKey) == null) {
-		allHistogramsMapKeyRemap.get(valueKey).put(newKey, new HashMap<Pair<Integer, Integer>, Integer>());
+	    if (allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint) == null) {
+		allHistogramsMapKeyRemap.get(valuePoint).put(categoryPoint, new HashMap<Pair<Integer, Integer>, Integer>());
 	    }
 	    startAndEnd = getStartAndEndTime(newID);
-	    allHistogramsMapKeyRemap.get(valueKey).get(newKey).put(startAndEnd, newID);
-	    System.out.println("ZZZ well here3\n");
+	    allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint).put(startAndEnd, newID);
 	}
 	allHistogramsMapLock.unlock();
 
@@ -407,6 +406,9 @@ public class DaemonService {
     }
 
     /**
+     * Compare the string names in a GenericPoint. This is for the category names only and
+     * not the histogram values
+     *
      * @param testPoint the point that may be a subset
      * @param bigPoint the point that may be a superset
      *
@@ -440,13 +442,13 @@ public class DaemonService {
     @Path("/testSVM")
     @Produces(MediaType.TEXT_HTML)
     public Response getDataSVM(@QueryParam("trainID") Integer trainID,
-			       @QueryParam("trainKeyCSV") String trainKey,
+			       @QueryParam("trainCategoryCSV") String trainCategory,
 			       @QueryParam("trainValue") String trainValue,
 			       @QueryParam("testID") Integer testID,
-			       @QueryParam("testKeyCSV") String testKey,
+			       @QueryParam("testCategoryCSV") String testCategory,
 			       @QueryParam("testValue") String testValue,
 			       @QueryParam("anomalyTrainID") Integer anomalyTrainID,
-			       @QueryParam("anomalyTrainKeyCSV") String anomalyTrainKey,
+			       @QueryParam("anomalyTrainCategoryCSV") String anomalyTrainCategory,
 			       @QueryParam("anomalyTrainValue") String anomalyTrainValue,
 			       @QueryParam("autoReloadSec") Integer autoReloadSec) {
 
@@ -456,50 +458,50 @@ public class DaemonService {
 	}
 	output.append("<body><pre>Calculation method: SVM\n");
 
-	GenericPoint<String> trainKeyPoint = getPointFromCSV(trainKey);
+	GenericPoint<String> trainCategoryPoint = getPointFromCSV(trainCategory);
 	GenericPoint<String> trainValuePoint = getPointFromCSV(trainValue);
-	GenericPoint<String> testKeyPoint = getPointFromCSV(testKey);
+	GenericPoint<String> testCategoryPoint = getPointFromCSV(testCategory);
 	GenericPoint<String> testValuePoint = getPointFromCSV(testValue);
 
-	GenericPoint<String> anomalyTrainKeyPoint = null;
+	GenericPoint<String> anomalyTrainCategoryPoint = null;
 	GenericPoint<String> anomalyTrainValuePoint = null;
-	if (anomalyTrainKey != null) {
-	    anomalyTrainKeyPoint = getPointFromCSV(anomalyTrainKey);
+	if (anomalyTrainCategory != null) {
+	    anomalyTrainCategoryPoint = getPointFromCSV(anomalyTrainCategory);
 	    anomalyTrainValuePoint = getPointFromCSV(anomalyTrainValue);
 	}
-	System.out.println("ZZZ " + trainID + " : " + testID + " : " + anomalyTrainID + "\n");
-	int newTrainID = recalculateByKey(trainID, trainKey, trainValue, output);
+
+	int newTrainID = recalculateByCategory(trainID, trainCategory, trainValue, output);
 	if (newTrainID == -1) {
-	    output.append("ERROR: trainKeyCSV (" + trainKey + ") was not found and could not be calculated from existing data\n");
+	    output.append("ERROR: trainCategoryCSV (" + trainCategory + ") was not found and could not be calculated from existing data\n");
 	    return Response.status(200).entity(output.toString()).build();
 	}
 	else if (newTrainID != trainID) {
-	    output.append("NOTE: trainKeyCSV (" + trainKey + ") was not found at id " + trainID + " but found it at ID " + newTrainID + "\n");
+	    output.append("NOTE: trainCategoryCSV (" + trainCategory + ") was not found at id " + trainID + " but found it at ID " + newTrainID + "\n");
 	    trainID = newTrainID;
 	}
-	int newTestID = recalculateByKey(testID, testKey, testValue, output);
+	int newTestID = recalculateByCategory(testID, testCategory, testValue, output);
 	if (newTestID == -1) {
-	    output.append("ERROR: testKeyCSV  (" + testKey + ") was not found and could not be calculated from existing data\n");
+	    output.append("ERROR: testCategoryCSV  (" + testCategory + ") was not found and could not be calculated from existing data\n");
 	    return Response.status(200).entity(output.toString()).build();
 	}
 	else if (newTestID != testID) {
-	    output.append("NOTE: testKeyCSV  (" + testKey + ") was not found at id " + testID + " but found it at ID " + newTestID + "\n");
+	    output.append("NOTE: testCategoryCSV  (" + testCategory + ") was not found at id " + testID + " but found it at ID " + newTestID + "\n");
 	    testID = newTestID;
 	}
 	if (anomalyTrainID != null) {
-	    int newAnomalyTrainID = recalculateByKey(anomalyTrainID, anomalyTrainKey, anomalyTrainValue, output);
+	    int newAnomalyTrainID = recalculateByCategory(anomalyTrainID, anomalyTrainCategory, anomalyTrainValue, output);
 	    if (newAnomalyTrainID == -1) {
-		output.append("ERROR: anomalyTrainKeyCSV (" + anomalyTrainKey + ") was not found and could not be calculated from existing data\n");
+		output.append("ERROR: anomalyTrainCategoryCSV (" + anomalyTrainCategory + ") was not found and could not be calculated from existing data\n");
 		return Response.status(200).entity(output.toString()).build();
 	    }
 	    else if (newAnomalyTrainID != anomalyTrainID) {
-		output.append("NOTE: anomalyTrainKeyCSV (" + anomalyTrainKey + ") was not found at id " + anomalyTrainID + " but found it at ID " + newAnomalyTrainID + "\n");
+		output.append("NOTE: anomalyTrainCategoryCSV (" + anomalyTrainCategory + ") was not found at id " + anomalyTrainID + " but found it at ID " + newAnomalyTrainID + "\n");
 		anomalyTrainID = newAnomalyTrainID;
 	    }
 	}
 	System.out.println("ZZZ " + trainID + " : " + testID + " : " + anomalyTrainID + "\n");
 	MultiValueMap resultsHash = new MultiValueMap();
-	output.append(SVMCalc.runOneTestSVM(trainID, trainKeyPoint, trainValuePoint, testID, testKeyPoint, testValuePoint, anomalyTrainID, anomalyTrainKeyPoint, anomalyTrainValuePoint, resultsHash));
+	output.append(SVMCalc.runOneTestSVM(trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, resultsHash));
 
 	List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 	Collections.sort(resultsHashList); // ascending order
@@ -517,12 +519,12 @@ public class DaemonService {
 	    output.append("\n====== Anomaly Detected Info =====\n"); //right now we just say the highest scoring point is anomaly just to make sure we can print the info
 	    output.append("Anomaly " + score + " at time " + timestamp + "( " + ((Collection<Integer>)resultsHash.getCollection(score)).size() + " with this score)\n");
 	    output.append(" * anomaly datapoint: " + onePoint.getValue1() + "\n");
-	    output.append(" * Training data: " + trainID + "," + trainKeyPoint.toString() + "," + trainValuePoint.toString() + " time range: " + trainTime.getValue0() + " to " + trainTime.getValue1() + "\n"); 
-	    output.append(" * Anomaly training data: " + anomalyTrainID + "," + anomalyTrainKeyPoint.toString() + "," + anomalyTrainValuePoint.toString() + " time range: " + anomalyTrainTime.getValue0() + " to " + anomalyTrainTime.getValue1() + "\n"); 
-	    output.append(" * Testing data: " + testID + "," + testKeyPoint.toString() + "," + testValuePoint.toString() + " time range: " + testTime.getValue0() + " to " + testTime.getValue1() + "\n");
-	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + trainID + "&keyCSV=" + trainKey + "&valueCSV=" + trainValue + ">link to training dataset</a>\n");
-	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&keyCSV=" + anomalyTrainKey + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
-	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + testID + "&keyCSV=" + testKey + "&valueCSV=" + testValue + ">link to testing dataset</a>\n");
+	    output.append(" * Training data: " + trainID + "," + trainCategoryPoint.toString() + "," + trainValuePoint.toString() + " time range: " + trainTime.getValue0() + " to " + trainTime.getValue1() + "\n"); 
+	    output.append(" * Anomaly training data: " + anomalyTrainID + "," + anomalyTrainCategoryPoint.toString() + "," + anomalyTrainValuePoint.toString() + " time range: " + anomalyTrainTime.getValue0() + " to " + anomalyTrainTime.getValue1() + "\n"); 
+	    output.append(" * Testing data: " + testID + "," + testCategoryPoint.toString() + "," + testValuePoint.toString() + " time range: " + testTime.getValue0() + " to " + testTime.getValue1() + "\n");
+	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + trainID + "&categoryCSV=" + trainCategory + "&valueCSV=" + trainValue + ">link to training dataset</a>\n");
+	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&categoryCSV=" + anomalyTrainCategory + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
+	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + testID + "&categoryCSV=" + testCategory + "&valueCSV=" + testValue + ">link to testing dataset</a>\n");
 	    break;
 	}
 
@@ -533,13 +535,15 @@ public class DaemonService {
      * This function does not lock the allHistogramsMap. It assumes the caller will use it and therefore
      * will handle the locking
      *
+     * I am not sure how useful this function is; functions that need this information seem to do
+     * different things that defy 
      * @param id 
-     * @param key
+     * @param category
      * @param value
      *
      * @return true if there is a histogram for the input values, false if not
      */
-    public boolean verifyHistogram(Integer id, GenericPoint<String> key, GenericPoint<String> value) {
+    public boolean verifyHistogram(Integer id, GenericPoint<String> category, GenericPoint<String> value) {
 	boolean ret = true;
 
 	if (allHistogramsMapLock.isHeldByCurrentThread() == false) {
@@ -547,7 +551,7 @@ public class DaemonService {
 	}
 	if (allHistogramsMap.get(id) == null ||
 	    allHistogramsMap.get(id).get(value) == null ||
-	    allHistogramsMap.get(id).get(value).get(key) == null) {
+	    allHistogramsMap.get(id).get(value).get(category) == null) {
 	    ret = false;
 	}
 
@@ -568,14 +572,14 @@ public class DaemonService {
 	    return null;
 	}
 
-	for (GenericPoint<String> value : allHistogramsMap.get(id).keySet()) {
-	    for (GenericPoint<String> key : allHistogramsMap.get(id).get(value).keySet()) {
-		int size = allHistogramsMap.get(id).get(value).get(key).size();
+	for (GenericPoint<String> category : allHistogramsMap.get(id).keySet()) {
+	    for (GenericPoint<String> key : allHistogramsMap.get(id).get(category).keySet()) {
+		int size = allHistogramsMap.get(id).get(category).get(key).size();
 		if (size == 0) {
 		    continue;
 		}
-		Integer firstTime = allHistogramsMap.get(id).get(value).get(key).get(0).getValue0();
-		Integer lastTime = allHistogramsMap.get(id).get(value).get(key).get(size - 1).getValue0();
+		Integer firstTime = allHistogramsMap.get(id).get(category).get(key).get(0).getValue0();
+		Integer lastTime = allHistogramsMap.get(id).get(category).get(key).get(size - 1).getValue0();
 		Pair<Integer, Integer> ret = new Pair(firstTime, lastTime);
 
 		allHistogramsMapLock.unlock();
@@ -587,14 +591,14 @@ public class DaemonService {
     }
 
     @GET
-    @Path("/testall/{valueCSV}")
+    @Path("/testall/{categoryCSV}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDataAll(@PathParam("valueCSV") String value) {
+    public Response getDataAll(@PathParam("categoryCSV") String category) {
 	if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
-	    return getDataAllKDTree(value);
+	    return getDataAllKDTree(category);
 	}
 	else if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
-	    return getDataAllSVM(value);
+	    return getDataAllSVM(category);
 	}
 	else {
 	    throw new RuntimeException("unknown calculation type");
@@ -602,20 +606,20 @@ public class DaemonService {
     }
 
     @GET
-    @Path("/testallKDTree/{valueCSV}")
+    @Path("/testallKDTree/{categoryCSV}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDataAllKDTree(@PathParam("valueCSV") String value) {
+    public Response getDataAllKDTree(@PathParam("categoryCSV") String category) {
 	StringBuilder output = new StringBuilder("Calculation method: KDTree\n");
-	output.append(KDTreeCalc.runAllTestKDTree(getPointFromCSV(value)));
+	output.append(KDTreeCalc.runAllTestKDTree(getPointFromCSV(category)));
 	return Response.status(200).entity(output.toString()).build();
     }
 
     @GET
-    @Path("/testallSVM/{valueCSV}")
+    @Path("/testallSVM/{categoryCSV}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDataAllSVM(@PathParam("valueCSV") String value) {
+    public Response getDataAllSVM(@PathParam("categoryCSV") String category) {
 	StringBuilder output = new StringBuilder("Calculation method: SVM\n");
-	output.append(SVMCalc.runAllTestSVM(getPointFromCSV(value)));
+	output.append(SVMCalc.runAllTestSVM(getPointFromCSV(category)));
 	return Response.status(200).entity(output.toString()).build();
     }
 

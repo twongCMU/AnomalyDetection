@@ -54,14 +54,14 @@ public class DataIOFile implements DataIO {
 		    applicationName = sParts[3];
 		}
 
-		GenericPoint<String> key = new GenericPoint<String>(2);
-		key.setCoord(0, ipAddress);
-		key.setCoord(1, applicationName);
+		GenericPoint<String> category = new GenericPoint<String>(2);
+		category.setCoord(0, ipAddress);
+		category.setCoord(1, applicationName);
 
-		if (!trainMap.get(valueType).containsKey(key)) {
-		    trainMap.get(valueType).put(key, new ArrayList<HistoTuple>());
+		if (!trainMap.get(valueType).containsKey(category)) {
+		    trainMap.get(valueType).put(category, new ArrayList<HistoTuple>());
 		}
-		trainMap.get(valueType).get(key).add(new HistoTuple(timeStamp, messageType, valueType));
+		trainMap.get(valueType).get(category).add(new HistoTuple(timeStamp, messageType, valueType));
 
 		count++;
 	    }
@@ -81,7 +81,7 @@ public class DataIOFile implements DataIO {
 	return trainMap;
     }
 
-    public void putData(String keyCSV, int dateSecs, String messageType) {
+    public void putData(String categoryCSV, int dateSecs, String messageType) {
 	throw new RuntimeException("putData for files not implemented");
     }
 

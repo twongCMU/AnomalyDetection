@@ -9,53 +9,53 @@ public class DataIOCassandraDB implements DataIO {
     private Session _session;
     private String _keyspace;
     private int _counter;
-    private ArrayList<String> _keyFieldsList;
-    private ArrayList<String> _dataFieldsList;
+    private ArrayList<String> _categoryFieldsList;
+    private ArrayList<String> _valueFieldsList;
 
     public DataIOCassandraDB(String hostname, String keyspace) {
 	Cluster cluster = Cluster.builder().addContactPoint(hostname).build();
 	_session = cluster.connect();
 	_keyspace = keyspace;
 	_counter = 0;
-	_keyFieldsList = new ArrayList<String>();
-	_keyFieldsList.add("source_addr");
-	_keyFieldsList.add("text_values.endpoint");
+	_categoryFieldsList = new ArrayList<String>();
+	_categoryFieldsList.add("source_addr");
+	_categoryFieldsList.add("text_values.endpoint");
 
-	_dataFieldsList = new ArrayList<String>();
-	_dataFieldsList.add("time_stamp"); // timestamp must be first
-	_dataFieldsList.add("text_values.messagetype");
-	_dataFieldsList.add("dest_addr");
+	_valueFieldsList = new ArrayList<String>();
+	_valueFieldsList.add("time_stamp"); // timestamp must be first
+	_valueFieldsList.add("text_values.messagetype");
+	_valueFieldsList.add("dest_addr");
     }
 
     /*
-     * @param keyFieldsCSV a CSV of DB column names to categorize the histograms by
+     * @param categoryFieldsCSV a CSV of DB column names to categorize the histograms by
      */
-    public void setKeyFields(String keyFieldsCSV) {
-	String[] sParts = keyFieldsCSV.split(",");
+    public void setCategoryFields(String categoryFieldsCSV) {
+	String[] sParts = categoryFieldsCSV.split(",");
 	Arrays.sort(sParts);
-	_keyFieldsList = new ArrayList<String>();
+	_categoryFieldsList = new ArrayList<String>();
 
 	for (int ii = 0; ii < sParts.length; ii++) {
-	    _keyFieldsList.add(sParts[ii]);
+	    _categoryFieldsList.add(sParts[ii]);
 	}
     }
 
     /*
-     * @param dataFieldsCSV a CSV of DB column names to generate histograms on
+     * @param valueFieldsCSV a CSV of DB column names to generate histograms on
      */
-    public void setValueFields(String dataFieldsCSV) {
-	String[] sParts = dataFieldsCSV.split(",");
+    public void setValueFields(String valueFieldsCSV) {
+	String[] sParts = valueFieldsCSV.split(",");
 	Arrays.sort(sParts);
-	_dataFieldsList = new ArrayList<String>();
+	_valueFieldsList = new ArrayList<String>();
 
-	_dataFieldsList.add("time_stamp");
+	_valueFieldsList.add("time_stamp");
 
 	for (int ii = 0; ii < sParts.length; ii++) {
-	    _dataFieldsList.add(sParts[ii]);
+	    _valueFieldsList.add(sParts[ii]);
 	}
     }
 
-    /* histogram data names -> key names -> histograms */
+    /* histogram value names -> category names -> histograms */
     public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData(int minutesBack) {
 	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
 
@@ -69,7 +69,7 @@ public class DataIOCassandraDB implements DataIO {
 	String selectStatement = "SELECT ";
 	HashMap<String, Integer> fieldsSeen = new HashMap();
 	// get the column names for our data's keys
-	for (String oneField : _keyFieldsList) {
+	for (String oneField : _categoryFieldsList) {
 	    int oneFieldEnd = oneField.indexOf(".");
 	    if (oneFieldEnd == -1) {
 		oneFieldEnd = oneField.length();
@@ -86,7 +86,7 @@ public class DataIOCassandraDB implements DataIO {
 	    }
 	}
 	// get the column names for our data's histogram values
-	for (String oneField : _dataFieldsList) {
+	for (String oneField : _valueFieldsList) {
 	    int oneFieldEnd = oneField.indexOf(".");
 	    if (oneFieldEnd == -1) {
 		oneFieldEnd = oneField.length();
@@ -114,21 +114,21 @@ public class DataIOCassandraDB implements DataIO {
 	// get the data we want out of what the database returned
 	// some of the db columns are hashses of more values, so we have to be smart about pulling those out too 
 	int rowCount = 0;
-	int keyFieldsListSize = _keyFieldsList.size();//cache these outside of the loops to save recalculation
-	int valueFieldsListSize = _dataFieldsList.size() - 1; // -1 because  we don't want to count time_stamp
+	int categoryFieldsListSize = _categoryFieldsList.size();//cache these outside of the loops to save recalculation
+	int valueFieldsListSize = _valueFieldsList.size() - 1; // -1 because  we don't want to count time_stamp
 
 	for (Row row: results) {
-	    GenericPoint<String> key = new GenericPoint<String>(keyFieldsListSize);
+	    GenericPoint<String> category = new GenericPoint<String>(categoryFieldsListSize);
 	    Map<String, String> fieldMap = new HashMap(); // initializing this isn't needed but Java complains
 	    if (getTextValues == 1) {
 		fieldMap = row.getMap("text_values", String.class, String.class);
 	    }
 
 	    int ii = 0;
-	    for (String oneField : _keyFieldsList) {
-		String keyString = oneField + ";";
+	    for (String oneField : _categoryFieldsList) {
+		String categoryString = oneField + ";";
 		if (oneField.equals("time_stamp")) {
-		    keyString += (row.getDate("time_stamp").getTime() / 1000);
+		    categoryString += (row.getDate("time_stamp").getTime() / 1000);
 		}
 		else if (oneField.matches("^text_values.*$")) {
 		    if (getTextValues == 0) {
@@ -139,24 +139,24 @@ public class DataIOCassandraDB implements DataIO {
 			throw new RuntimeException("did not find a period in field " + oneField);
 		    }
 		    String oneFieldTrailing = oneField.substring(oneFieldStart + 1, oneField.length());
-		    keyString += (fieldMap.get(oneFieldTrailing));
+		    categoryString += (fieldMap.get(oneFieldTrailing));
 		}
 		else {
 		    String fieldValue = row.getString(oneField);
-		    keyString += (fieldValue == null ? "" : fieldValue);
+		    categoryString += (fieldValue == null ? "" : fieldValue);
 		}
-		key.setCoord(ii, keyString);
+		category.setCoord(ii, categoryString);
 		ii++;
 	    }
 	   
-	    if (!_dataFieldsList.get(0).equals("time_stamp")) {
-		throw new RuntimeException("First data field was not time_stamp");
+	    if (!_valueFieldsList.get(0).equals("time_stamp")) {
+		throw new RuntimeException("First value field was not time_stamp");
 	    }
 	    double dateSecs = (row.getDate("time_stamp").getTime() / 1000);
 	    String value = "";
 	    GenericPoint<String> valueNamePoint = new GenericPoint<String>(valueFieldsListSize);
 	    ii = 0;
-	    for (String valueName : _dataFieldsList) {
+	    for (String valueName : _valueFieldsList) {
 		if (valueName.equals("time_stamp")) {
 		    continue;
 		}
@@ -186,10 +186,10 @@ public class DataIOCassandraDB implements DataIO {
 	    if (!trainMap.containsKey(valueNamePoint)) {
 		trainMap.put(valueNamePoint, new HashMap<GenericPoint<String>, ArrayList<HistoTuple>>());
 	    }
-	    if (!trainMap.get(valueNamePoint).containsKey(key)) {
-		trainMap.get(valueNamePoint).put(key, new ArrayList<HistoTuple>());
+	    if (!trainMap.get(valueNamePoint).containsKey(category)) {
+		trainMap.get(valueNamePoint).put(category, new ArrayList<HistoTuple>());
 	    }
-	    trainMap.get(valueNamePoint).get(key).add(new HistoTuple(dateSecs, value, valueNamePoint));
+	    trainMap.get(valueNamePoint).get(category).add(new HistoTuple(dateSecs, value, valueNamePoint));
 	    rowCount++;
 	    if ((rowCount % 1000) == 0) {
 		System.out.println("Read in " + rowCount + " rows");
@@ -200,8 +200,8 @@ public class DataIOCassandraDB implements DataIO {
 	return trainMap;
     }
 
-    public void putData(String keyCSV, int dateSecs, String messageType) {
-    // from group meeting, we're going to write to a different db not the cassandra one so we won't reimplement this in a dynamic key friendly way 
+    public void putData(String categoryCSV, int dateSecs, String messageType) {
+    // from group meeting, we're going to write to a different db not the cassandra one so we won't reimplement this in a dynamic category friendly way 
     // until we know more details
     //	_session.execute("INSERT INTO " + _keyspace + ".packet (time_stamp, source_addr, text_values, dest_addr) VALUES (" + dateSecs + ",'" + ipAddress + "',{'messagetype' : '" + messageType + "', 'endpoint' : '" + appName + "'}, '" + _counter + "')");
     //_counter++;
