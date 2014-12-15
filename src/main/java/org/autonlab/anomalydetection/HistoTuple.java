@@ -16,7 +16,7 @@ public class HistoTuple {
      */
     static volatile HashMap<GenericPoint<String>, HashMap<String, Integer>> _valueMap = new HashMap();
 
-    static volatile Lock _histoTupleDataLock = new ReentrantLock(); //this protects all above static data
+    static volatile ReentrantLock _histoTupleDataLock = new ReentrantLock(); //this protects all above static data
     /*
      * we use the volatile keyword for the above static values because each REST daemon call
      * starts a new thread 
@@ -92,7 +92,10 @@ public class HistoTuple {
      * @return the number of unique value seen
      */
     public static int getDimensions(GenericPoint<String> valueType) {
-	return _valueMap.get(valueType).size();
+	_histoTupleDataLock.lock();
+	int size = _valueMap.get(valueType).size();
+	_histoTupleDataLock.lock();
+	return size;
     }
 
     /**
@@ -284,8 +287,16 @@ public class HistoTuple {
 	return false;
     }
 
-    // do this in here so we can handle the locking better
+
+    /**
+     * Caller must hold _histoTupleDataLock
+     */
     private static boolean upgradeWindowsDimensionsOne(GenericPoint<String> valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
+
+	if (_histoTupleDataLock.isHeldByCurrentThread() == false) {
+	    throw new RuntimeException("upgradeWindowsDimensionsOne called without lock being held");
+	}
+
 	if (histogram.get(0).getValue1().getDimensions() == _valueMap.get(valueType).size()) {
 	    return false;
 	}

@@ -286,6 +286,9 @@ public class SVMCalc {
 	svm_node[][] bar = svmKernel.getData();
 
 	int index = 0;
+	double anomalyScale = 0.0;
+	ArrayList<Double> scoreList = new ArrayList();
+	/* loop through the histograms to generate the predictions */
 	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey)) {
 	    double[] values = new double[1];
 
@@ -295,13 +298,29 @@ public class SVMCalc {
 	    // this code returns a lower score for more anomalous so we flip it to match kdtree
 	    prediction *= -1;
 
-	    output.append("predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data " + bar[index][0].value + "\n");
+	    scoreList.add(prediction);
+
+	    if (anomalyScale < prediction) {
+		anomalyScale = prediction;
+	    }
+	 
+	    index++;
+	}
+
+	/* loop through the results again and scale them so the highest anomaly is 1.0 */
+	index = 0;
+	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey)) {
+	    if (anomalyScale > 1.0) {
+		scoreList.set(index, scoreList.get(index) / anomalyScale);
+	    }
+	    output.append("predicted " + scoreList.get(index) + " for " + onePoint.getValue1().toString() + " with data \n");
 
 	    if (results != null) {
-		results.put(prediction, onePoint);
+		results.put(scoreList.get(index), onePoint);
 	    }
 	    index++;
 	}
+
 	return output;
     }
 

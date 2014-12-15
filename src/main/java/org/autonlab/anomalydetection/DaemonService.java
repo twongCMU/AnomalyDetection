@@ -624,7 +624,13 @@ public class DaemonService {
     @Path("/setSampleWindowSecs/{newVal}")
     @Produces(MediaType.TEXT_PLAIN)
     public Response setSampleWindowSecs(@PathParam("newVal") int newValue) {
+
+	allHistogramsMapLock.lock();
+
 	AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS = newValue;
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity("ok").build();
     }
 
@@ -632,7 +638,13 @@ public class DaemonService {
     @Path("/getSampleWindowSecs")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getSampleWindowSecs() {
+
+	allHistogramsMapLock.lock();
+
 	String output = "" + AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS;
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output).build();
     }
 
@@ -641,7 +653,13 @@ public class DaemonService {
     @Path("/setSlideWindowSecs/{newVal}")
     @Produces(MediaType.TEXT_PLAIN)
     public Response setSlideWindowSecs(@PathParam("newVal") int newValue) {
+
+	allHistogramsMapLock.lock();
+
 	AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS = newValue;
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity("ok").build();
     }
 
@@ -649,7 +667,13 @@ public class DaemonService {
     @Path("/getSlideWindowSecs")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getSlideWindowSecs() {
+
+	allHistogramsMapLock.lock();
+
 	String output = "" + AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS;
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output).build();
     }
 
@@ -657,6 +681,9 @@ public class DaemonService {
     @Path("/setCalcType/{newVal}")
     @Produces(MediaType.TEXT_HTML)
     public Response setCalcType(@PathParam("newVal") String newValue) {
+
+	allHistogramsMapLock.lock();
+
 	String output = "Ok. Calc type set to " + newValue;
 	int newIndex = Arrays.asList(AnomalyDetectionConfiguration.CALC_TYPE_NAMES).indexOf(newValue);
 	if (newIndex >= 0) {
@@ -666,6 +693,9 @@ public class DaemonService {
 	    output = "Invalid type<br>\n";
 	}
 	output += AnomalyDetectionConfiguration.printCalcTypeNameLinksHTML("");
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output).build();
     }
 
@@ -673,8 +703,14 @@ public class DaemonService {
     @Path("/getCalcType")
     @Produces(MediaType.TEXT_HTML)
     public Response getCalcType() {
+
+	allHistogramsMapLock.lock();
+
 	String output = "Calc type is " + AnomalyDetectionConfiguration.CALC_TYPE_NAMES[AnomalyDetectionConfiguration.CALC_TYPE_TO_USE];
 	output += "<br>" + AnomalyDetectionConfiguration.printCalcTypeNameLinksHTML("setCalcType/");
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output).build();
     }
 	
