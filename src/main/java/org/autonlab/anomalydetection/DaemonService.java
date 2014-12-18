@@ -13,7 +13,6 @@ import org.javatuples.*;
 public class DaemonService {
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
     static volatile HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, HashMap<Pair<Integer, Integer>, Integer>>> allHistogramsMapKeyRemap = new HashMap();
-    // XYZ the lock should also protect reads/deletes to allHistogramsMap!
 
     static volatile int nextHistogramMapID = 0;
     static volatile ReentrantLock allHistogramsMapLock = new ReentrantLock();
@@ -42,6 +41,8 @@ public class DaemonService {
     public Response getDatasetKeys() {
 	String output = new String();
 
+	allHistogramsMapLock.lock();
+
 	for (Integer id : allHistogramsMap.keySet()) {
 	    output += "ID " + id + "<ul>";
 	    for (GenericPoint<String> valueName : allHistogramsMap.get(id).keySet()) {
@@ -58,6 +59,9 @@ public class DaemonService {
 	    }
 	    output += "</ul>";
 	}
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output).build();
     }
 
@@ -67,20 +71,27 @@ public class DaemonService {
     public Response getHistograms(@QueryParam("id") Integer id,
 				  @QueryParam("categoryCSV") String category,
 				  @QueryParam("valueCSV") String value) {
-    
-	StringBuilder output = new StringBuilder();
 
-	int newID = recalculateByCategory(id, category, value, output);
+	GenericPoint<String> categoryPoint = getPointFromCSV(category);
+	GenericPoint<String> valuePoint = getPointFromCSV(value);
+
+	allHistogramsMapLock.lock();
+
+	StringBuilder output = new StringBuilder();
+	int newID = recalculateByCategory(id, categoryPoint, valuePoint, output);
 	if (newID != id) {
 	    output.append("Didn't find the data at id " + id + " but found it at id " + newID);
 	    id = newID;
 	}
-	System.out.println("ZZZ id is now " + id + "\n");
-	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(getPointFromCSV(value)).get(getPointFromCSV(category));
+
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(valuePoint).get(categoryPoint);
 	output.append("Number of datapoints: " + histograms.size() + " \n");
 	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
 	    output.append(tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n");
 	}
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output.toString()).build();
     }
 	
@@ -91,7 +102,9 @@ public class DaemonService {
     @Path("/getfile")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getFile(@QueryParam("filename") String filename) {
+
 	allHistogramsMapLock.lock();
+
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 
 	DataIOFile foo = new DataIOFile(filename);
@@ -103,7 +116,9 @@ public class DaemonService {
 	    }
 	}
 	nextHistogramMapID++;
+
 	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output.toString()).build();
     }
 
@@ -120,12 +135,11 @@ public class DaemonService {
 			  @QueryParam("categoryCSV") String categoryCSV,
 			  @QueryParam("value") String valueCSV,
 			  @QueryParam("ageMins") Integer ageMins) {
+
 	allHistogramsMapLock.lock();
 
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
-	    
 	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, "demo2");
-
 	if (categoryCSV != null) {
 	    dbHandle.setCategoryFields(categoryCSV);
 	}
@@ -144,7 +158,9 @@ public class DaemonService {
 	    }
 	}
 	nextHistogramMapID++;
+
 	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output.toString()).build();
     }
 
@@ -203,19 +219,24 @@ public class DaemonService {
 	fakeDataFinal.put(valueType, fakeData);
 	allHistogramsMap.put(nextHistogramMapID, fakeDataFinal);
 	nextHistogramMapID++;
+
 	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output.toString()).build();
     }
 
     /**
      * Delete the mapping for one ID -> newMap
      *
-     * Return "ok" on success, something else on error
+     * @return "ok" on success, something else on error
      */
     @GET
     @Path("/deleteone/{id}")
     @Produces(MediaType.TEXT_PLAIN)
     public Response deleteOne(@PathParam("id") Integer id) {
+
+	allHistogramsMapLock.lock();
+
 	String output = "ok";
 	if (!allHistogramsMap.containsKey(id)) {
 	    output = "No data matching id " + id;
@@ -224,6 +245,32 @@ public class DaemonService {
 	    allHistogramsMap.remove(id);
 	}
 	SVMCalc.removeModelFromCache(id);
+
+	allHistogramsMapLock.unlock();
+
+	return Response.status(200).entity(output).build();
+    }	    
+
+    /**
+     * Delete all mappingings for ID -> newMap
+     *
+     * @return "ok" and the number if elements removed
+     */
+    @GET
+    @Path("/deleteall/{id}")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response deleteAll() {
+	String output = "ok";
+
+	allHistogramsMapLock.lock();
+
+	output += " : delete " + allHistogramsMap.size();
+	for (Integer id : allHistogramsMap.keySet()) {
+	    deleteOne(id);
+	}
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output).build();
     }	    
 
@@ -240,10 +287,17 @@ public class DaemonService {
 			    @QueryParam("anomalyTrainCategoryCSV") String anomalyTrainCategory,
 			    @QueryParam("anomalyTrainValue") String anomalyTrainValue,
 			    @QueryParam("autoReload") Integer autoReloadSec) {
-	if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
+
+	int calcTypeToUse;
+
+	allHistogramsMapLock.lock();
+	calcTypeToUse = AnomalyDetectionConfiguration.CALC_TYPE_TO_USE;
+	allHistogramsMapLock.unlock();
+
+	if (calcTypeToUse == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
 	    return getDataKDTree(trainID, trainCategory, trainValue, testID, testCategory, testValue);
 	}
-	else if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
+	else if (calcTypeToUse == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
 	    return getDataSVM(trainID, trainCategory, trainValue, testID, testCategory, testValue, anomalyTrainID, anomalyTrainCategory, anomalyTrainValue, autoReloadSec);
 	}
 	else {
@@ -297,10 +351,29 @@ public class DaemonService {
 	    throw new RuntimeException("error in inputs");
 	}
 
-	output += KDTreeCalc.runOneTestKDTree(trainID, getPointFromCSV(trainCategory), getPointFromCSV(trainValue), testID, getPointFromCSV(testCategory), getPointFromCSV(testValue), null);
+	GenericPoint<String> trainCategoryPoint = getPointFromCSV(trainCategory);
+	GenericPoint<String> trainValuePoint =  getPointFromCSV(trainValue);
+	GenericPoint<String> testCategoryPoint = getPointFromCSV(testCategory);
+	GenericPoint<String> testValuePoint = getPointFromCSV(testValue);
+
+	allHistogramsMapLock.lock();
+
+	output += KDTreeCalc.runOneTestKDTree(trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, null);
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output).build();
     }
 
+    /**
+     * Simply convert a CSV of strings into a GenericPoint where each dimension was one of the CSV strings
+     *
+     * Relative to the rest of the code, this is not an expensive operation but when possible we call
+     * this outside of the allHistogramsMapLock
+     *
+     * @param csv
+     * @return GenericPoint
+     */
     public GenericPoint<String> getPointFromCSV(String csv) {
 	String[] sParts = csv.split(",");
 	Arrays.sort(sParts);
@@ -315,15 +388,17 @@ public class DaemonService {
 
     /**
      * @param id The data index ID returned when the data was read in
-     * @param categoryCSV a CSV of category
-     * @param valueCSV a CSV of histogram values
+     * @param categoryPoint category
+     * @param valuePoint histogram values
      * @param output function will add text to this if it makes a new mapping
      *
      * @return the ID that contains the data with indexes valueCSV and categoryCSV (which may be different from the input id) or -1 if none
      */
-    public int recalculateByCategory(Integer id, String categoryCSV, String valueCSV, StringBuilder output) {
-	GenericPoint<String> categoryPoint = getPointFromCSV(categoryCSV);
-	GenericPoint<String> valuePoint    = getPointFromCSV(valueCSV);
+    public int recalculateByCategory(Integer id, GenericPoint<String> categoryPoint, GenericPoint<String> valuePoint, StringBuilder output) {
+
+	if (allHistogramsMapLock.isHeldByCurrentThread() == false) {
+	    throw new RuntimeException("Error: did not hold lock in recalculateByCategory");
+	}
 
 	// If the data we want is already there
 	if (allHistogramsMap.get(id) == null) {
@@ -343,11 +418,8 @@ public class DaemonService {
 	    allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint).get(startAndEnd) != null) {
 	    return allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint).get(startAndEnd);
 	}
-	// XYZ probably move this lock to beginning of function
-	allHistogramsMapLock.lock();
 
 	allHistogramsMap.put(nextHistogramMapID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
-
 	allHistogramsMap.get(nextHistogramMapID).put(valuePoint, new HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>());
 	allHistogramsMap.get(nextHistogramMapID).get(valuePoint).put(categoryPoint, new ArrayList<Pair<Integer, GenericPoint<Integer>>>());
 
@@ -355,8 +427,6 @@ public class DaemonService {
 	// the histograms are in an arraylist so it's hard to add them together. Sum them in a hashmap then convert it to an arraymap
 	TreeMap<Integer, GenericPoint<Integer>> newDataSum = new TreeMap(); //use TreeMap not HashMap so we get keys back in sorted orders
 	for (GenericPoint<String> oneKey : allHistogramsMap.get(id).get(valuePoint).keySet()) {
-	    System.out.println("XYZ " + oneKey.toString() + " compare to " + categoryPoint.toString());
-
 	    if (isPointSubset(categoryPoint, oneKey)) {
 		System.out.println("counting " + categoryPoint.toString() + " as subset as " + oneKey.toString() + "\n");
 		subsetsFound++;
@@ -400,7 +470,6 @@ public class DaemonService {
 	    startAndEnd = getStartAndEndTime(newID);
 	    allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint).put(startAndEnd, newID);
 	}
-	allHistogramsMapLock.unlock();
 
 	return newID;
     }
@@ -415,6 +484,10 @@ public class DaemonService {
      * @return true if every coord in testPoint also exists in bigPoint, false otherwise
      */
     public Boolean isPointSubset(GenericPoint<String> testPoint, GenericPoint<String> bigPoint) {
+	if (allHistogramsMapLock.isHeldByCurrentThread() == false) {
+	    throw new RuntimeException("Error: did not hold lock in isPointSubset");
+	}
+
 	if (bigPoint.getDimensions() <  testPoint.getDimensions()) {
 	    return false;
 	}
@@ -470,18 +543,22 @@ public class DaemonService {
 	    anomalyTrainValuePoint = getPointFromCSV(anomalyTrainValue);
 	}
 
-	int newTrainID = recalculateByCategory(trainID, trainCategory, trainValue, output);
+	allHistogramsMapLock.lock();
+
+	int newTrainID = recalculateByCategory(trainID, trainCategoryPoint, trainValuePoint, output);
 	if (newTrainID == -1) {
 	    output.append("ERROR: trainCategoryCSV (" + trainCategory + ") was not found and could not be calculated from existing data\n");
+	    allHistogramsMapLock.unlock();
 	    return Response.status(200).entity(output.toString()).build();
 	}
 	else if (newTrainID != trainID) {
 	    output.append("NOTE: trainCategoryCSV (" + trainCategory + ") was not found at id " + trainID + " but found it at ID " + newTrainID + "\n");
 	    trainID = newTrainID;
 	}
-	int newTestID = recalculateByCategory(testID, testCategory, testValue, output);
+	int newTestID = recalculateByCategory(testID, testCategoryPoint, testValuePoint, output);
 	if (newTestID == -1) {
 	    output.append("ERROR: testCategoryCSV  (" + testCategory + ") was not found and could not be calculated from existing data\n");
+	    allHistogramsMapLock.unlock();
 	    return Response.status(200).entity(output.toString()).build();
 	}
 	else if (newTestID != testID) {
@@ -489,9 +566,10 @@ public class DaemonService {
 	    testID = newTestID;
 	}
 	if (anomalyTrainID != null) {
-	    int newAnomalyTrainID = recalculateByCategory(anomalyTrainID, anomalyTrainCategory, anomalyTrainValue, output);
+	    int newAnomalyTrainID = recalculateByCategory(anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, output);
 	    if (newAnomalyTrainID == -1) {
 		output.append("ERROR: anomalyTrainCategoryCSV (" + anomalyTrainCategory + ") was not found and could not be calculated from existing data\n");
+		allHistogramsMapLock.unlock();
 		return Response.status(200).entity(output.toString()).build();
 	    }
 	    else if (newAnomalyTrainID != anomalyTrainID) {
@@ -499,7 +577,7 @@ public class DaemonService {
 		anomalyTrainID = newAnomalyTrainID;
 	    }
 	}
-	System.out.println("ZZZ " + trainID + " : " + testID + " : " + anomalyTrainID + "\n");
+
 	MultiValueMap resultsHash = new MultiValueMap();
 	output.append(SVMCalc.runOneTestSVM(trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, resultsHash));
 
@@ -528,6 +606,8 @@ public class DaemonService {
 	    break;
 	}
 
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output.toString()).build();
     }
 
@@ -536,7 +616,8 @@ public class DaemonService {
      * will handle the locking
      *
      * I am not sure how useful this function is; functions that need this information seem to do
-     * different things that defy 
+     * different things that defy lumping them all into a do-it-all function
+     *
      * @param id 
      * @param category
      * @param value
@@ -594,10 +675,16 @@ public class DaemonService {
     @Path("/testall/{categoryCSV}")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDataAll(@PathParam("categoryCSV") String category) {
-	if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
+	int calcTypeToUse;
+
+	allHistogramsMapLock.lock();
+	calcTypeToUse = AnomalyDetectionConfiguration.CALC_TYPE_TO_USE;
+	allHistogramsMapLock.unlock();
+
+	if (calcTypeToUse == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
 	    return getDataAllKDTree(category);
 	}
-	else if (AnomalyDetectionConfiguration.CALC_TYPE_TO_USE == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
+	else if (calcTypeToUse == AnomalyDetectionConfiguration.CALC_TYPE_SVM) {
 	    return getDataAllSVM(category);
 	}
 	else {
@@ -610,7 +697,14 @@ public class DaemonService {
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDataAllKDTree(@PathParam("categoryCSV") String category) {
 	StringBuilder output = new StringBuilder("Calculation method: KDTree\n");
-	output.append(KDTreeCalc.runAllTestKDTree(getPointFromCSV(category)));
+	GenericPoint<String> categoryPoint = getPointFromCSV(category);
+
+	allHistogramsMapLock.lock();
+	
+	output.append(KDTreeCalc.runAllTestKDTree(categoryPoint));
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output.toString()).build();
     }
 
@@ -619,11 +713,24 @@ public class DaemonService {
     @Produces(MediaType.TEXT_PLAIN)
     public Response getDataAllSVM(@PathParam("categoryCSV") String category) {
 	StringBuilder output = new StringBuilder("Calculation method: SVM\n");
-	output.append(SVMCalc.runAllTestSVM(getPointFromCSV(category)));
+	GenericPoint<String> categoryPoint = getPointFromCSV(category);
+
+	allHistogramsMapLock.lock();
+
+	output.append(SVMCalc.runAllTestSVM(categoryPoint));
+
+	allHistogramsMapLock.unlock();
+
 	return Response.status(200).entity(output.toString()).build();
     }
 
-    // XYZ this should nullify the caches
+    /**
+     * Set a new value for the size of the window to use when calculating histograms
+     * WARNING: if the value is different from the current value, this function will
+     *  delete all existing data from the system
+     *
+     * @param new value in seconds
+     */
     @GET
     @Path("/setSampleWindowSecs/{newVal}")
     @Produces(MediaType.TEXT_PLAIN)
@@ -631,6 +738,9 @@ public class DaemonService {
 
 	allHistogramsMapLock.lock();
 
+	if (newValue != AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS) {
+	    deleteAll(); //invalidate the existing data
+	}
 	AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS = newValue;
 
 	allHistogramsMapLock.unlock();
@@ -652,7 +762,13 @@ public class DaemonService {
 	return Response.status(200).entity(output).build();
     }
 
-    // XYZ this should nullify the caches
+    /**
+     * Set a new value for how far to slide the window when calculating histograms
+     * WARNING: if the value is different from the current value, this function will
+     *  delete all existing data from the system
+     *
+     * @param new value in seconds
+     */
     @GET
     @Path("/setSlideWindowSecs/{newVal}")
     @Produces(MediaType.TEXT_PLAIN)
@@ -660,6 +776,9 @@ public class DaemonService {
 
 	allHistogramsMapLock.lock();
 
+	if (newValue != AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS) {
+	    deleteAll(); //invalidate the existing data
+	}
 	AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS = newValue;
 
 	allHistogramsMapLock.unlock();
