@@ -341,7 +341,7 @@ public class DaemonService {
 
 		StringBuilder output = new StringBuilder("Custom Test\n\n");
 		
-		//output.append(getFakeData2(n,s,rn).getEntity());
+		output.append(getFakeData2(n,s,rn).getEntity());
 		getFakeData2(n,s,rn);
 //		String filename="/usr0/home/sibiv/Research/Data/GRE.out";
 //		DataIOFile foo = new DataIOFile(filename);
@@ -353,18 +353,18 @@ public class DaemonService {
 		String csvKey2 = "a2,b2";
 		
 		GenericPoint<String> trainKey = getPointFromCSV(csvKey1);
-		GenericPoint<String> testKey = getPointFromCSV(csvKey1);
+		GenericPoint<String> testKey = getPointFromCSV(csvKey2);
 
 		output.append("\n\nSVM RANDOM:\n");
 		long startTime1 = System.nanoTime();
-		//output.append(SVMRandomCalc.runOneTestSVM(id, trainKey, id, testKey, null).toString());
+		output.append(SVMRandomCalc.runOneTestSVM(id, trainKey, id, testKey, null).toString());
 		SVMRandomCalc.runOneTestSVM(id, trainKey, id, testKey, null).toString();
 		long endTime1 = System.nanoTime();
 		double duration = (double)(endTime1 - startTime1)/1000000000;
 		output.append("\n\nTime taken:\n" + (duration));
 		output.append("\n\nSVM:\n");
 		long startTime2 = System.nanoTime();
-		//output.append(SVMCalc.runOneTestSVM(id, trainKey, id, testKey, null));
+		output.append(SVMCalc.runOneTestSVM(id, trainKey, id, testKey, null));
 		SVMCalc.runOneTestSVM(id, trainKey, id, testKey, null);
 		long endTime2 = System.nanoTime();
 		duration = (double)(endTime2 - startTime2)/1000000000;
