@@ -1,0 +1,1 @@
+import numpy as np, numpy.random as nr, numpy.linalg as nlg

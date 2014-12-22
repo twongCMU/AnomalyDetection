@@ -94,32 +94,34 @@ public class SVMRandomCalc {
 		svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
 		svmParameter.gamma = AnomalyDetectionConfiguration.SVM_GAMMA;
 		// the library uses kfold
-		svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, targetAnomalyAccuracy);
-		if (svmParameter.nu == -1) {
-			throw new RuntimeException("nu was not set");
-		}
-		System.out.println("YYY picked a nu of " + svmParameter.nu);
-
-		// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
-		// or somehow have so small a nu that it stops being relevant
-		int expandTimes = 0;
-		while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
-			System.out.println("YYY expanding");
-			for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
-				for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
-					nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
-				}
-			}
-
-			// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
-			// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
-			// problem we can do something smarter
-			nuValues.put(svmParameter.nu, -1.0);
-
-			AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
-			svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
-			expandTimes++;
-		}
+//		svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, targetAnomalyAccuracy);
+//		if (svmParameter.nu == -1) {
+//			throw new RuntimeException("nu was not set");
+//		}
+//		System.out.println("YYY picked a nu of " + svmParameter.nu);
+//
+//		// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
+//		// or somehow have so small a nu that it stops being relevant
+//		int expandTimes = 0;
+//		while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
+//			System.out.println("YYY expanding");
+//			for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
+//				for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
+//					nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
+//				}
+//			}
+//
+//			// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
+//			// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
+//			// problem we can do something smarter
+//			nuValues.put(svmParameter.nu, -1.0);
+//
+//			AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
+//			svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
+//			expandTimes++;
+//		}
+		
+		svmParameter.nu = 0.5;
 
 		System.out.println("YYY selected nu of " + svmParameter.nu);
 		Pair <GaussianRandomFeatures, svm_model> gffSVMPair = new Pair<GaussianRandomFeatures, svm_model> (gff, svm.svm_train(svmProblem, svmParameter));

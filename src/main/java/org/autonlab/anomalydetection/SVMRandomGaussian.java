@@ -36,6 +36,8 @@ public class SVMRandomGaussian implements Runnable {
 
 	// These are used by all related threads. Volatile variables are modified by threads
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> _histograms = null;
+	// ArrayList<Pair<Double, GenericPoint<Integer>>> _histograms2 = null; // 
+
 	int _n = 0; // The length of histogram element
 	int _D = 0; // The number of random features 
 	volatile svm_node _retNode[][] = null;
