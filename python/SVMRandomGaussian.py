@@ -2,19 +2,17 @@ from __future__ import division
 import numpy as np, numpy.random as nr, numpy.linalg as nlg
 
 import gaussianRandomFeatures as grf
+import SVM
 
-class SVMRandomGaussian:
+class RandomGaussianFeatures:
 
-	def __init__(self, fs, rn, gammak, feature_generator=None):
+	def __init__(self, dim, rn, gammak, feature_generator=None):
 		"""
-		Assumes fs is a list of features to be projected into fourier space.
 		"""
 
-		self.dim = len(fs[0])
+		self.dim = dim
 		self.rn = rn
-		self.fs = fs
-
-		self.rfs = []
+		self.gammak = gammak
 
 		if feature_generator is None:
 			self.feature_generator = gff.gaussianRandomFeatures(self.dim, self.rn, self.gammak)
@@ -26,12 +24,50 @@ class SVMRandomGaussian:
 		"""
 		return self.feature_generator
 
-	def getData (self):
+	def getData (self, fs):
 		"""
 		Gets the projected features.
 		"""
-		if not self.rfs:
-			for f in self.fs:
-				self.rfs.append(self.feature_generator.computeRandomFeatures(f))
+		assert len(fs[0]) == self.dim
+		rfs = []
+		for f in self.fs:
+			rfs.append(self.feature_generator.computeRandomFeatures(f))
 
-		return self.rfs
+		return rfs
+
+class SVMRandomGaussian:
+
+	def __init__(self, rgf, params, svm_type='LinearSVM'):
+		self.rgf = rgf
+
+		self.svm = None
+		if svm_type=='LinearSVM':
+			self.svm = SVM.LinearSVM(params)
+		elif svm_type=='SVM':
+			self.svm = SVM.SVM(params)
+		else:
+			raise NotImplementedError('SVM type %s not implemented.'%svm_type)
+
+
+	def setParam(self, param):
+		self.svm.setParam(param)
+
+	def train (self, X, Y):
+		"""
+		X --> list of features
+		Y --> list of +1/-1
+
+		Train SVM with X as input and Y as output.
+		"""
+		XR = self.rgf.getData(X)
+		self.svm.train(XR,Y)
+
+	def predict(self, X):
+		"""
+		Prediction for list of features X.
+		"""
+		XR = self.rgf.getData(X)
+		return self.svm.predict(XR)
+
+	def reset(self, param=None):
+		self.svm.reset(param)

@@ -11,7 +11,7 @@ def computeGaussianFourierFeatures (hist):
 	Compute gaussian random features for hist.
 	"""
 	hist = np.atleast_1d(np.squeeze(hist))
-	d = hist.shape[0]
+	d = hist.shape[0]	
 
 	assert ws and bs
 
