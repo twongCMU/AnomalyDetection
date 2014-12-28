@@ -4,10 +4,13 @@ import numpy as np, numpy.random as nr, numpy.linalg as nlg
 import gaussianRandomFeatures as grf
 import SVM
 
-class RandomGaussianFeatures:
+class RandomFeaturesConverter:
 
 	def __init__(self, dim, rn, gammak, feature_generator=None):
 		"""
+		dim 	--> dimension of input space
+		rn  	--> number of random features
+		gammak 	--> bandwidth of rbf kernel
 		"""
 
 		self.dim = dim
@@ -15,7 +18,7 @@ class RandomGaussianFeatures:
 		self.gammak = gammak
 
 		if feature_generator is None:
-			self.feature_generator = gff.gaussianRandomFeatures(self.dim, self.rn, self.gammak)
+			self.feature_generator = grf.GaussianRandomFeatures(self.dim, self.rn, self.gammak)
 		else: self.feature_generator = feature_generator
 
 	def getFeatureGenerator(self):
@@ -30,15 +33,15 @@ class RandomGaussianFeatures:
 		"""
 		assert len(fs[0]) == self.dim
 		rfs = []
-		for f in self.fs:
+		for f in fs:
 			rfs.append(self.feature_generator.computeRandomFeatures(f))
 
 		return rfs
 
 class SVMRandomGaussian:
 
-	def __init__(self, rgf, params, svm_type='LinearSVM'):
-		self.rgf = rgf
+	def __init__(self, rfc, params, svm_type='LinearSVM'):
+		self.rfc = rfc
 
 		self.svm = None
 		if svm_type=='LinearSVM':
@@ -59,14 +62,14 @@ class SVMRandomGaussian:
 
 		Train SVM with X as input and Y as output.
 		"""
-		XR = self.rgf.getData(X)
+		XR = self.rfc.getData(X)
 		self.svm.train(XR,Y)
 
 	def predict(self, X):
 		"""
 		Prediction for list of features X.
 		"""
-		XR = self.rgf.getData(X)
+		XR = self.rfc.getData(X)
 		return self.svm.predict(XR)
 
 	def reset(self, param=None):

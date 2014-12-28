@@ -1,3 +1,68 @@
-import numpy as np
+from __future__ import division
+import numpy as np, numpy.random as nr
 
-def generateGaussian()
+import SVM, SVMRandomGaussian as SRG
+import visualize as vis
+def generateGaussian():
+	pass
+
+
+def generateBinaryDataset(size, n, anomaly_n):
+
+	fs = []
+	ys = []
+
+	s2 = int(size/2)
+	s4 = int(size/4)
+
+	for _ in range(n):
+		f = [0]*s2 + nr.randint(0,2,(size-s2)).tolist()
+		y = 1
+
+		fs.append(f)
+		ys.append(y)
+
+	for _ in range(anomaly_n):
+		f = nr.randint(0,2,(s4)).tolist() + [0]*(size-s4)
+		y = -1
+
+		fs.append(f)
+		ys.append(y)
+
+	return fs, ys
+
+def testBinary ():
+	size = 12
+	n = 10
+	anomaly_n = 5
+
+	rn = 10000
+	gammak=1.0
+
+	xs_train, ys_train = generateBinaryDataset(size, n, anomaly_n)
+	xs_test, ys_test = generateBinaryDataset(size, n, anomaly_n)
+
+	rfc = SRG.RandomFeaturesConverter(dim=size, rn=rn, gammak=gammak)
+
+	params1 = SVM.SVMParam(ktype='rbf')
+	params2 = SVM.SVMParam(ktype='linear')
+
+	svm1 = SVM.SVM(params1)#SRG.SVMRandomGaussian(rgf, params1, svm_type='SVM')
+	svm2 = SRG.SVMRandomGaussian(rfc, params2, svm_type='SVM')
+
+	svm1.train(xs_train, ys_train)
+	svm2.train(xs_train, ys_train)
+
+	ys1 = svm1.predict(xs_test)
+	ys2 = svm2.predict(xs_test)
+
+	vis.visualize2d(rfc.getData(xs_train[:n]), rfc.getData(xs_train[n:]), show=False)
+	vis.visualize2d(xs_train[:n], xs_train[n:])
+
+
+	import IPython
+	IPython.embed()
+
+
+if __name__ == '__main__':
+	testBinary()

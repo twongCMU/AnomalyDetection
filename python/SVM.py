@@ -1,11 +1,11 @@
 import sklearn.svm as svm
-
+import numpy as np
 """
 One class SVMs from sci-kit learn.
 """
 
 class SVMParam:
-	def __init__(self, 	ktype='linear', nu=1.0, gamma=1.0, 
+	def __init__(self, 	ktype='linear', nu=0.5, gamma=1.0, 
 						C=1.0, dual=False, loss='l2', penalty='l2'):
 		self.kernel_type = ktype
 		self.nu = nu
@@ -82,4 +82,4 @@ class LinearSVM(SVM):
 									gamma=self.param.gamma,
 									loss=self.param.loss,
 									penalty=self.param.penalty)
-		self.trained = False
+		self.trained = False	

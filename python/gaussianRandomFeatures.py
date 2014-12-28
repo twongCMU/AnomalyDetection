@@ -22,8 +22,8 @@ class GaussianRandomFeatures:
 		"""
 		self.ws = []
 		self.bs = []
-		mean = np.zeros(dim)
-		cov = np.eye(dim)*(2*self.gammak)
+		mean = np.zeros(self.dim)
+		cov = np.eye(self.dim)*(2*self.gammak)
 
 		for _ in range(self.rn):
 			self.ws.append(nr.multivariate_normal(mean, cov))
@@ -37,7 +37,7 @@ class GaussianRandomFeatures:
 		ws = np.array(self.ws)
 		bs = np.array(self.bs)
 
-		rf = np.cos(ws.dot(f) + bs)*np.sqrt(2/rn)
+		rf = np.cos(ws.dot(f) + bs)*np.sqrt(2/self.rn)
 		return rf.tolist()
 
 	def RBFKernel(self, f1, f2, gammak=None):
