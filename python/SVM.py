@@ -5,7 +5,7 @@ One class SVMs from sci-kit learn.
 """
 
 class SVMParam:
-	def __init__(self, 	ktype='linear', nu=0.5, gamma=1.0, 
+	def __init__(self, 	ktype='linear', nu=0.2, gamma=1.0, 
 						C=1.0, dual=False, loss='l2', penalty='l2'):
 		self.kernel_type = ktype
 		self.nu = nu
@@ -29,6 +29,7 @@ class SVM(object):
 		self.model = svm.NuSVC(	kernel=self.param.kernel_type, 
 						nu=self.param.nu,
 						gamma=self.param.gamma)
+
 		self.trained = False
 
 	def train (self, X, Y):

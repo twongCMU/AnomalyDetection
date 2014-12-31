@@ -32,6 +32,7 @@ class RandomFeaturesConverter:
 		Gets the projected features.
 		"""
 		assert len(fs[0]) == self.dim
+
 		rfs = []
 		for f in fs:
 			rfs.append(self.feature_generator.computeRandomFeatures(f))
