@@ -79,10 +79,10 @@ def testBinary ():
 
 
 def testGaussian ():
-	size = 1
+	size = 2
 	n = 20
 	var = 1.0
-	c = 1.5
+	c = 1
 
 	rn = 10000
 	gammak=1.0
@@ -108,10 +108,11 @@ def testGaussian ():
 	xtrain_anomaly = [f for f,y in zip(xs_train, ys_train) if y == -1]
 
 	vis.visualize2d(rfc.getData(xtrain_normal), rfc.getData(xtrain_anomaly), show=False)
-	vis.visualize2d(xtrain_normal, xtrain_anomaly)
+	vis.visualize2d(xtrain_normal, xtrain_anomaly, show=False)
+	vis.drawCircle((0,0), c)
 
-	# import IPython
-	# IPython.embed()
+	import IPython
+	IPython.embed()
 
 
 def testKernel():
@@ -120,7 +121,7 @@ def testKernel():
 	var = 1.0
 	c = 1.5
 
-	rn = 20000
+	rn = 50000
 	gammak=1.0
 
 	xs_train, ys_train = generateGaussian(size, n, var, c)
@@ -141,8 +142,10 @@ def testKernel():
 	print K
 	print K2
 
+	print np.abs(K-K2).max()
+
 
 if __name__ == '__main__':
 	#testBinary()
-	#testGaussian()
-	testKernel()
+	testGaussian()
+	#testKernel()
