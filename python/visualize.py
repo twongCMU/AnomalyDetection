@@ -24,7 +24,6 @@ def visualize2d(pts1, pts2=None, show=True, rtn=False):
 	else:
 		prj1 = project2d(pts1)
 
-	print len(prj1)
 	plt.scatter(prj1[:,0], prj1[:,1], color='blue')
 
 	if pts2 is not None:
@@ -36,7 +35,6 @@ def visualize2d(pts1, pts2=None, show=True, rtn=False):
 		else:
 			prj2 = project2d(pts2)
 
-		print len(prj2)
 		plt.scatter(prj2[:,0], prj2[:,1], color='red')
 
 	if show:

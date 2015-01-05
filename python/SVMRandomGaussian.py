@@ -70,8 +70,13 @@ class SVMRandomGaussian:
 		"""
 		Prediction for list of features X.
 		"""
+		import time
 		XR = self.rfc.getData(X)
-		return self.svm.predict(XR)
+		t1 = time.time()
+		rtn =  self.svm.predict(XR)
+		t2 = time.time()
+		print "TIME TAKEN: %f"%( t2-t1)
+		return rtn
 
 	def reset(self, param=None):
 		self.svm.reset(param)

@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy as np, numpy.random as nr, numpy.linalg as nlg
+import time
 
 import SVM, SVMRandomGaussian as SRG
 import visualize as vis
@@ -62,7 +63,7 @@ def testBinary ():
 	params2 = SVM.SVMParam(ktype='linear')
 
 	svm1 = SVM.SVM(params1)#SRG.SVMRandomGaussian(rgf, params1, svm_type='SVM')
-	svm2 = SRG.SVMRandomGaussian(rfc, params2, svm_type='SVM')
+	svm2 = SRG.SVMRandomGaussian(rfc, params2, svm_type='LinearSVM')
 
 	svm1.train(xs_train, ys_train)
 	svm2.train(xs_train, ys_train)
@@ -70,8 +71,8 @@ def testBinary ():
 	ys1 = svm1.predict(xs_test)
 	ys2 = svm2.predict(xs_test)
 
-	vis.visualize2d(rfc.getData(xs_train[:n]), rfc.getData(xs_train[n:]), show=False)
-	vis.visualize2d(xs_train[:n], xs_train[n:])
+	# vis.visualize2d(rfc.getData(xs_train[:n]), rfc.getData(xs_train[n:]), show=False)
+	# vis.visualize2d(xs_train[:n], xs_train[n:])
 
 
 	import IPython
@@ -114,6 +115,67 @@ def testGaussian ():
 	import IPython
 	IPython.embed()
 
+def testGaussian2 ():
+	size = 2
+	n = 200
+	var = 1.0
+	c = 1
+
+	rn = 10000
+	gammak=1.0
+
+	xs_train, ys_train = generateGaussian(size, n, var, c)
+	xs_test, ys_test = generateGaussian(size, n, var, c)
+
+	rfc = SRG.RandomFeaturesConverter(dim=size, rn=rn, gammak=gammak)
+
+	params1 = SVM.SVMParam(ktype='rbf')
+	params2 = SVM.SVMParam(ktype='linear')
+
+	svm1 = SVM.SVM(params1)#SRG.SVMRandomGaussian(rgf, params1, svm_type='SVM')
+	svm2 = SRG.SVMRandomGaussian(rfc, params2, svm_type='SVM')
+
+	tr_t1 = time.time()
+	svm1.train(xs_train, ys_train)
+	tr_t2 = time.time()
+	svm2.train(xs_train, ys_train)
+	tr_t3 = time.time()
+
+	print("Training time for 1: %f"%(tr_t2-tr_t1))
+	print("Training time for 2: %f"%(tr_t3-tr_t2))
+
+	ts_t1 = time.time()
+	ys1 = svm1.predict(xs_test)
+	ts_t2 = time.time()
+	ys2 = svm2.predict(xs_test)
+	ts_t3 = time.time()
+
+	print("Testing time for 1: %f"%(ts_t2-ts_t1))
+	print("Testing time for 2: %f"%(ts_t3-ts_t2))
+
+	xtrain_normal = [f for f,y in zip(xs_train, ys_train) if y == 1]
+	xtrain_anomaly = [f for f,y in zip(xs_train, ys_train) if y == -1]
+
+	# vis.visualize2d(rfc.getData(xtrain_normal), rfc.getData(xtrain_anomaly), show=False)
+	# vis.visualize2d(xtrain_normal, xtrain_anomaly, show=False)
+	#vis.drawCircle((0,0), c)
+	grf = rfc.getFeatureGenerator()
+
+	K = np.zeros((n,n))
+	for i in range(n):
+		for j in range(n):
+			K[i,j] = K[j,i] = grf.RBFKernel(xs_train[i], xs_train[j])
+
+	XRF = np.array(rfc.getData(xs_train))
+	K2 = np.dot(XRF, XRF.T)
+
+	# print K
+	# print K2
+
+	print np.abs(K-K2).max()
+	# import IPython
+	# IPython.embed()
+
 
 def testKernel():
 	size = 1
@@ -146,6 +208,10 @@ def testKernel():
 
 
 if __name__ == '__main__':
-	#testBinary()
-	testGaussian()
+	testBinary()
+#	testGaussian()
+	#testGaussian2()
 	#testKernel()
+
+	# import cProfile
+	# cProfile.run('testGaussian2()')

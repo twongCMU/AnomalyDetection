@@ -71,8 +71,7 @@ class LinearSVM(SVM):
 		if param is None:
 			param = SVMParam(ktype='linear')
 	
-		super(SVM, self).__init__(param)
-		
+		self.setParam(param)		
 
 	def setParam(self, param):
 		assert param.kernel_type == 'linear'
@@ -80,7 +79,40 @@ class LinearSVM(SVM):
 		self.param = param
 		self.model = svm.LinearSVC(	C=self.param.C, 
 									dual=self.param.dual,
-									gamma=self.param.gamma,
+									#gamma=self.param.gamma,
 									loss=self.param.loss,
 									penalty=self.param.penalty)
 		self.trained = False	
+
+	def train (self, X, Y):
+		"""
+		X --> list of features
+		Y --> list of +1/-1
+
+		Train SVM with X as input and Y as output.
+		"""
+		self.n_samples = len(X)
+		self.n_features = len(X[0])
+
+		X = np.array(X)
+		Y = np.array(Y)
+		assert (Y**2 == 1).all()
+
+		self.model.fit(X, Y)
+		self.trained = True
+
+	def predict(self, X):
+		"""
+		Prediction for list of features X.
+		"""
+		if self.trained == False:
+			print("Warning: SVM is untrained.")
+			return None
+
+		return self.model.predict(np.atleast_2d(X))
+
+	def reset(self, param=None):
+		if param is None:
+			param = self.param
+
+		self.setParam(param)
