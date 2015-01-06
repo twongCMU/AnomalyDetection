@@ -14,6 +14,7 @@ import javax.ws.rs.core.Response;
 
 import org.javatuples.Pair;
 import org.apache.commons.math3.distribution.UniformRealDistribution;
+import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 
 import com.savarese.spatial.GenericPoint;
 
@@ -488,7 +489,138 @@ public class DaemonService {
 		//output.append(allHistogramsMap.get(0).get(key2).get(0).toString());
 		return Response.status(200).entity(output.toString()).build();
 	}
-
+	
+	public double norm(double[] v) {
+		double n = 0.0;
+		for (int i = 0; i < v.length; i++)
+			n += v[i]*v[i];
+		return Math.sqrt(n);
+	}
+	
+//	@GET
+//	@Path("/getfakedata3")
+//	@Produces(MediaType.TEXT_PLAIN)
+//	public Response getFakeData3(@QueryParam("n") Integer n, @QueryParam("size") Integer s, @QueryParam("var") Integer var, @QueryParam("rn") Integer rn) {
+//		
+//		//allHistogramsMap.clear();
+//		
+//		StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
+//	
+//		double c = var;
+//		
+//		double[][] _cov = new double[s][s];
+//		double[] _mu = new double[s];
+//		for(int i = 0; i < s; i++) {
+//			_mu[i] = 0;
+//			for(int j = 0; j < s; j++)
+//				_cov[i][j] = (i == j) ? var : 0;
+//		}
+//		
+//		MultivariateNormalDistribution mnd = new MultivariateNormalDistribution (_mu, _cov);
+//		
+//		output.append("Anomaly data:\n\n");
+//		
+//		HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalyData = new HashMap();
+//		ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyTraining = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+//		int fakeTime = 1;
+//		for (int i = 0; i < n; i += 1) {
+//			GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
+//			for (int j = 0; j < s; j += 1) { // Randomly fill first quarter with 0s and 1s (anomalies)
+//				double [][] sample  = mnd.sample();
+//				if (j < qs && urd.sample() > 0.5)
+//					fakePoint.setCoord(j, 1);
+//				else
+//					fakePoint.setCoord(j, 0);
+//				
+//			}
+//			output.append(fakePoint.toString() + "\n");
+//			Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
+//			anomalyTraining.add(fakePair);
+//			fakeTime++;
+//		}
+//		GenericPoint<String> aKey = new GenericPoint<String>(2);
+//		aKey.setCoord(0, "a");
+//		aKey.setCoord(1, "b");
+//		anomalyData.put(aKey, anomalyTraining);
+//		output.append("Key: a, b (" + anomalyTraining.size() + ")\n\n");
+//		anomalyID = -1;//nextHistogramMapID;
+//		anomalyKey = aKey;
+//		
+//		allHistogramsMap.put(nextHistogramMapID, anomalyData);
+//		nextHistogramMapID++;
+//		
+//		
+//		output.append("Train data:\n\n");
+//		HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> fakeData = new HashMap();
+//		ArrayList<Pair<Integer, GenericPoint<Integer>>> training = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+//		
+//		fakeTime = 1;
+//		for (int i = 0; i < n; i += 1) {
+//			GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
+//			for (int j = 0; j < s; j += 1) { // Randomly fill second half with 1s and 0s
+//				if (j < hs)
+//					fakePoint.setCoord(j, 0);
+//				else if (urd.sample() > 0.5)
+//					fakePoint.setCoord(j, 1);
+//				else
+//					fakePoint.setCoord(j, 0);
+//				
+//			}
+//			output.append(fakePoint.toString() + "\n");
+//			Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
+//			training.add(fakePair);
+//			fakeTime++;
+//		}
+//		GenericPoint<String> key = new GenericPoint<String>(2);
+//		key.setCoord(0, "a1");
+//		key.setCoord(1, "b1");
+//		fakeData.put(key, training);
+//		output.append("Key: a1, b1 (" + training.size() + ")\n\n");
+//
+//		output.append("Test data:\n\n");
+//		// generate a dense full matrix. This will be test data used to run against the lower half matrix
+//		int normal_n = (int) 3*n/4;
+//		fakeTime = 1;
+//		ArrayList<Pair<Integer, GenericPoint<Integer>>> testing = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+//		for (int i = 0; i < n; i += 1) {
+//			GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
+//			if (i < normal_n) {
+//				for (int j = 0; j < s; j += 1) { // Randomly fill second half with 1s and 0s
+//					if (j < hs || urd.sample() < 0.5)
+//						fakePoint.setCoord(j, 0);
+//					else
+//						fakePoint.setCoord(j, 1);
+//				}
+//			} else {
+//				for (int j = 0; j < s; j += 1) { // Randomly fill first quarter with 0s and 1s (anomalies)
+//					if (j < qs && urd.sample() > 0.5)
+//						fakePoint.setCoord(j, 1);
+//					else
+//						fakePoint.setCoord(j, 0);
+//					
+//				}
+//			}
+//			output.append(fakePoint.toString() + "\n");
+//			Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
+//			testing.add(fakePair);
+//			fakeTime++;
+//		}
+//		GenericPoint<String> key2 = new GenericPoint<String>(2);
+//		key2.setCoord(0, "a2");
+//		key2.setCoord(1, "b2");
+//		fakeData.put(key2, testing);
+//		output.append("Key: a2, b2 (" + testing.size() + ")\n");
+//
+//		// override this since we don't use the ?????????????????????
+//		HistoTuple.setDimensions(s);
+//		
+//		allHistogramsMap.put(nextHistogramMapID, fakeData);
+//		nextHistogramMapID++;
+//		
+//		//output.append(allHistogramsMap.get(0).get(key2).get(0).toString());
+//		return Response.status(200).entity(output.toString()).build();
+//	}
+	
 	
 	@GET
 	@Path("/getDatasetKeys")

@@ -60,7 +60,7 @@ def testBinary ():
 	rfc = SRG.RandomFeaturesConverter(dim=size, rn=rn, gammak=gammak)
 
 	params1 = SVM.SVMParam(ktype='rbf')
-	params2 = SVM.SVMParam(ktype='linear')
+	params2 = SVM.SVMParam(ktype='linear', dual=True)
 
 	svm1 = SVM.SVM(params1)#SRG.SVMRandomGaussian(rgf, params1, svm_type='SVM')
 	svm2 = SRG.SVMRandomGaussian(rfc, params2, svm_type='LinearSVM')
@@ -71,8 +71,8 @@ def testBinary ():
 	ys1 = svm1.predict(xs_test)
 	ys2 = svm2.predict(xs_test)
 
-	# vis.visualize2d(rfc.getData(xs_train[:n]), rfc.getData(xs_train[n:]), show=False)
-	# vis.visualize2d(xs_train[:n], xs_train[n:])
+	vis.visualize2d(rfc.getData(xs_train[:n]), rfc.getData(xs_train[n:]), show=False)
+	vis.visualize2d(xs_train[:n], xs_train[n:])
 
 
 	import IPython
@@ -116,12 +116,12 @@ def testGaussian ():
 	IPython.embed()
 
 def testGaussian2 ():
-	size = 2
+	size = 4
 	n = 200
 	var = 1.0
 	c = 1
 
-	rn = 10000
+	rn = 30000
 	gammak=1.0
 
 	xs_train, ys_train = generateGaussian(size, n, var, c)
@@ -173,8 +173,8 @@ def testGaussian2 ():
 	# print K2
 
 	print np.abs(K-K2).max()
-	# import IPython
-	# IPython.embed()
+	import IPython
+	IPython.embed()
 
 
 def testKernel():
@@ -208,9 +208,9 @@ def testKernel():
 
 
 if __name__ == '__main__':
-	testBinary()
-#	testGaussian()
-	#testGaussian2()
+	#testBinary()
+	# testGaussian()
+	testGaussian2()
 	#testKernel()
 
 	# import cProfile

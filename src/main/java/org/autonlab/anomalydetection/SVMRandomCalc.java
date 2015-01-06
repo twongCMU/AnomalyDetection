@@ -326,14 +326,14 @@ public class SVMRandomCalc {
 
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testKey)) {
 			double[] values = new double[1];
-			svm.svm_predict_values(oneModel, testFeatures[index], values);
+			double d = svm.svm_predict_values(oneModel, testFeatures[index], values);
 			double prediction = values[0];
 
 			// this code returns a lower score for more anomalous so we flip it to match kdtree
 			prediction *= -1;
 
 
-			output.append("predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data " + testFeatures[index][0].value + "\n");
+			output.append("Pred: " + d + ".\t Dec: " + prediction + " for " + onePoint.getValue1().toString() + "\n");
 
 			if (results != null) {
 				results.put(prediction, onePoint.getValue0());
