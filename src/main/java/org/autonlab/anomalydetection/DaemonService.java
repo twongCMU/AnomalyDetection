@@ -134,12 +134,13 @@ public class DaemonService {
     public Response getDb(@QueryParam("hostname") String hostname,
 			  @QueryParam("categoryCSV") String categoryCSV,
 			  @QueryParam("value") String valueCSV,
-			  @QueryParam("ageMins") Integer ageMins) {
+			  @QueryParam("ageMins") Integer ageMins,
+			  @QueryParam("keySpace") String keySpace) {
 
 	allHistogramsMapLock.lock();
 
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
-	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, "demo2");
+	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, keySpace);
 	if (categoryCSV != null) {
 	    dbHandle.setCategoryFields(categoryCSV);
 	}
@@ -410,7 +411,7 @@ public class DaemonService {
 	if (allHistogramsMap.get(id).get(valuePoint).get(categoryPoint) != null) {
 	    return id;
 	}
-	// XYZ need to calculate the time range from any existing data even if it doesn't match key and value since all data in ID has the same ranges
+
 	Pair<Integer, Integer> startAndEnd = getStartAndEndTime(id);
 	if (allHistogramsMapKeyRemap.get(valuePoint) != null &&
 	    allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint) != null &&
@@ -745,7 +746,7 @@ public class DaemonService {
 
 	allHistogramsMapLock.unlock();
 
-	return Response.status(200).entity("ok").build();
+	return Response.status(200).entity("Changes enacted. All data deleted.").build();
     }
 
     @GET
@@ -783,7 +784,7 @@ public class DaemonService {
 
 	allHistogramsMapLock.unlock();
 
-	return Response.status(200).entity("ok").build();
+	return Response.status(200).entity("Change enacted. All data deleted.").build();
     }
 
     @GET
@@ -836,5 +837,27 @@ public class DaemonService {
 
 	return Response.status(200).entity(output).build();
     }
-	
+
+    
+    @GET
+    @Path("/setNumThreads/{newVal}")
+    @Produces(MediaType.TEXT_HTML)
+    public Response setNumThreads(@PathParam("newVal") Integer newValue) {
+	String output = "Number of threads was " + AnomalyDetectionConfiguration.NUM_THREADS + " and is now " + newValue;
+
+	if (AnomalyDetectionConfiguration.NUM_THREADS == newValue) {
+	    output = "Number of threads is already " + newValue + ". No change";
+	}
+	else {
+	    // grab the lock in the event that an SVM calculation is in progress
+	    allHistogramsMapLock.lock();
+
+	    AnomalyDetectionConfiguration.NUM_THREADS = newValue;
+
+	    allHistogramsMapLock.unlock();
+	}
+
+	return Response.status(200).entity(output).build();
+    }
+
 }

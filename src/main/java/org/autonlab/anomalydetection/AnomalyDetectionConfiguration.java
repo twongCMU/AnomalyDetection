@@ -5,7 +5,7 @@ import libsvm.*;
 public class AnomalyDetectionConfiguration {
 
     // number of CPU threads to use when doing parallel computation
-    static final int NUM_THREADS = 4;
+    static int NUM_THREADS = 4;
 
     // The width of time in which we count datapoints - can be changed via REST call
     static int SAMPLE_WINDOW_SECS = 1800;
