@@ -150,8 +150,10 @@ def plotAccuracyRN (size, ntr, nts, rn_range, var=1.0, c=1.0, gammak=1.0):
 	acc1 = []
 	acc2 = []
 
-	trs = []
-	tss = []
+	tr1s = []
+	ts1s = []
+	tr2s = []
+	ts2s = []
 
 	for rn in rn_range:
 		print '\n rn:', rn
@@ -161,8 +163,10 @@ def plotAccuracyRN (size, ntr, nts, rn_range, var=1.0, c=1.0, gammak=1.0):
 		acc1.append(ag[1])
 		acc2.append(ag[2])
 
-		trs.append(tr[1])
-		tss.append(ts[1])
+		tr1s.append(tr[0])
+		tr2s.append(tr[1])
+		ts1s.append(ts[0])
+		ts2s.append(ts[1])
 
 	print("Average agreement: %f"%(sum(agg)/len(rn_range)))
 	print("Average accuracy of 1: %f"%(sum(acc1)/len(rn_range)))
@@ -173,12 +177,14 @@ def plotAccuracyRN (size, ntr, nts, rn_range, var=1.0, c=1.0, gammak=1.0):
 	plt.plot(rn_range, acc1, label='Acc kernel')
 	plt.plot(rn_range, acc2, label='Acc linear')
 	plt.title('Accuracy: d = %d, ntr = %d, nts = %d'%(size, ntr, nts))
-	plt.legend()
+	plt.legend(loc=4)
 	f2 = plt.figure()
-	plt.plot(rn_range, trs, label='svm2 tr')
-	plt.plot(rn_range, tss, label='svm2 ts')
-	plt.title('Time for svm2: d = %d, ntr = %d, nts = %d'%(size, ntr, nts))
-	plt.legend()
+	plt.plot(rn_range, tr1s, label='svm1 tr')
+	plt.plot(rn_range, ts1s, label='svm1 ts')
+	plt.plot(rn_range, tr2s, label='svm2 tr')
+	plt.plot(rn_range, ts2s, label='svm2 ts')
+	plt.title('Time: d = %d, ntr = %d, nts = %d'%(size, ntr, nts))
+	plt.legend(loc=4)
 	plt.show()
 
 
@@ -199,4 +205,4 @@ if __name__ == '__main__':
 
 	# plotRangeN(size, ntr_range, nts_range, rn = rn)
 	rn_range=[2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 300, 400, 500, 750, 1000]
-	plotAccuracyRN(size=2, ntr=20000, nts=20000, rn_range=rn_range)
+	plotAccuracyRN(size=2, ntr=10000, nts=10000, rn_range=rn_range)
