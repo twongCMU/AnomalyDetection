@@ -1,0 +1,3 @@
+Average agreement: 0.994333
+Average accuracy of 1: 0.994072
+Average accuracy of 2: 0.999193

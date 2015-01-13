@@ -1,0 +1,19 @@
+Training:
+ntr_min = 10
+ntr_max = 50000
+ntr = 20
+
+Testing:
+nmin = 10
+nmax = 50000
+nt = 20
+
+size = 2
+rn = 1000
+
+
+Accuracy:
+Average agreement: 0.994025
+Average accuracy of 1: 0.993675
+Average accuracy of 2: 0.998858
+
