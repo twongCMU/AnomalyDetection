@@ -6,7 +6,8 @@ One class SVMs from sci-kit learn.
 
 class SVMParam:
 	def __init__(self, 	ktype='linear', nu=0.2, gamma=1.0, 
-						C=1.0, dual=False, loss='l2', penalty='l2'):
+						C=1.0, dual=False, loss='l2', penalty='l2',
+						verbose=False):
 		self.kernel_type = ktype
 		self.nu = nu
 		self.gamma = gamma
@@ -15,6 +16,8 @@ class SVMParam:
 		self.dual = dual
 		self.loss = loss
 		self.penalty = penalty
+
+		self.verbose = verbose
 
 
 class SVM(object):
@@ -28,7 +31,8 @@ class SVM(object):
 		self.param = param
 		self.model = svm.NuSVC(	kernel=self.param.kernel_type, 
 						nu=self.param.nu,
-						gamma=self.param.gamma)
+						gamma=self.param.gamma,
+						verbose=self.param.verbose)
 
 		self.trained = False
 
@@ -81,7 +85,8 @@ class LinearSVM(SVM):
 									dual=self.param.dual,
 									#gamma=self.param.gamma,
 									loss=self.param.loss,
-									penalty=self.param.penalty)
+									penalty=self.param.penalty,
+									verbose=self.param.verbose)
 		self.trained = False	
 
 	def train (self, X, Y):
@@ -99,6 +104,54 @@ class LinearSVM(SVM):
 		assert (Y**2 == 1).all()
 
 		self.model.fit(X, Y)
+		self.trained = True
+
+	def predict(self, X):
+		"""
+		Prediction for list of features X.
+		"""
+		if self.trained == False:
+			print("Warning: SVM is untrained.")
+			return None
+
+		return self.model.predict(np.atleast_2d(X))
+
+	def reset(self, param=None):
+		if param is None:
+			param = self.param
+
+		self.setParam(param)
+
+
+class OneClassSVM(SVM):
+	def __init__ (self, param=None):
+		if param is None:
+			param = SVMParam()
+
+		self.setParam(param)		
+
+	def setParam(self, param):
+		self.param = param
+		self.model = svm.OneClassSVM(	kernel=self.param.kernel_type, 
+										nu=self.param.nu,
+										gamma=self.param.gamma,
+										verbose=self.param.verbose)
+
+		self.trained = False
+
+	def train (self, X, Y):
+		"""
+		X --> list of features
+		Y --> list of +1/-1
+
+		Train SVM with X as input and Y as output.
+		"""
+		self.n_samples = len(X)
+		self.n_features = len(X[0])
+
+		X = np.array(X)
+
+		self.model.fit(X)
 		self.trained = True
 
 	def predict(self, X):

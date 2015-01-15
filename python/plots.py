@@ -48,9 +48,9 @@ def generateBinaryDataset(size, n, anomaly_n):
 def testGaussian (size, ntr, nts, rn, var =1.0 , c=1.0, gammak=1.0):
 
 	xs_train, ys_train = generateGaussian(size, ntr, var, c)
-	# print xs_train, ys_train
+	print sum(ys_train)
 	# print [nlg.norm(f) for f in xs_train]
-	# raw_input()
+	#raw_input()
 	xs_test, ys_test = generateGaussian(size, nts, var, c)
 
 	rfc = SRG.RandomFeaturesConverter(dim=size, rn=rn, gammak=gammak)
@@ -137,11 +137,15 @@ def plotRangeN (size, ntr_range, nts_range, rn, var=1.0, c=1.0, gammak=1.0):
 	plt.plot(ntr_range, tr2s, label='svm2 tr')
 	plt.title('Training: d = %d, rn = %d'%(size, rn))
 	plt.legend()
+	plt.xlabel('Training points')
+	plt.xlabel('Time')
 	f2 = plt.figure()
 	plt.plot(nts_range, ts1s, label='svm1 ts')
 	plt.plot(nts_range, ts2s, label='svm2 ts')
 	plt.title('Testing: d = %d, rn = %d'%(size, rn))
 	plt.legend()
+	plt.xlabel('Testing points')
+	plt.xlabel('Time')
 	plt.show()
 
 def plotAccuracyRN (size, ntr, nts, rn_range, var=1.0, c=1.0, gammak=1.0):
@@ -173,10 +177,12 @@ def plotAccuracyRN (size, ntr, nts, rn_range, var=1.0, c=1.0, gammak=1.0):
 	print("Average accuracy of 2: %f"%(sum(acc2)/len(rn_range)))
 
 	f1 = plt.figure()
-	plt.plot(rn_range, agg, label='Agreement')
+	plt.plot(	rn_range, agg, label='Agreement')
 	plt.plot(rn_range, acc1, label='Acc kernel')
 	plt.plot(rn_range, acc2, label='Acc linear')
 	plt.title('Accuracy: d = %d, ntr = %d, nts = %d'%(size, ntr, nts))
+	plt.xlabel('Random features')
+	plt.ylabel('Fraction')
 	plt.legend(loc=4)
 	f2 = plt.figure()
 	plt.plot(rn_range, tr1s, label='svm1 tr')
@@ -185,24 +191,30 @@ def plotAccuracyRN (size, ntr, nts, rn_range, var=1.0, c=1.0, gammak=1.0):
 	plt.plot(rn_range, ts2s, label='svm2 ts')
 	plt.title('Time: d = %d, ntr = %d, nts = %d'%(size, ntr, nts))
 	plt.legend(loc=4)
+	plt.xlabel('Random features')
+	plt.ylabel('Time')
 	plt.show()
+
+
 
 
 if __name__ == '__main__':
 	ntr_min = 10
-	ntr_max = 100000
+	ntr_max = 30000
 	ntr = 20
 	
 	nts_min = 10
-	nts_max = 100000
+	nts_max = 30000
 	nts = 20
 
-	size = 2
-	rn = 100
+	size = 8
+	c = 2.5
+	rn = 5000
 
 	ntr_range = np.squeeze(np.linspace(ntr_min, ntr_max, ntr).astype(int)).tolist()
 	nts_range = np.squeeze(np.linspace(nts_min, nts_max, nts).astype(int)).tolist()
 
-	# plotRangeN(size, ntr_range, nts_range, rn = rn)
-	rn_range=[2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 300, 400, 500, 750, 1000]
-	plotAccuracyRN(size=2, ntr=10000, nts=10000, rn_range=rn_range)
+	plotRangeN(size, ntr_range, nts_range, rn = rn, c = c)
+	#rn_range=[100, 150, 200, 300, 400, 500, 750, 1000, 2000, 5000]#[2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 300, 400, 500, 750, 1000]
+	#rn_range.extend([10000, 20000, 30000, 40000, 50000, 60000, 70000])
+	#plotAccuracyRN(size=size, ntr=2000, nts=2000, rn_range=rn_range, c=c)

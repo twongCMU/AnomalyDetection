@@ -1,9 +1,8 @@
 import csv
 
-def generateHistograms(data, all_mtypes, wsize, wsep):
+def generateHistograms(data, all_mtypes, start_t, wsize, wsep, vals_only=False):
 	"""
 	"""
-	all_mtypes.sort()
 
 	hists = {}
 	for ip in data:
@@ -24,16 +23,19 @@ def generateHistograms(data, all_mtypes, wsize, wsep):
 			while True:
 				t, m = data[ip][app][idx]
 
-				if next is False and t >= tbegin + wsep:
+				if (next is False) and (t >= tbegin + wsep):
 					tbegin = tbegin + wsep
 					sidx = idx
 					next = True
 
 				if t > tend or idx == n-1:
-					if idx == n-1:
+					if idx == n-1 and t <= tend:
 						hist[m] += 1
 
-					hists[ip][app].append(hist)
+					if vals_only:
+						hists[ip][app].append([hist[mt] for mt in all_mtypes])
+					else:
+						hists[ip][app].append(hist)
 					if not next:
 						break
 					else:
@@ -48,7 +50,7 @@ def generateHistograms(data, all_mtypes, wsize, wsep):
 
 	return hists
 
-def generateHistogramsFromFile(file_name, wsize, wsep):
+def generateHistogramsFromFile(file_name, wsize, wsep, vals_only=False):
 
 	fh = open(file_name,'r')
 	r = csv.reader(fh)
@@ -59,10 +61,10 @@ def generateHistogramsFromFile(file_name, wsize, wsep):
 	start_t = -1
 
 	for row in r:
-		if len(r) != 4: continue
+		if len(row) != 4: continue
 
-		ip, t, mtype, app = r
-		if start_t == -1: start_t = t
+		ip, t, m, app = row
+		if start_t == -1: start_t = float(t)
 
 		if ip not in data:
 			data[ip] = {}
@@ -71,11 +73,15 @@ def generateHistogramsFromFile(file_name, wsize, wsep):
 
 		if m not in all_mtypes:
 			all_mtypes.append(m)
-		data[ip][app].append((t, mtype))
+		data[ip][app].append((float(t), m))
 	fh.close()
 
-	return generateHistograms(data, all_mtypes, wsize, wsep)
+	all_mtypes.sort()
+	return generateHistograms(data, all_mtypes, start_t, wsize, wsep, vals_only), all_mtypes
 
 
-if __name == '__main__':
-	
+if __name__ == '__main__':
+	import os, os.path as osp
+	#file_name = osp.join(os.getenv('HOME'), 'Research/AnomalyDetection/python/tmp.txt')
+	file_name = osp.join(os.getenv('HOME'), 'Research/Data/GRE.out')
+	hists, all_mtypes = generateHistogramsFromFile(file_name, 2., 1., vals_only=True)

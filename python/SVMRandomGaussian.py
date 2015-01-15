@@ -49,6 +49,8 @@ class SVMRandomGaussian:
 			self.svm = SVM.LinearSVM(params)
 		elif svm_type=='SVM':
 			self.svm = SVM.SVM(params)
+		elif svm_type=='OneClassSVM':
+			self.svm = SVM.OneClassSVM(params)
 		else:
 			raise NotImplementedError('SVM type %s not implemented.'%svm_type)
 

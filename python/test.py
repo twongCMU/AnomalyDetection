@@ -4,6 +4,7 @@ import time
 
 import SVM, SVMRandomGaussian as SRG
 import visualize as vis
+import parse
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -210,12 +211,72 @@ def testKernel():
 
 	print np.abs(K-K2).max()
 
+def testOneClass():
+	import os, os.path as osp
+	#file_name = osp.join(os.getenv('HOME'), 'Research/AnomalyDetection/python/tmp.txt')
+	file_name = osp.join(os.getenv('HOME'), 'Research/Data/GRE.out')
+	hists, all_mtypes = parse.generateHistogramsFromFile(file_name, 2., 1., vals_only=True)
+
+	k1,k2 = hists.keys()
+	v1,v2 = hists[k1].keys()
+	v3 = hists[k2].keys()[0]
+
+	xs_train = hists[k1][v1]
+	xs_test = hists[k2][v3]
+
+	dim = len(xs_train[0])
+	gammak = 1.0
+	rn = 200
+
+	rfc = SRG.RandomFeaturesConverter(dim=dim, rn=rn, gammak=gammak)
+
+	params1 = SVM.SVMParam(ktype='rbf', verbose=True)
+	params2 = SVM.SVMParam(ktype='linear', verbose=True)
+
+	svm1 = SVM.OneClassSVM(params1)#SRG.SVMRandomGaussian(rgf, params1, svm_type='SVM')
+	svm2 = SRG.SVMRandomGaussian(rfc, params2, svm_type='OneClassSVM')
+
+	print ("Training")
+
+	tr_t1 = time.time()
+	svm1.train(xs_train, None)
+	tr_t2 = time.time()
+	svm2.train(xs_train, None)
+	tr_t3 = time.time()
+
+	print("Training time for 1: %f"%(tr_t2-tr_t1))
+	print("Training time for 2: %f"%(tr_t3-tr_t2))
+
+	ts_t1 = time.time()
+	ys1 = svm1.predict(xs_test)
+	ts_t2 = time.time()
+	ys2 = svm2.predict(xs_test)
+	ts_t3 = time.time()
+
+	print("Testing time for 1: %f"%(ts_t2-ts_t1))
+	print("Testing time for 2: %f"%(ts_t3-ts_t2))
+
+	print ("Agreement: %f"%(sum(ys1==ys2)*1.0/len(ys1)))
+
+	# xtrain_normal = [f for f,y in zip(xs_train, ys_train) if y == 1]
+	# xtrain_anomaly = [f for f,y in zip(xs_train, ys_train) if y == -1]
+
+	# vis.visualize2d(rfc.getData(xtrain_normal), rfc.getData(xtrain_anomaly), show=False)
+	# vis.visualize2d(xtrain_normal, xtrain_anomaly, show=False)
+	# vis.drawCircle((0,0), c)
+	grf = rfc.getFeatureGenerator()
+
+	import IPython
+	IPython.embed()
+
+
 
 if __name__ == '__main__':
 	#testBinary()
 	# testGaussian()
-	testGaussian2()
+	# testGaussian2()
 	#testKernel()
+	testOneClass()
 
 	# import cProfile
 	# cProfile.run('testGaussian2()')
