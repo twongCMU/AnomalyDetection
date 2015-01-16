@@ -226,7 +226,7 @@ def testOneClass():
 
 	dim = len(xs_train[0])
 	gammak = 1.0
-	rn = 200
+	rn = 500
 
 	rfc = SRG.RandomFeaturesConverter(dim=dim, rn=rn, gammak=gammak)
 

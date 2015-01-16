@@ -200,16 +200,16 @@ def plotAccuracyRN (size, ntr, nts, rn_range, var=1.0, c=1.0, gammak=1.0):
 
 if __name__ == '__main__':
 	ntr_min = 10
-	ntr_max = 30000
-	ntr = 20
+	ntr_max = 100000
+	ntr = 25
 	
 	nts_min = 10
-	nts_max = 30000
-	nts = 20
+	nts_max = 100000
+	nts = 25
 
 	size = 8
 	c = 2.5
-	rn = 5000
+	rn = 2000
 
 	ntr_range = np.squeeze(np.linspace(ntr_min, ntr_max, ntr).astype(int)).tolist()
 	nts_range = np.squeeze(np.linspace(nts_min, nts_max, nts).astype(int)).tolist()
