@@ -6,11 +6,12 @@ import SVM
 
 class RandomFeaturesConverter:
 
-	def __init__(self, dim, rn, gammak, feature_generator=None):
+	def __init__(self, dim, rn, gammak, sine=False, feature_generator=None):
 		"""
 		dim 	--> dimension of input space
 		rn  	--> number of random features
 		gammak 	--> bandwidth of rbf kernel
+		sine 	--> use sin in the random fourier features
 		"""
 
 		self.dim = dim
@@ -18,7 +19,7 @@ class RandomFeaturesConverter:
 		self.gammak = gammak
 
 		if feature_generator is None:
-			self.feature_generator = grf.GaussianRandomFeatures(self.dim, self.rn, self.gammak)
+			self.feature_generator = grf.GaussianRandomFeatures(self.dim, self.rn, self.gammak, sine=sine)
 		else: self.feature_generator = feature_generator
 
 	def getFeatureGenerator(self):

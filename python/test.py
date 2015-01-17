@@ -271,6 +271,75 @@ def testOneClass():
 
 
 
+def testRFFSine ():
+	size = 2
+	n = 30000
+	var = 1.0
+	c = 1
+
+	rn = 1000
+	gammak=1.0
+
+	xs_train, ys_train = generateGaussian(size, n, var, c)
+	xs_test, ys_test = generateGaussian(size, n, var, c)
+
+	rfc1 = SRG.RandomFeaturesConverter(dim=size, rn=rn, gammak=gammak, sine=False)
+	rfc2 = SRG.RandomFeaturesConverter(dim=size, rn=rn, gammak=gammak, sine=True)
+
+	params1 = SVM.SVMParam(ktype='rbf')
+	params2 = SVM.SVMParam(ktype='linear')
+	params3 = SVM.SVMParam(ktype='linear')
+
+	svm1 = SVM.SVM(params1)#SRG.SVMRandomGaussian(rgf, params1, svm_type='SVM')
+	svm2 = SRG.SVMRandomGaussian(rfc1, params2, svm_type='LinearSVM')
+	svm3 = SRG.SVMRandomGaussian(rfc2, params3, svm_type='LinearSVM')
+
+	tr_t1 = time.time()
+	svm1.train(xs_train, ys_train)
+	tr_t2 = time.time()
+	svm2.train(xs_train, ys_train)
+	tr_t3 = time.time()
+
+	print("Training time for 1: %f"%(tr_t2-tr_t1))
+	print("Training time for 2: %f"%(tr_t3-tr_t2))
+
+	ts_t1 = time.time()
+	ys1 = svm1.predict(xs_test)
+	ts_t2 = time.time()
+	ys2 = svm2.predict(xs_test)
+	ts_t3 = time.time()
+
+	print("Testing time for 1: %f"%(ts_t2-ts_t1))
+	print("Testing time for 2: %f"%(ts_t3-ts_t2))
+
+	xtrain_normal = [f for f,y in zip(xs_train, ys_train) if y == 1]
+	xtrain_anomaly = [f for f,y in zip(xs_train, ys_train) if y == -1]
+
+	# vis.visualize2d(rfc.getData(xtrain_normal), rfc.getData(xtrain_anomaly), show=False)
+	# vis.visualize2d(xtrain_normal, xtrain_anomaly, show=False)
+	# vis.drawCircle((0,0), c)
+	grf = rfc.getFeatureGenerator()
+
+	# K = np.zeros((n,n))
+	# for i in range(n):
+	# 	for j in range(n):
+	# 		K[i,j] = K[j,i] = grf.RBFKernel(xs_train[i], xs_train[j])
+
+	# XRF = np.array(rfc.getData(xs_train))
+	# K2 = np.dot(XRF, XRF.T)
+
+	# print K
+	# print K2
+
+	print ("Agreement: %f"%(sum(ys1==ys2)*1.0/len(ys1)))
+	print ("Accuracy 1: %f"%(sum(ys1==ys_test)*1.0/len(ys1)))
+	print ("Accuracy 2: %f"%(sum(ys2==ys_test)*1.0/len(ys1)))
+
+	#print np.abs(K-K2).max()
+	# import IPython
+
+
+
 if __name__ == '__main__':
 	#testBinary()
 	# testGaussian()

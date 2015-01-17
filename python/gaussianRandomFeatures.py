@@ -5,7 +5,7 @@ class GaussianRandomFeatures:
 	"""
 	Class to store Gaussian Random Features.
 	"""
-	def __init__(self, dim, rn, gammak=1.0):
+	def __init__(self, dim, rn, gammak=1.0, sine=False):
 		"""
 		Initialize with dim of input space, dim of random feature space
 		and bandwidth of the RBF kernel.
@@ -13,6 +13,7 @@ class GaussianRandomFeatures:
 		self.dim = dim
 		self.rn = rn
 		self.gammak = gammak
+		self.sine = sine
 
 		self.generateCoefficients()
 
@@ -21,13 +22,18 @@ class GaussianRandomFeatures:
 		Generate coefficients for GFF.
 		"""
 		self.ws = []
-		self.bs = []
+		if not self.sine:
+			self.bs = []
 		mean = np.zeros(self.dim)
 		cov = np.eye(self.dim)*(2*self.gammak)
 
-		for _ in range(self.rn):
-			self.ws.append(nr.multivariate_normal(mean, cov))
-			self.bs.append(nr.uniform(0.0, 2*np.pi))
+		if self.sine:
+			for _ in range(self.rn):
+				self.ws.append(nr.multivariate_normal(mean, cov))
+		else:
+			for _ in range(self.rn):
+				self.ws.append(nr.multivariate_normal(mean, cov))
+				self.bs.append(nr.uniform(0.0, 2*np.pi))
 
 	def computeRandomFeatures (self, f):
 		"""
@@ -35,10 +41,15 @@ class GaussianRandomFeatures:
 		"""
 		f = np.array(f)
 		ws = np.array(self.ws)
-		bs = np.array(self.bs)
+		if self.sin:
+			rf_cos = (np.cos(ws.dot(f))*np.sqrt(1/self.rn)).tolist()
+			rf_sin = (np.sin(ws.dot(f))*np.sqrt(1/self.rn)).tolist()
 
-		rf = np.cos(ws.dot(f) + bs)*np.sqrt(2/self.rn)
-		return rf.tolist()
+			return rf_cos + rf_sin
+		else:
+			bs = np.array(self.bs)
+			rf = np.cos(ws.dot(f) + bs)*np.sqrt(2/self.rn)
+			return rf.tolist()
 
 	def RBFKernel(self, f1, f2, gammak=None):
 		"""
