@@ -273,7 +273,7 @@ def testOneClass():
 
 def testRFFSine ():
 	size = 2
-	n = 30000
+	n = 1000
 	var = 1.0
 	c = 1
 
@@ -284,7 +284,7 @@ def testRFFSine ():
 	xs_test, ys_test = generateGaussian(size, n, var, c)
 
 	rfc1 = SRG.RandomFeaturesConverter(dim=size, rn=rn, gammak=gammak, sine=False)
-	rfc2 = SRG.RandomFeaturesConverter(dim=size, rn=rn, gammak=gammak, sine=True)
+	rfc2 = SRG.RandomFeaturesConverter(dim=size, rn=int(rn/2), gammak=gammak, sine=True)
 
 	params1 = SVM.SVMParam(ktype='rbf')
 	params2 = SVM.SVMParam(ktype='linear')
@@ -299,45 +299,51 @@ def testRFFSine ():
 	tr_t2 = time.time()
 	svm2.train(xs_train, ys_train)
 	tr_t3 = time.time()
+	svm3.train(xs_train, ys_train)
+	tr_t4 = time.time()
 
 	print("Training time for 1: %f"%(tr_t2-tr_t1))
 	print("Training time for 2: %f"%(tr_t3-tr_t2))
+	print("Training time for 2: %f"%(tr_t4-tr_t3))
 
 	ts_t1 = time.time()
 	ys1 = svm1.predict(xs_test)
 	ts_t2 = time.time()
 	ys2 = svm2.predict(xs_test)
 	ts_t3 = time.time()
+	ys3 = svm3.predict(xs_test)
+	ts_t4 = time.time()
 
 	print("Testing time for 1: %f"%(ts_t2-ts_t1))
 	print("Testing time for 2: %f"%(ts_t3-ts_t2))
+	print("Testing time for 2: %f"%(ts_t4-ts_t3))
 
-	xtrain_normal = [f for f,y in zip(xs_train, ys_train) if y == 1]
-	xtrain_anomaly = [f for f,y in zip(xs_train, ys_train) if y == -1]
-
-	# vis.visualize2d(rfc.getData(xtrain_normal), rfc.getData(xtrain_anomaly), show=False)
-	# vis.visualize2d(xtrain_normal, xtrain_anomaly, show=False)
-	# vis.drawCircle((0,0), c)
-	grf = rfc.getFeatureGenerator()
-
-	# K = np.zeros((n,n))
-	# for i in range(n):
-	# 	for j in range(n):
-	# 		K[i,j] = K[j,i] = grf.RBFKernel(xs_train[i], xs_train[j])
-
-	# XRF = np.array(rfc.getData(xs_train))
-	# K2 = np.dot(XRF, XRF.T)
-
-	# print K
-	# print K2
-
-	print ("Agreement: %f"%(sum(ys1==ys2)*1.0/len(ys1)))
+	print ("Agreement 1,2: %f"%(sum(ys1==ys2)*1.0/len(ys1)))
+	print ("Agreement 2,3: %f"%(sum(ys3==ys2)*1.0/len(ys1)))
+	print ("Agreement 1,3: %f"%(sum(ys3==ys1)*1.0/len(ys1)))
 	print ("Accuracy 1: %f"%(sum(ys1==ys_test)*1.0/len(ys1)))
 	print ("Accuracy 2: %f"%(sum(ys2==ys_test)*1.0/len(ys1)))
+	print ("Accuracy 3: %f"%(sum(ys3==ys_test)*1.0/len(ys1)))
 
-	#print np.abs(K-K2).max()
-	# import IPython
+	grf1 = rfc1.getFeatureGenerator()
+	grf2 = rfc2.getFeatureGenerator()
 
+	K1 = np.zeros((n,n))
+	for i in range(n):
+		for j in range(n):
+			K1[i,j] = K1[j,i] = grf1.RBFKernel(xs_train[i], xs_train[j])
+
+	XRF1 = np.array(rfc1.getData(xs_train))
+	XRF2 = np.array(rfc2.getData(xs_train))
+	K2 = np.dot(XRF1, XRF1.T)
+	K3 = np.dot(XRF2, XRF2.T)
+
+	print "Original/cos+unif:", np.abs(K1-K2).max()
+	print "Cos+unif/cos+sin:", np.abs(K2-K3).max()
+	print "Cos+sin/original:", np.abs(K1-K3).max()
+
+	import IPython
+	IPython.embed()
 
 
 if __name__ == '__main__':
@@ -345,7 +351,8 @@ if __name__ == '__main__':
 	# testGaussian()
 	# testGaussian2()
 	#testKernel()
-	testOneClass()
+	# testOneClass()
+	testRFFSine()
 
 	# import cProfile
 	# cProfile.run('testGaussian2()')

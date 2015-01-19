@@ -41,7 +41,7 @@ class GaussianRandomFeatures:
 		"""
 		f = np.array(f)
 		ws = np.array(self.ws)
-		if self.sin:
+		if self.sine:
 			rf_cos = (np.cos(ws.dot(f))*np.sqrt(1/self.rn)).tolist()
 			rf_sin = (np.sin(ws.dot(f))*np.sqrt(1/self.rn)).tolist()
 
