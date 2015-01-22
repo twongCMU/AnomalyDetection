@@ -67,7 +67,7 @@ public class SVMRandomCalc {
 		}
 
 		//Initialize before so we can pull out coefficiencts.
-		SVMRandomGaussian svmrg = new SVMRandomGaussian(histograms, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS);
+		SVMRandomGaussian svmrg = new SVMRandomGaussian(histograms, AnomalyDetectionConfiguration.SVM_D, AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.RFF_SINE, AnomalyDetectionConfiguration.NUM_THREADS);
 		GaussianRandomFeatures gff = svmrg.getRandomFeatures();
 
 		// fill in the svm_problem with the histogram data points

@@ -59,7 +59,7 @@ public class SVMRandomGaussian implements Runnable {
 	 * @param sigmak A measure of the bandwidth of the RBF kernel; gammak = 1/(2*sigmak^2)   
 	 * @param threadCount if svm_type is svm_parameter.PRECOMPUTED, use this many threads to apply kernel. Otherwise ignore value
 	 */
-	public SVMRandomGaussian(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, int D, double gammak, int threadCount) {
+	public SVMRandomGaussian(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, int D, double gammak, boolean sine, int threadCount) {
 		_threadCount = threadCount;
 		_threadArray = new Thread[_threadCount];
 		_histograms = histograms;
@@ -68,11 +68,8 @@ public class SVMRandomGaussian implements Runnable {
 		_retNode = new svm_node[histograms.size()][];
 		_retNodeRowCache = new HashMap<GenericPoint<Integer>,Integer>();
 		
-		long st = System.nanoTime();
-		_gff = new GaussianRandomFeatures(_D, _n, gammak);
-		long et = System.nanoTime();
-		double dur = (double)(et-st)/1000000000;
-		System.out.println("Time to create gff: " + dur);
+		_gff = new GaussianRandomFeatures(_D, _n, gammak, sine);
+		if (sine) _D *= 2; // sine version makes it twice as long.
 
 		for (svm_node[] svmNodeArr : _retNode)
 			svmNodeArr = null;

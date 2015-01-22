@@ -29,6 +29,7 @@ public class AnomalyDetectionConfiguration {
     static final double SVM_EPS = .001; // README says "eps is the stopping criterion. (we usually use 0.00001 in nu-SVC, 0.001 in others)"
     static final double SVM_GAMMA = 0.02; // For the RBF Kernel, we need the additional gamma = 1/(2*variance) factor. Variance = 5.0
     static final int SVM_D = 10000;//Number of random Fourier features 
+    static final boolean RFF_SINE = true; //parameter determining whether to use cos+unif or cos+sine.
 
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_NONE = 0;
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_CHI_SQUARED = 1;

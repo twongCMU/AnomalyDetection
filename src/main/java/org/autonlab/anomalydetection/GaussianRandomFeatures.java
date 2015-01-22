@@ -31,10 +31,13 @@ public class GaussianRandomFeatures {
 	// Our w vectors in order to generate the random features
 	double[] _bs;
 	
-	public GaussianRandomFeatures(int D, int n, double gammak) {
+	boolean _sine;
+
+	public GaussianRandomFeatures(int D, int n, double gammak, boolean sine) {
 		_D = D;
 		_n = n;
 		_gammak = gammak;
+		_sine = sine;
 		
 		// Initialize mnd
 		// The value for the variances are taken from: http://www.eecs.berkeley.edu/~brecht/papers/07.rah.rec.nips.pdf
@@ -69,22 +72,40 @@ public class GaussianRandomFeatures {
 	 * 
 	 * @return the feature array f = sqrt(2/D)*[cos(w_1 T x + b_1) ... cos(w_D T x + b_D)]  
 	 */
+	// TODO: Make them into matrix operations perhaps. This could make them faster.
 	public double[] computeGaussianFourierFeatures(GenericPoint<Integer> hist) {
 
-		double[] f = new double[_D];
-		
-		for (int i = 0; i < _D; i++) {
-			double[] w = _ws[i];
-			double b = _bs[i];
-
-			double t = 0.0;	// t = wTx	
-			for (int j = 0; j < _n; j++)
-				t += hist.getCoord(j)*w[j];
+		if (_sine) {
+			double[] f = new double[2*_D];
 			
-			f[i] = Math.cos(t + b)*Math.sqrt(2.0/_D);
-		}
+			for (int i = 0; i < _D; i++) {
+				double[] w = _ws[i];
 	
-		return f;
+				double t = 0.0;	// t = wTx	
+				for (int j = 0; j < _n; j++)
+					t += hist.getCoord(j)*w[j];
+				
+				f[i] = Math.cos(t)*Math.sqrt(1.0/_D);
+				f[_D+i] = Math.sin(t)*Math.sqrt(1.0/_D);
+			}
+			return f;
+		} else {
+			double[] f = new double[_D];
+			
+			for (int i = 0; i < _D; i++) {
+				double[] w = _ws[i];
+				double b = _bs[i];
+	
+				double t = 0.0;	// t = wTx	
+				for (int j = 0; j < _n; j++)
+					t += hist.getCoord(j)*w[j];
+				
+				f[i] = Math.cos(t + b)*Math.sqrt(2.0/_D);
+			}
+			return f;
+		}
+		
+		
 	}
 	
 	/**
