@@ -1,6 +1,5 @@
 package org.autonlab.anomalydetection;
 
-import com.datastax.driver.core.*;
 import com.savarese.spatial.*;
 
 import java.util.*; 
@@ -11,7 +10,6 @@ import javax.ws.rs.core.*;
 
 import org.apache.commons.collections.map.*;
 import org.javatuples.*;
-import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 import org.apache.commons.math3.distribution.UniformRealDistribution;
 
 @Path("/")
