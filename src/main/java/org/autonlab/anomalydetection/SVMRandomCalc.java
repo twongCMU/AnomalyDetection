@@ -62,7 +62,7 @@ public class SVMRandomCalc {
 	}
 
 	private static Pair<GaussianRandomFeatures, svm_model> 
-	generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, 
+	generateModelOneClass(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, 
 			double targetCrossTrainAccuracy, ArrayList<Pair<Integer, 
 			GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy, int rn) {
 
@@ -81,8 +81,99 @@ public class SVMRandomCalc {
 		int d = AnomalyDetectionConfiguration.SVM_D;
 		if (rn > 0) d = rn;
 		//Initialize before so we can pull out coefficiencts.
-		SVMRandomGaussian svmrg = new SVMRandomGaussian(histograms, d, 
-				AnomalyDetectionConfiguration.SVM_GAMMA, AnomalyDetectionConfiguration.NUM_THREADS);
+		SVMRandomGaussian svmrg = 
+		new SVMRandomGaussian(	histograms, d,
+								AnomalyDetectionConfiguration.SVM_GAMMA,
+								AnomalyDetectionConfiguration.RFF_SINE,
+								AnomalyDetectionConfiguration.NUM_THREADS);
+		GaussianRandomFeatures grf = svmrg.getRandomFeatures();
+
+		// fill in the svm_problem with the histogram data points
+		svm_problem svmProblem = new svm_problem();
+		svmProblem.l = histograms.size();
+		svmProblem.y = new double[histograms.size()];
+		Arrays.fill(svmProblem.y, 1.0); // all of our training data is non-anomalous
+		svmProblem.x = (svmrg.getData());
+
+		svm_problem svmProblemAnomaly = null;
+		// TODO: Wouldn't you want to add this to the same svmProblem as before?
+		if (histogramsAnomaly != null) {
+			svmProblemAnomaly = new svm_problem();
+			svmProblemAnomaly.l = histogramsAnomaly.size();
+			svmProblemAnomaly.y = new double[histogramsAnomaly.size()];
+			Arrays.fill(svmProblemAnomaly.y, -1.0); // set all of this data to anomalous
+			svmProblemAnomaly.x = (new SVMRandomGaussian(histogramsAnomaly, AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+		}
+
+
+		svm_parameter svmParameter = new svm_parameter();
+		svmParameter.svm_type = svm_parameter.NU_SVC;
+		svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_RANDOM_KERNEL_TYPE;
+		svmParameter.cache_size = AnomalyDetectionConfiguration.SVM_CACHE_SIZE;
+		svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
+		svmParameter.gamma = AnomalyDetectionConfiguration.SVM_GAMMA;
+		
+		// TODO: Need to fix allCrossValidate for only one single SVM for both normal and anomaly. 
+		// the library uses kfold
+		//svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, null, null, targetAnomalyAccuracy);
+		//		if (svmParameter.nu == -1) {
+		//			throw new RuntimeException("nu was not set");
+		//		}
+		//		System.out.println("YYY picked a nu of " + svmParameter.nu);
+		//
+		//		// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
+		//		// or somehow have so small a nu that it stops being relevant
+		//		int expandTimes = 0;
+		//		while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
+		//			System.out.println("YYY expanding");
+		//			for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
+		//				for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
+		//					nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
+		//				}
+		//			}
+		//
+		//			// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
+		//			// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
+		//			// problem we can do something smarter
+		//			nuValues.put(svmParameter.nu, -1.0);
+		//
+		//			AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
+		//			svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
+		//			expandTimes++;
+		//		}
+
+		svmParameter.nu = 0.5;
+
+		System.out.println("YYY selected nu of " + svmParameter.nu);
+		Pair <GaussianRandomFeatures, svm_model> gffSVMPair = new Pair<GaussianRandomFeatures, svm_model> (grf, svm.svm_train(svmProblem, svmParameter));
+		return gffSVMPair;
+	}
+	
+	private static Pair<GaussianRandomFeatures, svm_model> 
+	generateModelTwoClass(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, 
+			double targetCrossTrainAccuracy, ArrayList<Pair<Integer, 
+			GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy, int rn) {
+
+		// For quiet SVM
+		svm.svm_set_print_string_function(new QuietPrint());
+
+		TreeMap<Double, Double> nuValues = new TreeMap<Double,Double>();
+		System.out.println("YYY -------------------------");
+		// generate a list of nu values to try (we can add to this later)
+		for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
+			for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow <= AnomalyDetectionConfiguration.NU_START_POW_HIGH; testPow++) {
+				nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
+			}
+		}
+
+		int d = AnomalyDetectionConfiguration.SVM_D;
+		if (rn > 0) d = rn;
+		//Initialize before so we can pull out coefficiencts.
+		SVMRandomGaussian svmrg = 
+		new SVMRandomGaussian(	histograms, d,
+								AnomalyDetectionConfiguration.SVM_GAMMA,
+								AnomalyDetectionConfiguration.RFF_SINE,
+								AnomalyDetectionConfiguration.NUM_THREADS);
 		GaussianRandomFeatures grf = svmrg.getRandomFeatures();
 
 		// fill in the svm_problem with the histogram data points
@@ -338,7 +429,7 @@ public class SVMRandomCalc {
 				anomalyData = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey);
 			}
 			Pair<GaussianRandomFeatures, svm_model> grf_svm =
-					SVMRandomCalc.generateModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), .9, anomalyData, .9, rn);
+					SVMRandomCalc.generateModelOneClass(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), .9, anomalyData, .9, rn);
 			
 			grf = grf_svm.getValue0(); 
 			svmModel = grf_svm.getValue1();

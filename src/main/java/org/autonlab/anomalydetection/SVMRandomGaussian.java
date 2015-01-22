@@ -40,6 +40,7 @@ public class SVMRandomGaussian implements Runnable {
 
 	int _n = 0; // The length of histogram element
 	int _D = 0; // The number of random features 
+	boolean _sine = true; // if true, use cos+sine instead of cos+unif 
 	volatile svm_node _retNode[][] = null;
 	volatile Lock _retNodeLock = null;
 	
@@ -56,24 +57,24 @@ public class SVMRandomGaussian implements Runnable {
 	 * @param histograms The ArrayList of histograms that we're 
 	 * @param threadCount The number of threads to use to perform the computation
 	 * @param D The number of random fourier features
-	 * @param sigmak A measure of the bandwidth of the RBF kernel; gammak = 1/(2*sigmak^2)   
+	 * @param sigmak A measure of the bandwidth of the RBF kernel; gammak = 1/(2*sigmak^2)
+	 * @param 
 	 * @param threadCount if svm_type is svm_parameter.PRECOMPUTED, use this many threads to apply kernel. Otherwise ignore value
 	 */
-	public SVMRandomGaussian(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, int D, double gammak, int threadCount) {
+	public SVMRandomGaussian(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, int D, 
+							 double gammak, boolean sine, int threadCount) {
 		_threadCount = threadCount;
 		_threadArray = new Thread[_threadCount];
 		_histograms = histograms;
 		_D = D;
+		_sine = sine;
 		_n = _histograms.get(0).getValue1().getDimensions();
 		_retNode = new svm_node[histograms.size()][];
 		_retNodeRowCache = new HashMap<GenericPoint<Integer>,Integer>();
 		
-		long st = System.nanoTime();
-		_gff = new GaussianRandomFeatures(_D, _n, gammak);
-		long et = System.nanoTime();
-		double dur = (double)(et-st)/1000000000;
-		System.out.println("Time to create gff: " + dur);
-
+		_gff = new GaussianRandomFeatures(_D, _n, gammak, sine);
+		if (_sine) _D *= 2;
+		
 		for (svm_node[] svmNodeArr : _retNode)
 			svmNodeArr = null;
 
@@ -139,9 +140,9 @@ public class SVMRandomGaussian implements Runnable {
 
 			// look for the first unprocessed output row or decide that we're done
 			_retNodeLock.lock();
-			while (index < _histograms.size() && _retNode[index] != null) {
+			while (index < _histograms.size() && _retNode[index] != null)
 				index++;
-			}
+			
 			if (index < _histograms.size() && _retNode[index] == null) {
 				oneHist = _histograms.get(index).getValue1();
 
@@ -161,9 +162,8 @@ public class SVMRandomGaussian implements Runnable {
 			}
 			_retNodeLock.unlock();
 
-			if (index >= _histograms.size()) {
+			if (index >= _histograms.size()) 
 				break;
-			}
 
 			double[] f = _gff.computeGaussianFourierFeatures(oneHist);
 			for (int j = 0; j < _D; j++) {
