@@ -11,7 +11,7 @@ class GaussianRandomFeatures:
 		and bandwidth of the RBF kernel.
 		"""
 		self.dim = dim
-		self.rn = random
+		self.rn = rn
 		self.gammak = gammak
 		self.sine = sine
 

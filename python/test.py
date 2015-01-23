@@ -226,9 +226,9 @@ def testOneClass():
 
 	dim = len(xs_train[0])
 	gammak = 1.0
-	rn = 500
+	rn = 250
 
-	rfc = SRG.RandomFeaturesConverter(dim=dim, rn=rn, gammak=gammak)
+	rfc = SRG.RandomFeaturesConverter(dim=dim, rn=rn, sine=True, gammak=gammak)
 
 	params1 = SVM.SVMParam(ktype='rbf', verbose=True)
 	params2 = SVM.SVMParam(ktype='linear', verbose=True)
