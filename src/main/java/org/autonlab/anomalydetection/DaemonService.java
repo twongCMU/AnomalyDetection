@@ -589,7 +589,10 @@ public class DaemonService {
 	Double score = resultsHashList.get(0);
 
 	Pair<Integer, Integer> trainTime = getStartAndEndTime(trainID);
-	Pair<Integer, Integer> anomalyTrainTime = getStartAndEndTime(anomalyTrainID);
+	Pair<Integer, Integer> anomalyTrainTime = null;
+	if (anomalyTrainID != null) {
+	    anomalyTrainTime = getStartAndEndTime(anomalyTrainID);
+	}
 	Pair<Integer, Integer> testTime = getStartAndEndTime(testID);
 
 
@@ -599,10 +602,14 @@ public class DaemonService {
 	    output.append("Anomaly " + score + " at time " + timestamp + "( " + ((Collection<Integer>)resultsHash.getCollection(score)).size() + " with this score)\n");
 	    output.append(" * anomaly datapoint: " + onePoint.getValue1() + "\n");
 	    output.append(" * Training data: " + trainID + "," + trainCategoryPoint.toString() + "," + trainValuePoint.toString() + " time range: " + trainTime.getValue0() + " to " + trainTime.getValue1() + "\n"); 
-	    output.append(" * Anomaly training data: " + anomalyTrainID + "," + anomalyTrainCategoryPoint.toString() + "," + anomalyTrainValuePoint.toString() + " time range: " + anomalyTrainTime.getValue0() + " to " + anomalyTrainTime.getValue1() + "\n"); 
+	    if (anomalyTrainID != null) {
+		output.append(" * Anomaly training data: " + anomalyTrainID + "," + anomalyTrainCategoryPoint.toString() + "," + anomalyTrainValuePoint.toString() + " time range: " + anomalyTrainTime.getValue0() + " to " + anomalyTrainTime.getValue1() + "\n");
+	    }
 	    output.append(" * Testing data: " + testID + "," + testCategoryPoint.toString() + "," + testValuePoint.toString() + " time range: " + testTime.getValue0() + " to " + testTime.getValue1() + "\n");
 	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + trainID + "&categoryCSV=" + trainCategory + "&valueCSV=" + trainValue + ">link to training dataset</a>\n");
-	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&categoryCSV=" + anomalyTrainCategory + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
+	    if (anomalyTrainID != null) {
+		output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&categoryCSV=" + anomalyTrainCategory + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
+	    }
 	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + testID + "&categoryCSV=" + testCategory + "&valueCSV=" + testValue + ">link to testing dataset</a>\n");
 	    break;
 	}
