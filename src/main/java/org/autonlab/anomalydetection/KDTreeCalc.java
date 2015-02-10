@@ -14,14 +14,14 @@ public class KDTreeCalc {
      * @return HashMap of <GenericPoint>  to KDTree
      * 
      */
-    public static HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> makeKDTree(GenericPoint<String> valueType, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> trainHashMap, StringBuilder output) {
+    public static HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> makeKDTree(GenericPoint<String> valueType, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> trainHashMap, StringBuilder output) {
 	HashMap<GenericPoint<String>, KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = new HashMap();
 
 	for (GenericPoint<String> keyAddr : trainHashMap.keySet()) {
 	    if (output != null) {
 		output.append(keyAddr.toString());
 	    }
-	    newMap.put(keyAddr, GetKDTree(valueType, trainHashMap.get(keyAddr)));
+	    newMap.put(keyAddr, GetKDTree(valueType, trainHashMap.get(keyAddr).getValue1()));
 	}
 	
 	return newMap;
@@ -48,12 +48,12 @@ public class KDTreeCalc {
 
 	String output = new String();
 
-	HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey), null);
+	HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), null);
 
-	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey));
+	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1());
 
 	// The GenericPoints are often duplicated so we could add a cache here but I'm not sure if performace would improve by that much. KDTrees are already log time
-	for (Pair<Integer, GenericPoint<Integer>> tempPair : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey)) {
+	for (Pair<Integer, GenericPoint<Integer>> tempPair : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1()) {
 	    Integer histogramTime = (Integer)tempPair.getValue(0);
 	    GenericPoint<Integer> histogramData = (GenericPoint<Integer>)tempPair.getValue(1);
 

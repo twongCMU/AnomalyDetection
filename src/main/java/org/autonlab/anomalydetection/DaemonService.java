@@ -11,7 +11,8 @@ import org.javatuples.*;
 
 @Path("/")
 public class DaemonService {
-    static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> allHistogramsMap = new HashMap();
+    //                        ID                value                          category              scaling                 time       histogram S
+    static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>>> allHistogramsMap = new HashMap();
     static volatile HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, HashMap<Pair<Integer, Integer>, Integer>>> allHistogramsMapKeyRemap = new HashMap();
 
     static volatile int nextHistogramMapID = 0;
@@ -84,7 +85,7 @@ public class DaemonService {
 	    id = newID;
 	}
 
-	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(valuePoint).get(categoryPoint);
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = allHistogramsMap.get(id).get(valuePoint).get(categoryPoint).getValue1();
 	output.append("Number of datapoints: " + histograms.size() + " \n");
 	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
 	    output.append(tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n");
@@ -112,7 +113,7 @@ public class DaemonService {
 	for (GenericPoint<String> valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
 	    for (GenericPoint<String> category : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
 		output.append("Category: " + category.toString() + ", Value: " + valueName);
-		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(category).size() + ")\n");
+		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(category).getValue1().size() + ")\n");
 	    }
 	}
 	nextHistogramMapID++;
@@ -155,7 +156,7 @@ public class DaemonService {
 	for (GenericPoint<String> valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
 	    for (GenericPoint<String> category : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
 		output.append("Category: " + category.toString() + ", Value: " + valueName);
-		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(category).size() + ")\n");
+		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(category).getValue1().size() + ")\n");
 	    }
 	}
 	nextHistogramMapID++;
@@ -176,7 +177,7 @@ public class DaemonService {
 
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 
-	HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> fakeData = new HashMap();
+	HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> fakeData = new HashMap();
 
 	// generate a sparse-ish lower half of a matrix. This will be our training data
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> lowerHalf = new ArrayList();
@@ -193,7 +194,7 @@ public class DaemonService {
 	GenericPoint<String> category = new GenericPoint(2);
 	category.setCoord(0, "1.1.1.1");
 	category.setCoord(1, "myapp");
-	fakeData.put(category, lowerHalf);
+	fakeData.put(category, new Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>(0.0, lowerHalf));
 	output.append("Category: 1.1.1.1, myapp (" + lowerHalf.size() + ")\n");
 
 	// generate a dense full matrix. This will be test data used to run against the lower half matrix
@@ -209,14 +210,14 @@ public class DaemonService {
 	GenericPoint<String> category2 = new GenericPoint(2);
 	category2.setCoord(0, "5.5.5.5");
 	category2.setCoord(1, "otherthing");
-	fakeData.put(category2, fullMatrix);
+	fakeData.put(category2, new Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>(0.0, fullMatrix));
 	output.append("Category: 5.5.5.5, otherthing (" + fullMatrix.size() + ")\n");
 
 	// generate some fake HistoTuples. these are unused but the code would crash without them
 	HistoTuple foo = new HistoTuple(1, "fake1", valueType);
 	HistoTuple foo2 = new HistoTuple(2, "fake2", valueType);
 
-	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>> fakeDataFinal = new HashMap();
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> fakeDataFinal = new HashMap();
 	fakeDataFinal.put(valueType, fakeData);
 	allHistogramsMap.put(nextHistogramMapID, fakeDataFinal);
 	nextHistogramMapID++;
@@ -264,12 +265,8 @@ public class DaemonService {
 	String output = "ok";
 
 	allHistogramsMapLock.lock();
-
-	output += " : delete " + allHistogramsMap.size();
-	for (Integer id : allHistogramsMap.keySet()) {
-	    deleteOne(id);
-	}
-
+	allHistogramsMap = new HashMap();
+	nextHistogramMapID = 0;
 	allHistogramsMapLock.unlock();
 
 	return Response.status(200).entity(output).build();
@@ -420,9 +417,9 @@ public class DaemonService {
 	    return allHistogramsMapKeyRemap.get(valuePoint).get(categoryPoint).get(startAndEnd);
 	}
 
-	allHistogramsMap.put(nextHistogramMapID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
-	allHistogramsMap.get(nextHistogramMapID).put(valuePoint, new HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>>());
-	allHistogramsMap.get(nextHistogramMapID).get(valuePoint).put(categoryPoint, new ArrayList<Pair<Integer, GenericPoint<Integer>>>());
+	allHistogramsMap.put(nextHistogramMapID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>>());
+	allHistogramsMap.get(nextHistogramMapID).put(valuePoint, new HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
+	allHistogramsMap.get(nextHistogramMapID).get(valuePoint).put(categoryPoint, new Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>(0.0, new ArrayList()));
 
 	int subsetsFound = 0;
 	// the histograms are in an arraylist so it's hard to add them together. Sum them in a hashmap then convert it to an arraymap
@@ -431,7 +428,7 @@ public class DaemonService {
 	    if (isPointSubset(categoryPoint, oneKey)) {
 		System.out.println("counting " + categoryPoint.toString() + " as subset as " + oneKey.toString() + "\n");
 		subsetsFound++;
-		for (Pair<Integer, GenericPoint<Integer>> oneHist : allHistogramsMap.get(id).get(valuePoint).get(oneKey)) {
+		for (Pair<Integer, GenericPoint<Integer>> oneHist : allHistogramsMap.get(id).get(valuePoint).get(oneKey).getValue1()) {
 
 		    GenericPoint<Integer> sumData = newDataSum.get(oneHist.getValue0());
 		    if (sumData == null) {
@@ -453,7 +450,7 @@ public class DaemonService {
 
 	// convert the newdataSum TreeMap to an ArrayList
 	for (Integer timeSec : newDataSum.keySet()) {
-	    allHistogramsMap.get(nextHistogramMapID).get(valuePoint).get(categoryPoint).add(new Pair<Integer, GenericPoint<Integer>>(timeSec, newDataSum.get(timeSec)));
+	    allHistogramsMap.get(nextHistogramMapID).get(valuePoint).get(categoryPoint).getValue1().add(new Pair<Integer, GenericPoint<Integer>>(timeSec, newDataSum.get(timeSec)));
 	}
 
 	int newID = -1;
@@ -510,6 +507,35 @@ public class DaemonService {
 	}
 
 	return false;
+    }
+
+    @GET
+    @Path("/demo")
+    @Produces(MediaType.TEXT_HTML)
+    public Response demo(@QueryParam("hostname") String hostname,
+			  @QueryParam("categoryCSV") String categoryCSV,
+			  @QueryParam("valueCSV") String valueCSV,
+			  @QueryParam("ageMins") Integer ageMins,
+           		  @QueryParam("refreshSec") Integer refreshSec,
+			  @QueryParam("keySpace") String keySpace) {
+
+	allHistogramsMapLock.lock();
+	deleteAll(); //invalidate the existing data
+	allHistogramsMapLock.unlock();
+
+	//this will go into ID 0
+	getDb(hostname, categoryCSV, valueCSV, null, keySpace);
+
+	//this will go into ID 1
+	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace);
+
+	for (GenericPoint<String> oneValuePoint: allHistogramsMap.get(0).keySet()) {
+	    for (GenericPoint<String> oneCategoryPoint : allHistogramsMap.get(0).get(oneValuePoint).keySet()) {
+		System.out.println(oneCategoryPoint.getCoord(0));
+		return getDataSVM(0, oneCategoryPoint.getCoord(0), valueCSV, 1, oneCategoryPoint.getCoord(0), valueCSV, null, null, null, refreshSec);
+	    }
+	}
+	return null;
     }
 
     @GET
@@ -663,12 +689,12 @@ public class DaemonService {
 
 	for (GenericPoint<String> category : allHistogramsMap.get(id).keySet()) {
 	    for (GenericPoint<String> key : allHistogramsMap.get(id).get(category).keySet()) {
-		int size = allHistogramsMap.get(id).get(category).get(key).size();
+		int size = allHistogramsMap.get(id).get(category).get(key).getValue1().size();
 		if (size == 0) {
 		    continue;
 		}
-		Integer firstTime = allHistogramsMap.get(id).get(category).get(key).get(0).getValue0();
-		Integer lastTime = allHistogramsMap.get(id).get(category).get(key).get(size - 1).getValue0();
+		Integer firstTime = allHistogramsMap.get(id).get(category).get(key).getValue1().get(0).getValue0();
+		Integer lastTime = allHistogramsMap.get(id).get(category).get(key).getValue1().get(size - 1).getValue0();
 		Pair<Integer, Integer> ret = new Pair(firstTime, lastTime);
 
 		allHistogramsMapLock.unlock();

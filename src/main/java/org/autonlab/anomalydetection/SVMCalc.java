@@ -238,9 +238,9 @@ public class SVMCalc {
 
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyHistogram = null;
 	if (anomalyID != null) {
-	    anomalyHistogram = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey);
+	    anomalyHistogram = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey).getValue1();
 	}
-	boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey), anomalyHistogram);
+	boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), anomalyHistogram);
 
 	_svmModelsCacheLock.lock();
 
@@ -257,9 +257,9 @@ public class SVMCalc {
 	    // this calculation can take some time so we unlock the cache and we'll recheck before we save it to cache
 	    ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
 	    if (anomalyID != null) {
-		anomalyData = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey);
+		anomalyData = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey).getValue1();
 	    }
-	    svmModel = SVMCalc.generateModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), .9, anomalyData, .9);
+	    svmModel = SVMCalc.generateModel(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), .9, anomalyData, .9);
 
 	    _svmModelsCacheLock.lock();
 	    if (_svmModelsCache.get(trainID) == null) {
@@ -279,17 +279,51 @@ public class SVMCalc {
 	}
 	_svmModelsCacheLock.unlock();
 
+	// test the training set against itself to get a scaling factor
+	double anomalyScale = DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue0();
+	if (anomalyScale < 0.0) {
+	    SVMKernel svmKernel = new SVMKernel(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
+	    svm_node[][] bar = svmKernel.getData();
+
+	    int index = 0;
+	    anomalyScale = 0.0;
+	    /* loop through the histograms to generate the predictions */
+	    for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1()) {
+		double[] values = new double[1];
+
+		svm.svm_predict_values(svmModel, bar[index], values);
+		double prediction = values[0];
+
+		// this code returns a lower score for more anomalous so we flip it to match kdtree
+		prediction *= -1;
+		System.out.println("prediction is " + prediction);
+		if (anomalyScale < prediction) {
+		    anomalyScale = prediction;
+		}
+		index++;
+	    }
+
+	    // this can happen if the data is very simliar or there isn't a lot of it
+	    if (anomalyScale == 0.0) {
+		anomalyScale = 1.0;
+	    }
+
+	    DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).setAt0(anomalyScale);
+	    System.out.println("Calculated scaling factor of " + anomalyScale);
+	}
+	else {
+	    System.out.println("Using cached scaling factor of " + anomalyScale);
+	}
+
 	// If we're running many instances of similar test data against the same training data
 	// we might want to implement a cache that's per-training set and save it externally
 	// rather than the current scheme of only caching within an instance of SVMKernel
-	SVMKernel svmKernel = new SVMKernel(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey), DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
+	SVMKernel svmKernel = new SVMKernel(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
 	svm_node[][] bar = svmKernel.getData();
 
 	int index = 0;
-	double anomalyScale = 0.0;
-	ArrayList<Double> scoreList = new ArrayList();
 	/* loop through the histograms to generate the predictions */
-	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey)) {
+	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1()) {
 	    double[] values = new double[1];
 
 	    svm.svm_predict_values(svmModel, bar[index], values);
@@ -298,25 +332,12 @@ public class SVMCalc {
 	    // this code returns a lower score for more anomalous so we flip it to match kdtree
 	    prediction *= -1;
 
-	    scoreList.add(prediction);
+	    prediction /= anomalyScale;
 
-	    if (anomalyScale < prediction) {
-		anomalyScale = prediction;
-	    }
-	 
-	    index++;
-	}
-
-	/* loop through the results again and scale them so the highest anomaly is 1.0 */
-	index = 0;
-	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey)) {
-	    if (anomalyScale > 1.0) {
-		scoreList.set(index, scoreList.get(index) / anomalyScale);
-	    }
-	    output.append("predicted " + scoreList.get(index) + " for " + onePoint.getValue1().toString() + " with data \n");
+	    output.append("predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data \n");
 
 	    if (results != null) {
-		results.put(scoreList.get(index), onePoint);
+		results.put(prediction, onePoint);
 	    }
 	    index++;
 	}
