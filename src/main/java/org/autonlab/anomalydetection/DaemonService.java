@@ -264,12 +264,8 @@ public class DaemonService {
 	String output = "ok";
 
 	allHistogramsMapLock.lock();
-
-	output += " : delete " + allHistogramsMap.size();
-	for (Integer id : allHistogramsMap.keySet()) {
-	    deleteOne(id);
-	}
-
+	allHistogramsMap = new HashMap();
+	nextHistogramMapID = 0;
 	allHistogramsMapLock.unlock();
 
 	return Response.status(200).entity(output).build();
@@ -510,6 +506,35 @@ public class DaemonService {
 	}
 
 	return false;
+    }
+
+    @GET
+    @Path("/demo")
+    @Produces(MediaType.TEXT_HTML)
+    public Response demo(@QueryParam("hostname") String hostname,
+			  @QueryParam("categoryCSV") String categoryCSV,
+			  @QueryParam("valueCSV") String valueCSV,
+			  @QueryParam("ageMins") Integer ageMins,
+           		  @QueryParam("refreshSec") Integer refreshSec,
+			  @QueryParam("keySpace") String keySpace) {
+
+	allHistogramsMapLock.lock();
+	deleteAll(); //invalidate the existing data
+	allHistogramsMapLock.unlock();
+
+	//this will go into ID 0
+	getDb(hostname, categoryCSV, valueCSV, null, keySpace);
+
+	//this will go into ID 1
+	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace);
+
+	for (GenericPoint<String> oneValuePoint: allHistogramsMap.get(0).keySet()) {
+	    for (GenericPoint<String> oneCategoryPoint : allHistogramsMap.get(0).get(oneValuePoint).keySet()) {
+		System.out.println(oneCategoryPoint.getCoord(0));
+		return getDataSVM(0, oneCategoryPoint.getCoord(0), valueCSV, 1, oneCategoryPoint.getCoord(0), valueCSV, null, null, null, refreshSec);
+	    }
+	}
+	return null;
     }
 
     @GET
