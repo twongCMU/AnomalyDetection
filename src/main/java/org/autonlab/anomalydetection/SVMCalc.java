@@ -303,12 +303,13 @@ public class SVMCalc {
 		index++;
 	    }
 
-	    // this can happen if the data is very simliar or there isn't a lot of it
+	    // this can happen if the data is very simliar or there isn't a lot of it. If we do nothing all of the results end up as "Infinity"
 	    if (anomalyScale == 0.0) {
 		anomalyScale = 1.0;
 	    }
 
-	    DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).setAt0(anomalyScale);
+	    // the documentation for Pair doesn't say this but for some reason setAt0 doesn't overwrite the value, it returns a copy of the Pair with the new value
+	    DaemonService.allHistogramsMap.get(trainID).get(trainValue).put(trainKey, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).setAt0(anomalyScale));
 	    System.out.println("Calculated scaling factor of " + anomalyScale);
 	}
 	else {

@@ -182,8 +182,9 @@ public class HistoTuple {
 		slidingWindow:
 		// headTuple points to the newest tuple within the sliding window
 		// tailTuple the oldest
-		//while (headTuple != null && tailTuple != null) {
-		while (currentSecs < endTime) {
+		//while (currentSecs < endTime) {
+		//once a window runs off the edge we want to stop immediately so we don't get a window that's only partially filled
+		while (currentSecs + windowSecs <= endTime) {
 		    addCount = 0;
 		    // System.out.print("Window is " + currentSecs + " to " + (currentSecs+windowSecs) + ". Histogram: ");
 		    // add to the histogram tuples that have entered the window
