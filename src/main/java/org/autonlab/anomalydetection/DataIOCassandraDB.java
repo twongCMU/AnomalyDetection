@@ -5,7 +5,7 @@ import com.savarese.spatial.*;
 import java.util.*;
 import org.joda.time.*;
 import org.javatuples.*;
-
+import java.text.DateFormat;
 public class DataIOCassandraDB implements DataIO {
     /*
      * if open a new session with every call, the code crashes
@@ -75,13 +75,42 @@ public class DataIOCassandraDB implements DataIO {
 	}
     }
 
+    String dateString = null;
     /* histogram value names -> category names -> histograms */
     public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData(int minutesBack) {
 	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
+	Date highestDate = null;
+
+	// this is a dumb way of doing this: We want the most recent timestamp in the database
+	// but we can't query it from Cassandra. We loop through every record and find the highest
+	DateTime endTime = new DateTime();
+	DateTime startTime = new DateTime();
+	if (minutesBack > 0) {
+	    String selectStatement = "SELECT time_stamp FROM " + _keyspace + ".packet ";
+	    ResultSet results = _session.execute(selectStatement);
+	    int rowCount = 0;
+	    for (Row row: results) {
+		if (highestDate == null) {
+		    highestDate = row.getDate("time_stamp");
+		}
+		else if (row.getDate("time_stamp").after(highestDate)) {
+		    highestDate = row.getDate("time_stamp");
+		}
+		rowCount++;
+		if ((rowCount % 1000) == 0) {
+		    System.out.println("Read in " + rowCount + " rows");
+		}
+	    }
+	    endTime = new DateTime(highestDate.getTime());
+	    startTime = endTime.minusMinutes(minutesBack);
+	}
+		
 
 	// use a value relevant to the test data. In the future, use empty constructor for current time
-	DateTime endTime = new DateTime("2014-05-12T13:54:12.000-04:00");
-	DateTime startTime = endTime.minusMinutes(minutesBack);
+
+
+	//System.out.println("YEAR is " + dateString);
+    //	DateTime endTime = new DateTime("2014-05-12T13:54:12.000-04:00");
 
 	int getTextValues = 0;
 

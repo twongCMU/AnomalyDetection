@@ -624,7 +624,7 @@ public class DaemonService {
 
 	for (Pair<Integer, GenericPoint<Integer>> onePoint : ((Collection<Pair<Integer, GenericPoint<Integer>>>)resultsHash.getCollection(score))) {
 	    Integer timestamp = onePoint.getValue0();
-	    output.append("\n====== Anomaly Detected Info =====\n"); //right now we just say the highest scoring point is anomaly just to make sure we can print the info
+	    output.append("\n====== Highest Anomaly Info =====\n"); //right now we just say the highest scoring point is anomaly just to make sure we can print the info
 	    output.append("Anomaly " + score + " at time " + timestamp + "( " + ((Collection<Integer>)resultsHash.getCollection(score)).size() + " with this score)\n");
 	    output.append(" * anomaly datapoint: " + onePoint.getValue1() + "\n");
 	    output.append(" * Training data: " + trainID + "," + trainCategoryPoint.toString() + "," + trainValuePoint.toString() + " time range: " + trainTime.getValue0() + " to " + trainTime.getValue1() + "\n"); 
