@@ -2,16 +2,20 @@ package org.autonlab.anomalydetection;
 
 import com.datastax.driver.core.*;
 import com.savarese.spatial.*;
+
 import java.util.*; 
 import java.util.concurrent.locks.*;
+
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
+
 import org.apache.commons.collections.map.*;
 import org.javatuples.*;
+import org.apache.commons.math3.distribution.UniformRealDistribution;
 
 @Path("/")
 public class DaemonService {
-    //                        ID                value                          category              scaling                 time       histogram S
+    //                        ID                value                          category              scaling                 time       histogram
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>>> allHistogramsMap = new HashMap();
     static volatile HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, HashMap<Pair<Integer, Integer>, Integer>>> allHistogramsMapKeyRemap = new HashMap();
 
@@ -645,6 +649,110 @@ public class DaemonService {
 	return Response.status(200).entity(output.toString()).build();
     }
 
+    @GET
+    @Path("/testSVMRandom")
+    @Produces(MediaType.TEXT_HTML)
+    public Response getDataSVMRandom(@QueryParam("trainID") Integer trainID,
+				     @QueryParam("trainCategoryCSV") String trainCategory,
+				     @QueryParam("trainValue") String trainValue,
+				     @QueryParam("testID") Integer testID,
+				     @QueryParam("testCategoryCSV") String testCategory,
+				     @QueryParam("testValue") String testValue,
+				     @QueryParam("anomalyTrainID") Integer anomalyTrainID,
+				     @QueryParam("anomalyTrainCategoryCSV") String anomalyTrainCategory,
+				     @QueryParam("anomalyTrainValue") String anomalyTrainValue,
+				     @QueryParam("autoReloadSec") Integer autoReloadSec) {
+
+	StringBuilder output = new StringBuilder("<html>");
+	if (autoReloadSec != null && autoReloadSec > 0) {
+	    output.append("<head><meta http-equiv='refresh' content='" + autoReloadSec + "'></head>");
+	}
+	output.append("<body><pre>Calculation method: SVM\n");
+
+	GenericPoint<String> trainCategoryPoint = getPointFromCSV(trainCategory);
+	GenericPoint<String> trainValuePoint = getPointFromCSV(trainValue);
+	GenericPoint<String> testCategoryPoint = getPointFromCSV(testCategory);
+	GenericPoint<String> testValuePoint = getPointFromCSV(testValue);
+
+	GenericPoint<String> anomalyTrainCategoryPoint = null;
+	GenericPoint<String> anomalyTrainValuePoint = null;
+	if (anomalyTrainCategory != null) {
+	    anomalyTrainCategoryPoint = getPointFromCSV(anomalyTrainCategory);
+	    anomalyTrainValuePoint = getPointFromCSV(anomalyTrainValue);
+	}
+
+	allHistogramsMapLock.lock();
+
+	int newTrainID = recalculateByCategory(trainID, trainCategoryPoint, trainValuePoint, output);
+	if (newTrainID == -1) {
+	    output.append("ERROR: trainCategoryCSV (" + trainCategory + ") was not found and could not be calculated from existing data\n");
+	    return Response.status(200).entity(output.toString()).build();
+	}
+	else if (newTrainID != trainID) {
+	    output.append("NOTE: trainCategoryCSV (" + trainCategory + ") was not found at id " + trainID + " but found it at ID " + newTrainID + "\n");
+	    trainID = newTrainID;
+	}
+	int newTestID = recalculateByCategory(testID, testCategoryPoint, testValuePoint, output);
+	if (newTestID == -1) {
+	    output.append("ERROR: testCategoryCSV  (" + testCategory + ") was not found and could not be calculated from existing data\n");
+	    return Response.status(200).entity(output.toString()).build();
+	}
+	else if (newTestID != testID) {
+	    output.append("NOTE: testCategoryCSV  (" + testCategory + ") was not found at id " + testID + " but found it at ID " + newTestID + "\n");
+	    testID = newTestID;
+	}
+	if (anomalyTrainID != null) {
+	    int newAnomalyTrainID = recalculateByCategory(anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, output);
+	    if (newAnomalyTrainID == -1) {
+		output.append("ERROR: anomalyTrainCategoryCSV (" + anomalyTrainCategory + ") was not found and could not be calculated from existing data\n");
+		return Response.status(200).entity(output.toString()).build();
+	    }
+	    else if (newAnomalyTrainID != anomalyTrainID) {
+		output.append("NOTE: anomalyTrainCategoryCSV (" + anomalyTrainCategory + ") was not found at id " + anomalyTrainID + " but found it at ID " + newAnomalyTrainID + "\n");
+		anomalyTrainID = newAnomalyTrainID;
+	    }
+	}
+	System.out.println("ZZZ " + trainID + " : " + testID + " : " + anomalyTrainID + "\n");
+	MultiValueMap resultsHash = new MultiValueMap();
+	output.append(SVMRandomCalc.runOneTestSVM(trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, resultsHash, AnomalyDetectionConfiguration.SVM_D));
+
+	List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
+	Collections.sort(resultsHashList); // ascending order
+	Collections.reverse(resultsHashList); //descending order
+	int ii = 0;
+	Double score = resultsHashList.get(0);
+
+	Pair<Integer, Integer> trainTime = getStartAndEndTime(trainID);
+	Pair<Integer, Integer> anomalyTrainTime = null;
+	if (anomalyTrainID != null) {
+	    anomalyTrainTime = getStartAndEndTime(anomalyTrainID);
+	}
+	Pair<Integer, Integer> testTime = getStartAndEndTime(testID);
+
+
+	for (Pair<Integer, GenericPoint<Integer>> onePoint : ((Collection<Pair<Integer, GenericPoint<Integer>>>)resultsHash.getCollection(score))) {
+	    Integer timestamp = onePoint.getValue0();
+	    output.append("\n====== Anomaly Detected Info =====\n"); //right now we just say the highest scoring point is anomaly just to make sure we can print the info
+	    output.append("Anomaly " + score + " at time " + timestamp + "( " + ((Collection<Integer>)resultsHash.getCollection(score)).size() + " with this score)\n");
+	    output.append(" * anomaly datapoint: " + onePoint.getValue1() + "\n");
+	    output.append(" * Training data: " + trainID + "," + trainCategoryPoint.toString() + "," + trainValuePoint.toString() + " time range: " + trainTime.getValue0() + " to " + trainTime.getValue1() + "\n"); 
+	    if (anomalyTrainID != null) {
+		output.append(" * Anomaly training data: " + anomalyTrainID + "," + anomalyTrainCategoryPoint.toString() + "," + anomalyTrainValuePoint.toString() + " time range: " + anomalyTrainTime.getValue0() + " to " + anomalyTrainTime.getValue1() + "\n"); 
+	    }
+	    output.append(" * Testing data: " + testID + "," + testCategoryPoint.toString() + "," + testValuePoint.toString() + " time range: " + testTime.getValue0() + " to " + testTime.getValue1() + "\n");
+	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + trainID + "&categoryCSV=" + trainCategory + "&valueCSV=" + trainValue + ">link to training dataset</a>\n");
+	    if (anomalyTrainID != null) {
+		output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&categoryCSV=" + anomalyTrainCategory + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
+	    }
+	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + testID + "&categoryCSV=" + testCategory + "&valueCSV=" + testValue + ">link to testing dataset</a>\n");
+	    break;
+	}
+
+	allHistogramsMapLock.unlock();
+
+	return Response.status(200).entity(output.toString()).build();
+    }
+
     /**
      * This function does not lock the allHistogramsMap. It assumes the caller will use it and therefore
      * will handle the locking
@@ -893,4 +1001,183 @@ public class DaemonService {
 	return Response.status(200).entity(output).build();
     }
 
+
+// CUSTOM TESTS
+	//_______________________________________________________________________//
+	
+    @GET
+    @Path("/customTest")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response customTest(@QueryParam("n") Integer n, @QueryParam("size") Integer s, @QueryParam("rn") Integer rn){//@QueryParam("id") Integer id,
+	//@QueryParam("csvKey") String csvKey) {
+
+	StringBuilder output = new StringBuilder("Custom Test\n\n");
+		
+	output.append(getFakeData2(n,s,rn).getEntity());
+	getFakeData2(n,s,rn);
+	//		String filename="/usr0/home/sibiv/Research/Data/GRE.out";
+	//		DataIOFile foo = new DataIOFile(filename);
+	//		allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
+	//		System.out.println("Opened file.");
+
+	int id = nextHistogramMapID-1;
+	String csvKeyA = "a";
+	String csvValueA = "b";
+	String csvKey1 = "a1";
+	String csvValue1 = "b1";
+	String csvKey2 = "a2";
+	String csvValue2 = "b2";
+		
+	GenericPoint<String> trainKeyA = getPointFromCSV(csvKeyA);
+	GenericPoint<String> trainValueA = getPointFromCSV(csvValueA);
+	GenericPoint<String> trainKey = getPointFromCSV(csvKey1);
+	GenericPoint<String> trainValue = getPointFromCSV(csvValue1);
+	GenericPoint<String> testKey = getPointFromCSV(csvKey2);
+	GenericPoint<String> testValue = getPointFromCSV(csvValue2);
+
+	output.append("\n\nSVM RANDOM:\n");
+	long startTime1 = System.nanoTime();
+	output.append(SVMRandomCalc.runOneTestSVM(id, trainKey, trainValue, id, testKey, testValue, id-1, trainKeyA, trainValueA, null, -1).toString());
+	long endTime1 = System.nanoTime();
+	double duration = (double)(endTime1 - startTime1)/1000000000;
+	output.append("\n\nTime taken:\n" + (duration));
+	output.append("\n\nSVM:\n");
+	long startTime2 = System.nanoTime();
+	output.append(SVMCalc.runOneTestSVM(id, trainKey, trainValue, id, testKey, testValue, id-1, trainKeyA, trainValueA, null).toString());
+	long endTime2 = System.nanoTime();
+	duration = (double)(endTime2 - startTime2)/1000000000;
+	output.append("\n\nTime taken:\n" + (duration));
+		
+	return Response.status(200).entity(output.toString()).build();
+    }
+
+	
+    @GET
+    @Path("/getfakedata2")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response getFakeData2(@QueryParam("n") Integer n, @QueryParam("size") Integer s, @QueryParam("rn") Integer rn) {
+		
+	//allHistogramsMap.clear();
+		
+	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
+	
+	UniformRealDistribution urd = new UniformRealDistribution (0.0, 1.0);
+
+		
+	output.append("Anomaly data:\n\n");
+	int hs = (int) s/2; // half size
+	int qs = (int) s/2; // quarter size
+		
+	HashMap<GenericPoint<String> , HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> anomalyData = new HashMap();
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyTraining = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+	int fakeTime = 1;
+	for (int i = 0; i < n; i += 1) {
+	    GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
+	    for (int j = 0; j < s; j += 1) { // Randomly fill first quarter with 0s and 1s (anomalies)
+		if (j < qs && urd.sample() > 0.5)
+		    fakePoint.setCoord(j, 1);
+		else
+		    fakePoint.setCoord(j, 0);
+
+	    }
+	    output.append(fakePoint.toString() + "\n");
+	    Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
+	    anomalyTraining.add(fakePair);
+	    fakeTime++;
+	}
+	GenericPoint<String> aKey = new GenericPoint<String>(1);
+	aKey.setCoord(0, "a");
+	GenericPoint<String> aValue = new GenericPoint<String>(1);
+	aValue.setCoord(0, "b");
+	anomalyData.put(aValue, new HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
+	anomalyData.get(aValue).put(aKey, new Pair(0.0, anomalyTraining));
+	output.append("Key: a, Value: b (" + anomalyTraining.size() + ")\n\n");
+		
+	allHistogramsMap.put(nextHistogramMapID, anomalyData);
+	nextHistogramMapID++;
+		
+		
+	output.append("Train data:\n\n");
+	HashMap<GenericPoint<String> ,HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> fakeData = new HashMap();
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> training = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+		
+	fakeTime = 1;
+	for (int i = 0; i < n; i += 1) {
+	    GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
+	    for (int j = 0; j < s; j += 1) { // Randomly fill second half with 1s and 0s
+		if (j < hs)
+		    fakePoint.setCoord(j, 0);
+		else if (urd.sample() > 0.5)
+		    fakePoint.setCoord(j, 1);
+		else
+		    fakePoint.setCoord(j, 0);
+
+	    }
+	    output.append(fakePoint.toString() + "\n");
+	    Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
+	    training.add(fakePair);
+	    fakeTime++;
+	}
+	GenericPoint<String> key = new GenericPoint<String>(1);
+	key.setCoord(0, "a1");
+	GenericPoint<String> value = new GenericPoint<String>(1);
+	value.setCoord(0, "b1");
+	fakeData.put(value, new HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
+	fakeData.get(value).put(key, new Pair(0.0, training));
+	output.append("Key: a1, Value: b1 (" + training.size() + ")\n\n");
+
+	output.append("Test data:\n\n");
+	// generate a dense full matrix. This will be test data used to run against the lower half matrix
+	int normal_n = (int) 3*n/4;
+	fakeTime = 1;
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> testing = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+	for (int i = 0; i < n; i += 1) {
+	    GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
+	    if (i < normal_n) {
+		for (int j = 0; j < s; j += 1) { // Randomly fill second half with 1s and 0s
+		    if (j < hs || urd.sample() < 0.5)
+			fakePoint.setCoord(j, 0);
+		    else
+			fakePoint.setCoord(j, 1);
+		}
+	    } else {
+		for (int j = 0; j < s; j += 1) { // Randomly fill first quarter with 0s and 1s (anomalies)
+		    if (j < qs && urd.sample() > 0.5)
+			fakePoint.setCoord(j, 1);
+		    else
+			fakePoint.setCoord(j, 0);
+
+		}
+	    }
+	    output.append(fakePoint.toString() + "\n");
+	    Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
+	    testing.add(fakePair);
+	    fakeTime++;
+	}
+	GenericPoint<String> key2 = new GenericPoint<String>(1);
+	key2.setCoord(0, "a2");
+	GenericPoint<String> value2 = new GenericPoint<String>(1);
+	value2.setCoord(0, "b2");
+	fakeData.put(value2, new HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
+	fakeData.get(value2).put(key2, new Pair(0.0, testing));
+	output.append("Key: a2, b2 (" + testing.size() + ")\n");
+		
+	// generate some fake HistoTuples. these are unused but the code would crash without them
+	HistoTuple foo = new HistoTuple(1, "fake1", value);
+	HistoTuple foo2 = new HistoTuple(2, "fake2", value);
+		
+		
+	allHistogramsMap.put(nextHistogramMapID, fakeData);
+	nextHistogramMapID++;
+		
+	//output.append(allHistogramsMap.get(0).get(key2).get(0).toString());
+	return Response.status(200).entity(output.toString()).build();
+    }
+	
+    public double norm(double[] v) {
+	double n = 0.0;
+	for (int i = 0; i < v.length; i++)
+	    n += v[i]*v[i];
+	return Math.sqrt(n);
+    }
 }

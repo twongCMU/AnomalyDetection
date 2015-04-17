@@ -14,7 +14,8 @@ public class AnomalyDetectionConfiguration {
 
     static final int CALC_TYPE_KDTREE = 0;
     static final int CALC_TYPE_SVM = 1;
-    static final String[] CALC_TYPE_NAMES = {"KDTree", "SVM"}; // the index into this array's names should line up with the CALC_TYPE_<type> ints
+    static final int CALC_TYPE_SVM_RANDOM = 2;
+    static final String[] CALC_TYPE_NAMES = {"KDTree", "SVM", "SVMRandom"}; // the index into this array's names should line up with the CALC_TYPE_<type> ints
 
     static int CALC_TYPE_TO_USE = CALC_TYPE_KDTREE;
 
@@ -26,14 +27,20 @@ public class AnomalyDetectionConfiguration {
 
     static final int SVM_CACHE_SIZE = 28000;
     static final double SVM_EPS = .001; // README says "eps is the stopping criterion. (we usually use 0.00001 in nu-SVC, 0.001 in others)"
+    static final double SVM_GAMMA = 0.02; // For the RBF Kernel, we need the additional gamma = 1/(2*variance) factor. Variance = 5.0
+    static final int SVM_D = 10000;//Number of random Fourier features 
+    static final boolean RFF_SINE = true; //parameter determining whether to use cos+unif or cos+sine.
+	
 
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_NONE = 0;
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_CHI_SQUARED = 1;
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_LINEAR = 2;
+    static final int SVM_PRECOMPUTED_KERNEL_TYPE_RBF = 3;
 
     static final int SVM_TYPE_PRECOMPUTED_KERNEL_TYPE = SVM_PRECOMPUTED_KERNEL_TYPE_CHI_SQUARED;
     //static final int SVM_TYPE_PRECOMPUTED_KERNEL_TYPE = SVM_PRECOMPUTED_KERNEL_TYPE_LINEAR;
 
+    static final int SVM_RANDOM_KERNEL_TYPE = svm_parameter.LINEAR;
     static final int SVM_KERNEL_TYPE = svm_parameter.PRECOMPUTED;
     //static final int SVM_KERNEL_TYPE = svm_parameter.LINEAR;
 
