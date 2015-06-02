@@ -263,7 +263,7 @@ public class DaemonService {
      * @return "ok" and the number if elements removed
      */
     @GET
-    @Path("/deleteall/{id}")
+    @Path("/deleteall")
     @Produces(MediaType.TEXT_PLAIN)
     public Response deleteAll() {
 	String output = "ok";

@@ -297,7 +297,10 @@ public class HistoTuple {
 	if (_histoTupleDataLock.isHeldByCurrentThread() == false) {
 	    throw new RuntimeException("upgradeWindowsDimensionsOne called without lock being held");
 	}
-
+	if (histogram.size() == 0) {
+	    return false;
+	}
+	System.out.println(_valueMap.size() + " XYZ " + histogram.size());
 	if (histogram.get(0).getValue1().getDimensions() == _valueMap.get(valueType).size()) {
 	    return false;
 	}

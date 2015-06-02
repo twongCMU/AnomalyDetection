@@ -335,7 +335,7 @@ public class SVMCalc {
 
 	    prediction /= anomalyScale;
 
-	    output.append("predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data \n");
+	    output.append(index + ": predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data \n");
 
 	    if (results != null) {
 		results.put(prediction, onePoint);

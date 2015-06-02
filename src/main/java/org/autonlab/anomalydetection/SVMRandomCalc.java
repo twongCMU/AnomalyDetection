@@ -67,7 +67,7 @@ public class SVMRandomCalc {
 			GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy, int rn) {
 
 		// For quiet SVM
-		svm.svm_set_print_string_function(new QuietPrint());
+		//svm.svm_set_print_string_function(new QuietPrint());
 
 		TreeMap<Double, Double> nuValues = new TreeMap<Double,Double>();
 		System.out.println("YYY -------------------------");
@@ -107,7 +107,9 @@ public class SVMRandomCalc {
 
 
 		svm_parameter svmParameter = new svm_parameter();
-		svmParameter.svm_type = svm_parameter.NU_SVC;
+		//SIBI original svmParameter.svm_type = svm_parameter.NU_SVC;
+		svmParameter.svm_type = svm_parameter.ONE_CLASS;
+
 		svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_RANDOM_KERNEL_TYPE;
 		svmParameter.cache_size = AnomalyDetectionConfiguration.SVM_CACHE_SIZE;
 		svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
@@ -433,7 +435,7 @@ public class SVMRandomCalc {
 			
 		    grf = grf_svm.getValue0(); 
 		    svmModel = grf_svm.getValue1();
-
+		    System.out.println("ZZZ grf " + grf);
 		    _svmModelsCacheLock.lock();
 		    if (_svmModelsCache.get(trainID) == null) {
 			_svmModelsCache.put(trainID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>>>());
@@ -496,6 +498,7 @@ public class SVMRandomCalc {
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1()) {
 			double[] values = new double[1];
 			double d = svm.svm_predict_values(svmModel, testFeatures[index], values);
+
 			double prediction = values[0];
 
 			// this code returns a lower score for more anomalous so we flip it to match kdtree

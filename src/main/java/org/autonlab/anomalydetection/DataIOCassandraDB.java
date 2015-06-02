@@ -110,7 +110,7 @@ public class DataIOCassandraDB implements DataIO {
 
 
 	//System.out.println("YEAR is " + dateString);
-    //	DateTime endTime = new DateTime("2014-05-12T13:54:12.000-04:00");
+    //	DateTime ndTime = new DateTime("2014-05-12T13:54:12.000-04:00");
 
 	int getTextValues = 0;
 
