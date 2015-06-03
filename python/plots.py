@@ -328,4 +328,4 @@ if __name__ == '__main__':
 	#rn_range=[2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 300, 400, 500, 750, 1000, 2000, 5000]
 	rn_range = np.squeeze(np.linspace(2, 5000, 15).astype(int)).tolist()
 	#rn_range.extend([10000, 20000, 30000, 40000, 50000, 60000, 70000])
-	plotAccuracyRNSineCos(size=size, ntr=10000, nts=10000, rn_range=rn_range, c=c)
+	#plotAccuracyRNSineCos(size=size, ntr=10000, nts=10000, rn_range=rn_range, c=c)

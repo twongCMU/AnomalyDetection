@@ -188,7 +188,7 @@ def testKernel():
 	var = 1.0
 	c = 1.5
 
-	rn = 50000
+	rn = 300
 	gammak=1.0
 
 	xs_train, ys_train = generateGaussian(size, n, var, c)
@@ -350,8 +350,8 @@ if __name__ == '__main__':
 	#testBinary()
 	# testGaussian()
 	# testGaussian2()
-	#testKernel()
-	testOneClass()
+	testKernel()
+	# testOneClass()
 	#testRFFSine()
 
 	# import cProfile
