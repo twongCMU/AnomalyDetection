@@ -28,25 +28,6 @@ public class SVMRandomCalc {
 			new HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>>>>();
 	static volatile Lock _svmModelsCacheLock = new ReentrantLock();
 
-	//	public static HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>> 
-	//	makeSVMModel(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> histograms, 
-	//			StringBuilder output, double targetAccuracy) {
-	//
-	//		HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>> newMap = 
-	//				new HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>>();
-	//
-	//		ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
-	//		if (DaemonService.anomalyID >= 0) {
-	//			anomalyData = DaemonService.allHistogramsMap.get(DaemonService.anomalyID).get(DaemonService.anomalyKey);
-	//		}
-	//		for (GenericPoint<String> keyAddr : histograms.keySet()) {
-	//			// change 99.9 to be a parameter or maybe input to the rest call that sets the other anomaly key info
-	//			newMap.put(keyAddr, generateModel(histograms.get(keyAddr), targetAccuracy, anomalyData, 99.9));
-	//		}
-	//
-	//		return newMap;
-	//	}
-
 	public static svm_node[][] append(svm_node[][] a, svm_node[][] b) {
 		svm_node[][] result = new svm_node[a.length + b.length][];
 		System.arraycopy(a, 0, result, 0, a.length);
@@ -91,23 +72,26 @@ public class SVMRandomCalc {
 		// fill in the svm_problem with the histogram data points
 		svm_problem svmProblem = new svm_problem();
 		svmProblem.l = histograms.size();
-		svmProblem.y = new double[histograms.size()];
+
+		svmProblem.y = new double[histograms.size()]; // Not necessary
 		Arrays.fill(svmProblem.y, 1.0); // all of our training data is non-anomalous
+
 		svmProblem.x = (svmrg.getData());
 
 		svm_problem svmProblemAnomaly = null;
-		// TODO: Wouldn't you want to add this to the same svmProblem as before?
+		// Done only for grid search using cross-validation
 		if (histogramsAnomaly != null) {
 			svmProblemAnomaly = new svm_problem();
 			svmProblemAnomaly.l = histogramsAnomaly.size();
-			svmProblemAnomaly.y = new double[histogramsAnomaly.size()];
+
+			svmProblemAnomaly.y = new double[histogramsAnomaly.size()]; // Not necessary
 			Arrays.fill(svmProblemAnomaly.y, -1.0); // set all of this data to anomalous
+
 			svmProblemAnomaly.x = (new SVMRandomGaussian(histogramsAnomaly, AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 		}
 
 
 		svm_parameter svmParameter = new svm_parameter();
-		//SIBI original svmParameter.svm_type = svm_parameter.NU_SVC;
 		svmParameter.svm_type = svm_parameter.ONE_CLASS;
 
 		svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_RANDOM_KERNEL_TYPE;
@@ -144,8 +128,7 @@ public class SVMRandomCalc {
 		//			expandTimes++;
 		//		}
 
-		svmParameter.nu = 0.5;
-
+		svmParameter.nu = 0.1;
 		System.out.println("YYY selected nu of " + svmParameter.nu);
 		Pair <GaussianRandomFeatures, svm_model> gffSVMPair = new Pair<GaussianRandomFeatures, svm_model> (grf, svm.svm_train(svmProblem, svmParameter));
 		return gffSVMPair;
@@ -236,7 +219,7 @@ public class SVMRandomCalc {
 		//			expandTimes++;
 		//		}
 
-		svmParameter.nu = 0.5;
+		svmParameter.nu = 0.1;
 
 		System.out.println("YYY selected nu of " + svmParameter.nu);
 		Pair <GaussianRandomFeatures, svm_model> gffSVMPair = new Pair<GaussianRandomFeatures, svm_model> (grf, svm.svm_train(svmProblem, svmParameter));
@@ -410,8 +393,7 @@ public class SVMRandomCalc {
 		if (anomalyID != null) {
 		    anomalyHistogram = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey).getValue1();
 		}
-		boolean changed = true;//HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey), anomalyHistogram);
-//		boolean changed = HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testKey));
+		boolean changed = false; //HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey), anomalyHistogram);
 
 		_svmModelsCacheLock.lock();
 
@@ -454,37 +436,51 @@ public class SVMRandomCalc {
 		    System.out.println("SVM Model cache hit");
 
 		}
-//		allModels = _svmModelsCache.get(trainID);
-//		if (allModels == null) {
-//			_svmModelsCacheLock.unlock();
-//
-//			// this calculation can take some time so we unlock
-//			long st = System.nanoTime();
-//			allModels = SVMRandomCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID), output, 1.0);
-//			long et = System.nanoTime();
-//			double dur = (double)(et-st)/1000000000;
-//			System.out.println("Time to create model: " + dur);
-//
-//			_svmModelsCacheLock.lock();
-//			_svmModelsCache.put(trainID, allModels);
-//		}
-//		else {
-//			System.out.println("SVM Model cache hit");
-//
-//		}
 		_svmModelsCacheLock.unlock();
+
+		// test the training set against itself to get a scaling factor
+		double anomalyScale = DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue0();
+		if (anomalyScale <= 1e-3) {
+			SVMRandomGaussian svmSRG = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS);
+			svm_node[][] bar = svmSRG.getData();
+
+			int index = 0;
+			anomalyScale = 0.0;
+			/* loop through the histograms to generate the predictions */
+			for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1()) {
+				double[] values = new double[1];
+
+				svm.svm_predict_values(svmModel, bar[index], values);
+				double prediction = values[0];
+
+				// this code returns a lower score for more anomalous so we flip it to match kdtree
+				prediction *= -1;
+				System.out.println("prediction is " + prediction);
+				if (anomalyScale < prediction)
+					anomalyScale = prediction;
+				index++;
+			}
+			// this can happen if the data is very simliar or there isn't a lot of it.  all of the results end up as "Infinity"
+			if (anomalyScale <= 1e-3) {
+				System.out.println("Calculated scaling factor of " + anomalyScale);
+				anomalyScale = 1.0;
+			}
+			// the documentation for Pair doesn't say this but for some reason setAt0 doesn't overwrite the value, it returns a copy of the Pair with the new value
+			DaemonService.allHistogramsMap.get(trainID).get(trainValue).put(trainKey, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).setAt0(anomalyScale));
+			System.out.println("Calculated scaling factor of " + anomalyScale);
+		}
+		else {
+			System.out.println("Using cached scaling factor of " + anomalyScale);
+		}
+
 
 		// If we're running many instances of similar test data against the same training data
 		// we might want to implement a cache that's per-training set and save it externally
 		// rather than the current scheme of only caching within an instance of SVMKernel
-
-
-		long st2 = System.nanoTime();
 		SVMRandomGaussian GFSTest = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS);
 		svm_node[][] testFeatures = GFSTest.getData(); 
-
+		
 		int index = 0;
-
 		//		System.out.println("QUICK TESTS: -------------------");
 		//		
 		//		GenericPoint<Integer> p1 = DaemonService.allHistogramsMap.get(testID).get(testKey).get(2).getValue1();
@@ -492,9 +488,35 @@ public class SVMRandomCalc {
 		//
 		//		System.out.println("RBF Kernel: " +gff.gaussianKernel(p1, p2));
 		//		System.out.println("Linear Kernel: " + gff.linearKernel(gff.computeGaussianFourierFeatures(p1), gff.computeGaussianFourierFeatures(p2)));
-		//		
-		//		System.out.println("--------------------------------");
+		ArrayList<Pair<Integer, GenericPoint<Integer>>> ahists = DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1();
+		ArrayList<Pair<Integer, GenericPoint<Integer>>> bhists = DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1();
+		// bhists = ahists;
+		
+		output.append("\n\nLinear Random Kernel\n");
+		double [] lkernel = new double[ahists.size()]; 
+		for (int i = 0; i < ahists.size(); ++i) {
+			for (int j = 0; j < bhists.size(); ++j) {
+				lkernel[i] = grf.linearKernel(grf.computeGaussianFourierFeatures(ahists.get(i).getValue1()),
+												grf.computeGaussianFourierFeatures(bhists.get(j).getValue1()));
+				output.append(String.format("%.5f", lkernel[i]) + ' ');
+			}
+			output.append('\n');
+		}
+		output.append("\n\nRBF Kernel\n");
+		double [] rkernel = new double[ahists.size()]; 
+		for (int i = 0; i < ahists.size(); ++i) {
+			for (int j = 0; j < bhists.size(); ++j) {
+				rkernel[i] = grf.gaussianKernel(ahists.get(i).getValue1(), bhists.get(j).getValue1());
+				output.append(String.format("%.5f", rkernel[i]) + ' ');
+			}
+			output.append('\n');
+		}
+			
+		output.append("\n\n");
 
+				//              getFak
+		//		System.out.println("--------------------------------");
+		//		System.out.println("--------------------------------");
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1()) {
 			double[] values = new double[1];
 			double d = svm.svm_predict_values(svmModel, testFeatures[index], values);
@@ -504,8 +526,7 @@ public class SVMRandomCalc {
 			// this code returns a lower score for more anomalous so we flip it to match kdtree
 			prediction *= -1;
 
-
-			output.append("Pred: " + d + ".\t Dec: " + prediction + " for " + onePoint.getValue1().toString() + "\n");
+			output.append(index + ": score " + String.format("%.3f",prediction) +  " and predicted " + d + " for " + onePoint.getValue1().toString()+ "\n");
 
 			if (results != null) {
 				results.put(prediction, onePoint);
@@ -513,9 +534,49 @@ public class SVMRandomCalc {
 			index++;
 		}
 
-		long et2 = System.nanoTime();
-		double dur2 = (double)(et2-st2)/1000000000;
-		System.out.println("Time to test: " + dur2);
+		// output.append("\n\nSVectors\n");
+		// bhists = ahists;
+		int dim = bhists.get(0).getValue1().getDimensions();
+		double[][] SV = new double[svmModel.l][dim];
+		for (int k = 0; k < svmModel.l; ++k)
+			for (int l = 0; l < dim; ++l)
+				SV[k][l] = svmModel.SV[k][l].value;
+			// 	if (l < 10)
+			// 		output.append(String.format("%.1f",svmModel.SV[k][l].value) + " ");
+			// }
+			// output.append('\n');
+		output.append("\n\nSVSVKernel\n");
+		for (int j = 0; j < svmModel.l; ++j) {
+			for (int i = 0; i < svmModel.l; ++i) {
+				double rk = grf.gaussianKernel(SV[i], SV[j]);
+				output.append(String.format("%.5f", rk) + ' ');
+				}
+			output.append('\n');
+		}
+		output.append("\n\nSV Kernel\n");
+		for (int j = 0; j < svmModel.l; ++j) {
+			for (int i = 0; i < bhists.size(); ++i) {
+				// Constructing svm_node to pass into 
+				GenericPoint<Integer> bhist = bhists.get(i).getValue1();
+				double[] bnode = new double[dim];
+				for (int k = 0; k < dim; ++k)
+					bnode[k] = bhist.getCoord(k);
+
+				// for (int j = 0; j < svmModel.l; ++j) {
+				double rk = grf.gaussianKernel(bnode, SV[j]);
+				output.append(String.format("%.5f", rk) + ' ');
+				}
+			output.append('\n');
+		}
+
+		output.append("\n\nSV Coeffs\n");
+		for (int i = 0; i < svmModel.l; ++i)
+			output.append(String.format("%.5f", svmModel.sv_coef[0][i]) + " ");
+		output.append("\n");
+		output.append("\nSV Indices\n");
+				for (int i = 0; i < svmModel.l; ++i)
+			output.append(svmModel.sv_indices[i]+ " ");
+		output.append("\n\n");
 
 		return output;
 	}

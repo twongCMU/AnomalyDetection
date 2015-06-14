@@ -97,8 +97,38 @@ public class GaussianRandomFeatures {
 			}
 			return f;
 		}
-		
-		
+	}
+	public double[] computeGaussianFourierFeatures(double[] hist) {
+
+		if (_sine) {
+			double[] f = new double[2*_D];
+			
+			for (int i = 0; i < _D; i++) {
+				double[] w = _ws[i];
+	
+				double t = 0.0;	// t = wTx	
+				for (int j = 0; j < _n; j++)
+					t += hist[j]*w[j];
+				
+				f[i] = Math.cos(t)*Math.sqrt(1.0/_D);
+				f[_D+i] = Math.sin(t)*Math.sqrt(1.0/_D);
+			}
+			return f;
+		} else {
+			double[] f = new double[_D];
+			
+			for (int i = 0; i < _D; i++) {
+				double[] w = _ws[i];
+				double b = _bs[i];
+	
+				double t = 0.0;	// t = wTx	
+				for (int j = 0; j < _n; j++)
+					t += hist[j]*w[j];
+				
+				f[i] = Math.cos(t + b)*Math.sqrt(2.0/_D);
+			}
+			return f;
+		}
 	}
 	
 	/**
@@ -129,6 +159,16 @@ public class GaussianRandomFeatures {
 		}
 		return Math.exp(-_gammak*res);
 	}
+
+	public static double gaussianKernel(double[] histX, double[] histY, double gammak) {
+		double res = 0.0;
+
+		for (int i = 0; i < histX.length; i++) {
+			res += Math.pow(histX[i] - histY[i], 2);
+		}
+		return Math.exp(-gammak*res);
+	}
+
 	
 	/**
 	 * Calculate the kernel between two histograms histX and histY
@@ -150,7 +190,7 @@ public class GaussianRandomFeatures {
 		return res;
 	}
 	
-	public double linearKernel(double[] histX, double[] histY) {
+	public static double linearKernel(double[] histX, double[] histY) {
 		double res = 0.0;
 
 		for (int i = 0; i < histX.length; i++) {

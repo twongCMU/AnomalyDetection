@@ -301,6 +301,7 @@ public class HistoTuple {
 	    return false;
 	}
 	System.out.println(_valueMap.size() + " XYZ " + histogram.size());
+	System.out.println(_valueMap.get(valueType).size());
 	if (histogram.get(0).getValue1().getDimensions() == _valueMap.get(valueType).size()) {
 	    return false;
 	}
