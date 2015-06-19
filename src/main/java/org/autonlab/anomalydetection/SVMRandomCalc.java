@@ -87,7 +87,7 @@ public class SVMRandomCalc {
 			svmProblemAnomaly.y = new double[histogramsAnomaly.size()]; // Not necessary
 			Arrays.fill(svmProblemAnomaly.y, -1.0); // set all of this data to anomalous
 
-			svmProblemAnomaly.x = (new SVMRandomGaussian(histogramsAnomaly, AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+			svmProblemAnomaly.x = (new SVMRandomGaussian(histogramsAnomaly, d, grf, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 		}
 
 
@@ -134,6 +134,7 @@ public class SVMRandomCalc {
 		return gffSVMPair;
 	}
 	
+	@SuppressWarnings("unused")
 	private static Pair<GaussianRandomFeatures, svm_model> 
 	generateModelTwoClass(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, 
 			double targetCrossTrainAccuracy, ArrayList<Pair<Integer, 
@@ -240,6 +241,7 @@ public class SVMRandomCalc {
 	 * @return a nu that generates the accuracy closest (absolute value) to the targetCrossTrainAccuracy parameter
 	 */
 	// TODO: Fix this function for SVM for both normal and anomaly
+	@SuppressWarnings("unused")
 	private static double allCrossValidate(svm_problem svmProblem, svm_parameter svmParameter, 
 			TreeMap<Double, Double> nuValues, double targetCrossTrainAccuracy, 
 			ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, 
@@ -437,11 +439,11 @@ public class SVMRandomCalc {
 
 		}
 		_svmModelsCacheLock.unlock();
-
+		if (rn <= 0) rn = AnomalyDetectionConfiguration.SVM_D;
 		// test the training set against itself to get a scaling factor
 		double anomalyScale = DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue0();
 		if (anomalyScale <= 1e-3) {
-			SVMRandomGaussian svmSRG = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS);
+			SVMRandomGaussian svmSRG = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), rn, grf, AnomalyDetectionConfiguration.NUM_THREADS);
 			svm_node[][] bar = svmSRG.getData();
 
 			int index = 0;
@@ -477,7 +479,7 @@ public class SVMRandomCalc {
 		// If we're running many instances of similar test data against the same training data
 		// we might want to implement a cache that's per-training set and save it externally
 		// rather than the current scheme of only caching within an instance of SVMKernel
-		SVMRandomGaussian GFSTest = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS);
+		SVMRandomGaussian GFSTest = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), rn, grf, AnomalyDetectionConfiguration.NUM_THREADS);
 		svm_node[][] testFeatures = GFSTest.getData(); 
 		
 		int index = 0;
@@ -488,38 +490,48 @@ public class SVMRandomCalc {
 		//
 		//		System.out.println("RBF Kernel: " +gff.gaussianKernel(p1, p2));
 		//		System.out.println("Linear Kernel: " + gff.linearKernel(gff.computeGaussianFourierFeatures(p1), gff.computeGaussianFourierFeatures(p2)));
-		ArrayList<Pair<Integer, GenericPoint<Integer>>> ahists = DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1();
+//		ArrayList<Pair<Integer, GenericPoint<Integer>>> ahists = DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1();
 		ArrayList<Pair<Integer, GenericPoint<Integer>>> bhists = DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1();
-		// bhists = ahists;
-		
-		output.append("\n\nLinear Random Kernel\n");
-		double [] lkernel = new double[ahists.size()]; 
-		for (int i = 0; i < ahists.size(); ++i) {
-			for (int j = 0; j < bhists.size(); ++j) {
-				lkernel[i] = grf.linearKernel(grf.computeGaussianFourierFeatures(ahists.get(i).getValue1()),
-												grf.computeGaussianFourierFeatures(bhists.get(j).getValue1()));
-				output.append(String.format("%.5f", lkernel[i]) + ' ');
-			}
-			output.append('\n');
-		}
-		output.append("\n\nRBF Kernel\n");
-		double [] rkernel = new double[ahists.size()]; 
-		for (int i = 0; i < ahists.size(); ++i) {
-			for (int j = 0; j < bhists.size(); ++j) {
-				rkernel[i] = grf.gaussianKernel(ahists.get(i).getValue1(), bhists.get(j).getValue1());
-				output.append(String.format("%.5f", rkernel[i]) + ' ');
-			}
-			output.append('\n');
-		}
-			
-		output.append("\n\n");
+//		// bhists = ahists;
+//		
+//		output.append("\n\nLinear Random Kernel\n");
+//		double [] lkernel = new double[ahists.size()]; 
+//		for (int i = 0; i < ahists.size(); ++i) {
+//			for (int j = 0; j < bhists.size(); ++j) {
+//				lkernel[i] = GaussianRandomFeatures.linearKernel(grf.computeGaussianFourierFeatures(ahists.get(i).getValue1()),
+//												grf.computeGaussianFourierFeatures(bhists.get(j).getValue1()));
+//				output.append(String.format("%.5f", lkernel[i]) + ' ');
+//			}
+//			output.append('\n');
+//		}
+//		output.append("\n\nRBF Kernel\n");
+//		double [] rkernel = new double[ahists.size()]; 
+//		for (int i = 0; i < ahists.size(); ++i) {
+//			for (int j = 0; j < bhists.size(); ++j) {
+//				rkernel[i] = grf.gaussianKernel(ahists.get(i).getValue1(), bhists.get(j).getValue1());
+//				output.append(String.format("%.5f", rkernel[i]) + ' ');
+//			}
+//			output.append('\n');
+//		}
+//			
+//		output.append("\n\n");
 
 				//              getFak
 		//		System.out.println("--------------------------------");
-		//		System.out.println("--------------------------------");
+		//		System.out.println("--------------------------------");		
+		int dim = bhists.get(0).getValue1().getDimensions();
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1()) {
 			double[] values = new double[1];
-			double d = svm.svm_predict_values(svmModel, testFeatures[index], values);
+//			double d = svm.svm_predict_values(svmModel, testFeatures[index], values);
+			double[] bnode = grf.computeGaussianFourierFeatures(onePoint.getValue1());
+			svm_node[] bnode_svm = new svm_node[bnode.length];
+			for (int k = 0; k < bnode.length; ++k) {
+				bnode_svm[k] = new svm_node();
+				bnode_svm[k].index = k+1;
+				bnode_svm[k].value = bnode[k];
+			}
+
+			double d = svm.svm_predict_values(svmModel, bnode_svm, values);
 
 			double prediction = values[0];
 
@@ -536,42 +548,50 @@ public class SVMRandomCalc {
 
 		// output.append("\n\nSVectors\n");
 		// bhists = ahists;
-		int dim = bhists.get(0).getValue1().getDimensions();
-		double[][] SV = new double[svmModel.l][dim];
-		for (int k = 0; k < svmModel.l; ++k)
-			for (int l = 0; l < dim; ++l)
+//		int dim = bhists.get(0).getValue1().getDimensions();
+		double[][] SV = new double[svmModel.l][svmModel.SV[0].length];
+		for (int k = 0; k < svmModel.l; ++k) {
+			for (int l = 0; l < svmModel.SV[k].length; ++l) {
 				SV[k][l] = svmModel.SV[k][l].value;
-			// 	if (l < 10)
-			// 		output.append(String.format("%.1f",svmModel.SV[k][l].value) + " ");
-			// }
-			// output.append('\n');
-		output.append("\n\nSVSVKernel\n");
-		for (int j = 0; j < svmModel.l; ++j) {
-			for (int i = 0; i < svmModel.l; ++i) {
-				double rk = grf.gaussianKernel(SV[i], SV[j]);
-				output.append(String.format("%.5f", rk) + ' ');
-				}
-			output.append('\n');
+//			 	if (l < 10)
+//			 		output.append(String.format("%.4f",svmModel.SV[k][l].value) + " ");
+			 }
+//			 output.append('\n');
 		}
+//		output.append("\n\nSVSVKernel\n");
+//		for (int j = 0; j < svmModel.l; ++j) {
+//			for (int i = 0; i < svmModel.l; ++i) {
+//				double rk = GaussianRandomFeatures.linearKernel(SV[i], SV[j]);
+//				output.append(String.format("%.5f", rk) + ' ');
+//				}
+//			output.append('\n');
+//		}
+		output.append("\n\nRHO: " + svmModel.rho[0] + "\n");
+		
 		output.append("\n\nSV Kernel\n");
-		for (int j = 0; j < svmModel.l; ++j) {
-			for (int i = 0; i < bhists.size(); ++i) {
+		for (int i = 0; i < testFeatures.length; ++i) {
+//			for (int j = 0; j < svmModel.l; ++j) {
 				// Constructing svm_node to pass into 
-				GenericPoint<Integer> bhist = bhists.get(i).getValue1();
-				double[] bnode = new double[dim];
-				for (int k = 0; k < dim; ++k)
-					bnode[k] = bhist.getCoord(k);
+//				GenericPoint<Integer> bhist = bhists.get(i).getValue1();
+				svm_node [] bhist = testFeatures[i]; 
+//				double[] bnode = new double[dim];
+				double[] bnode = new double[bhist.length];
+				for (int k = 0; k < bhist.length; ++k)
+					//bnode[k] = bhist.getCoord(k);
+					bnode[k] = bhist[k].value;
 
-				// for (int j = 0; j < svmModel.l; ++j) {
-				double rk = grf.gaussianKernel(bnode, SV[j]);
-				output.append(String.format("%.5f", rk) + ' ');
+				for (int j = 0; j < svmModel.l; ++j) {
+	//				double rk = GaussianRandomFeatures.linearKernel(grf.computeGaussianFourierFeatures(bnode), SV[j]);
+					double rk = GaussianRandomFeatures.linearKernel(bnode, SV[j]);
+					output.append(String.format("%.5f", rk) + ", ");
 				}
 			output.append('\n');
 		}
+		output.append('\n' + testFeatures[0].length + '\n');
 
 		output.append("\n\nSV Coeffs\n");
 		for (int i = 0; i < svmModel.l; ++i)
-			output.append(String.format("%.5f", svmModel.sv_coef[0][i]) + " ");
+			output.append(String.format("%.5f", svmModel.sv_coef[0][i]) + ", ");
 		output.append("\n");
 		output.append("\nSV Indices\n");
 				for (int i = 0; i < svmModel.l; ++i)

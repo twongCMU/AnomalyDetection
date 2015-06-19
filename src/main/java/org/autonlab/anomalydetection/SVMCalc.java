@@ -252,7 +252,16 @@ public class SVMCalc {
 	if (anomalyID != null) {
 		anomalyHistogram = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey).getValue1();
 	}
+	
+//	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1())
+//		output.append(onePoint.getValue1().getDimensions() + " ");
+//	output.append('\n');
+	
 	boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), anomalyHistogram);
+	
+//	for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1())
+//		output.append(onePoint.getValue1().getDimensions() + " ");
+//	output.append('\n');
 
 	_svmModelsCacheLock.lock();
 
@@ -327,21 +336,24 @@ public class SVMCalc {
 		System.out.println("Using cached scaling factor of " + anomalyScale);
 	}
 
-	// output.append("\n\nSVectors\n");
+//	// output.append("\n\nSVectors\n");
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> bhists = DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1();
 	int dim = bhists.get(0).getValue1().getDimensions();
 	double[][] SV = new double[svmModel.l][dim];
-	for (int k = 0; k < svmModel.l; ++k)
-		for (int l = 0; l < dim; ++l)
+	for (int k = 0; k < svmModel.l; ++k) {
+		for (int l = 0; l < dim; ++l) {
 			SV[k][l] = svmModel.SV[k][l].value;
-			// if (l < 10)
-				// output.append(String.format("%.0f",svmModel.SV[k][l].value) + " ");
-	// 	// }
-	// 	output.append('\n');
-	// }
+//			 if (l < 10)
+//				 output.append(String.format("%.0f",svmModel.SV[k][l].value) + " ");
+	 	}
+//	s 	output.append('\n');
+	 }
+	
+	output.append("\n\nRHO: " + svmModel.rho[0] + "\n");
+	
 	output.append("\n\nSV Kernel\n");
-	for (int j = 0; j < svmModel.l; ++j) {
-		for (int i = 0; i < bhists.size(); ++i) {
+	for (int i = 0; i < bhists.size(); ++i) {
+//		for (int j = 0; j < svmModel.l; ++j) {
 
 		// Constructing svm_node to pass into 
 		GenericPoint<Integer> bhist = bhists.get(i).getValue1();
@@ -349,24 +361,24 @@ public class SVMCalc {
 		for (int k = 0; k < dim; ++k)
 			bnode[k] = bhist.getCoord(k);
 
-		// for (int j = 0; j < svmModel.l; ++j) {
+		 for (int j = 0; j < svmModel.l; ++j) {
 			double rk = GaussianRandomFeatures.gaussianKernel(bnode, SV[j], AnomalyDetectionConfiguration.SVM_GAMMA);
-			output.append(String.format("%.5f", rk) + ' ');
+			output.append(String.format("%.5f", rk) + ", ");
 		}
 		output.append('\n');
 	}
-	output.append("\n\nSVSVKernel\n");
-	for (int j = 0; j < svmModel.l; ++j) {
-		for (int i = 0; i < svmModel.l; ++i) {
-			double rk = GaussianRandomFeatures.gaussianKernel(SV[i], SV[j], AnomalyDetectionConfiguration.SVM_GAMMA);
-			output.append(String.format("%.5f", rk) + ' ');
-			}
-		output.append('\n');
-	}
-
+//	output.append("\n\nSVSVKernel\n");
+//	for (int j = 0; j < svmModel.l; ++j) {
+//		for (int i = 0; i < svmModel.l; ++i) {
+//			double rk = GaussianRandomFeatures.gaussianKernel(SV[i], SV[j], AnomalyDetectionConfiguration.SVM_GAMMA);
+//			output.append(String.format("%.5f", rk) + ' ');
+//			}
+//		output.append('\n');
+//	}
+//
 	output.append("\n\nSV Coeffs\n");
 	for (int i = 0; i < svmModel.l; ++i)
-		output.append(String.format("%.5f", svmModel.sv_coef[0][i]) + " ");
+		output.append(String.format("%.5f", svmModel.sv_coef[0][i]) + ", ");
 	output.append("\n\n");
 	output.append("\nSV Indices\n");
 			for (int i = 0; i < svmModel.l; ++i)
@@ -391,7 +403,6 @@ public class SVMCalc {
 		prediction *= -1;
 
 		//prediction /= anomalyScale;
-
 		output.append(index + ": score " + String.format("%.3f",prediction) + " and predicted " + d + " for " + onePoint.getValue1().toString() + "\n");
 
 		if (results != null) {
@@ -410,7 +421,7 @@ public class SVMCalc {
 	}
 
 	/**
-	 * Test every combination against every other combinatino
+	 * Test every combination against every other combination
 	 */
 	public static StringBuilder runAllTestSVM(GenericPoint<String> valueType) {
 	StringBuilder output = new StringBuilder();

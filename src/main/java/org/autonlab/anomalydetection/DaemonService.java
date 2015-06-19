@@ -1038,13 +1038,16 @@ public class DaemonService {
 
 	output.append("\n\nSVM RANDOM:\n");
 	long startTime1 = System.nanoTime();
-	output.append(SVMRandomCalc.runOneTestSVM(id, trainKey, trainValue, id, testKey, testValue, id-1, trainKeyA, trainValueA, null, -1).toString());
+	output.append(SVMRandomCalc.runOneTestSVM(id, trainKey, trainValue, id, testKey, testValue, id-1, trainKeyA, trainValueA, null, rn).toString());
+//	output.append(SVMRandomCalc.runOneTestSVM(id, trainKey, trainValue, id-1, trainKeyA, trainValueA, id-1, trainKeyA, trainValueA, null, -1).toString());
 	long endTime1 = System.nanoTime();
 	double duration = (double)(endTime1 - startTime1)/1000000000;
 	output.append("\n\nTime taken:\n" + (duration));
+	output.append("\n ---------------------------------------------------------------------------- \n");
 	output.append("\n\nSVM:\n");
 	long startTime2 = System.nanoTime();
 	output.append(SVMCalc.runOneTestSVM(id, trainKey, trainValue, id, testKey, testValue, id-1, trainKeyA, trainValueA, null).toString());
+//	output.append(SVMCalc.runOneTestSVM(id, trainKey, trainValue, id-1, trainKeyA, trainValueA, id-1, trainKeyA, trainValueA, null).toString());
 	long endTime2 = System.nanoTime();
 	duration = (double)(endTime2 - startTime2)/1000000000;
 	output.append("\n\nTime taken:\n" + (duration));
@@ -1077,11 +1080,10 @@ public class DaemonService {
 		for (int i = 0; i < n; i += 1) {
 			GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
 			for (int j = 0; j < s; j += 1) { // Randomly fill first quarter with 0s and 1s (anomalies)
-			if (j < qs && urd.sample() > 0.5)
-				fakePoint.setCoord(j, 1);
-			else
-				fakePoint.setCoord(j, 0);
-
+				if (j < qs)
+					fakePoint.setCoord(j, uid.sample());
+				else
+					fakePoint.setCoord(j, 0);
 			}
 			output.append(fakePoint.toString() + "\n");
 			Pair<Integer, GenericPoint<Integer>> fakePair = new Pair<Integer, GenericPoint<Integer>>(fakeTime, fakePoint);
