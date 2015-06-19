@@ -3,6 +3,7 @@ package org.autonlab.anomalydetection;
 import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 import org.apache.commons.math3.distribution.UniformRealDistribution;
 import com.savarese.spatial.GenericPoint;
+import libsvm.svm_node;
 
 public class GaussianRandomFeatures {
 
@@ -98,7 +99,8 @@ public class GaussianRandomFeatures {
 			return f;
 		}
 	}
-	public double[] computeGaussianFourierFeatures(double[] hist) {
+
+	public double[] computeGaussianFourierFeatures_SVM(double[] hist) {
 
 		if (_sine) {
 			double[] f = new double[2*_D];
@@ -130,6 +132,87 @@ public class GaussianRandomFeatures {
 			return f;
 		}
 	}
+	
+	public svm_node[] computeGaussianFourierFeatures_SVM(GenericPoint<Integer> hist) {
+
+		if (_sine) {
+			svm_node[] f = new svm_node[2*_D];
+			
+			for (int i = 0; i < _D; i++) {
+				double[] w = _ws[i];
+	
+				double t = 0.0;	// t = wTx	
+				for (int j = 0; j < _n; j++)
+					t += hist.getCoord(j)*w[j];
+				
+				f[i] = new svm_node();
+				f[i].index = i+1;
+				f[i].value = Math.cos(t)*Math.sqrt(1.0/_D);
+				
+				f[_D+i] = new svm_node();
+				f[_D+i].index = _D+i+1;
+				f[_D+i].value = Math.sin(t)*Math.sqrt(1.0/_D);
+			}
+			return f;
+		} else {
+			svm_node[] f = new svm_node[_D];
+			
+			for (int i = 0; i < _D; i++) {
+				double[] w = _ws[i];
+				double b = _bs[i];
+	
+				double t = 0.0;	// t = wTx	
+				for (int j = 0; j < _n; j++)
+					t += hist.getCoord(j)*w[j];
+				
+				f[i] = new svm_node();
+				f[i].index = i+1;
+				f[i].value = Math.cos(t + b)*Math.sqrt(2.0/_D);
+			}
+			return f;
+		}
+	}
+
+	public svm_node[] computeGaussianFourierFeatures(double[] hist) {
+
+		if (_sine) {
+			svm_node[] f = new svm_node[2*_D];
+			
+			for (int i = 0; i < _D; i++) {
+				double[] w = _ws[i];
+	
+				double t = 0.0;	// t = wTx	
+				for (int j = 0; j < _n; j++)
+					t += hist[j]*w[j];
+				
+				f[i] = new svm_node();
+				f[i].index = i+1;
+				f[i].value = Math.cos(t)*Math.sqrt(1.0/_D);
+				
+				f[_D+i] = new svm_node();
+				f[_D+i].index = _D+i+1;
+				f[_D+i].value = Math.sin(t)*Math.sqrt(1.0/_D);
+			}
+			return f;
+		} else {
+			svm_node[] f = new svm_node[_D];
+			
+			for (int i = 0; i < _D; i++) {
+				double[] w = _ws[i];
+				double b = _bs[i];
+	
+				double t = 0.0;	// t = wTx	
+				for (int j = 0; j < _n; j++)
+					t += hist[j]*w[j];
+
+				f[i] = new svm_node();
+				f[i].index = i+1;
+				f[i].value = Math.cos(t + b)*Math.sqrt(2.0/_D);
+			}
+			return f;
+		}
+	}
+
 	
 	/**
 	 * Calculate the kernel between two histograms histX and histY

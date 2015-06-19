@@ -1014,8 +1014,8 @@ public class DaemonService {
 
 	StringBuilder output = new StringBuilder("Custom Test\n\n");
 		
-	output.append(getFakeData2(n,s,rn).getEntity());
-	//getFakeData2(n,s,rn);
+//	output.append(getFakeData2(n,s,rn).getEntity());
+	getFakeData2(n,s,rn);
 	//      String filename="/usr0/home/sibiv/Research/Data/GRE.out";
 	//      DataIOFile foo = new DataIOFile(filename);
 	//      allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(foo.getData(), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
