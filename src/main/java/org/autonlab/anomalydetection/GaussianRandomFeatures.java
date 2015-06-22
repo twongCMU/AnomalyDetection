@@ -100,7 +100,7 @@ public class GaussianRandomFeatures {
 		}
 	}
 
-	public double[] computeGaussianFourierFeatures_SVM(double[] hist) {
+	public double[] computeGaussianFourierFeatures(double[] hist) {
 
 		if (_sine) {
 			double[] f = new double[2*_D];
@@ -173,7 +173,7 @@ public class GaussianRandomFeatures {
 		}
 	}
 
-	public svm_node[] computeGaussianFourierFeatures(double[] hist) {
+	public svm_node[] computeGaussianFourierFeatures_SVM(double[] hist) {
 
 		if (_sine) {
 			svm_node[] f = new svm_node[2*_D];

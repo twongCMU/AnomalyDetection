@@ -479,9 +479,8 @@ public class SVMRandomCalc {
 		// If we're running many instances of similar test data against the same training data
 		// we might want to implement a cache that's per-training set and save it externally
 		// rather than the current scheme of only caching within an instance of SVMKernel
-//		SVMRandomGaussian GFSTest = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), rn, grf, AnomalyDetectionConfiguration.NUM_THREADS);
-//		svm_node[][] testFeatures = GFSTest.getData(); 
-		
+		SVMRandomGaussian GFSTest = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), rn, grf, AnomalyDetectionConfiguration.NUM_THREADS);
+		svm_node[][] testFeatures = GFSTest.getData(); 
 		int index = 0;
 		//		System.out.println("QUICK TESTS: -------------------");
 		//		
@@ -519,19 +518,20 @@ public class SVMRandomCalc {
 				//              getFak
 		//		System.out.println("--------------------------------");
 		//		System.out.println("--------------------------------");		
-//		int dim = bhists.get(0).getValue1().getDimensions();
+//		int drfe3im = bhists.get(0).getValue1().getDimensions();
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1()) {
 			double[] values = new double[1];
-//			double d = svm.svm_predict_values(svmModel, testFeatures[index], values);
-			svm_node[] bnode = grf.computeGaussianFourierFeatures_SVM(onePoint.getValue1());
+			double d = svm.svm_predict_values(svmModel, testFeatures[index], values);
+//			svm_node[] bnode = grf.computeGaussianFourierFeatures_SVM(onePoint.getValue1());
+//			double[] bnode = grf.computeGaussianFourierFeatures(onePoint.getValue1());
 //			svm_node[] bnode_svm = new svm_node[bnode.length];
-//			for (int k = 0; k < bnode.length; ++k) {
+//			for (int k = 0; k < bnode_svm.length; ++k) {
 //				bnode_svm[k] = new svm_node();
 //				bnode_svm[k].index = k+1;
 //				bnode_svm[k].value = bnode[k];
 //			}
-
-			double d = svm.svm_predict_values(svmModel, bnode, values);
+//
+//			double d = svm.svm_predict_values(svmModel, bnode, values);
 
 			double prediction = values[0];
 
