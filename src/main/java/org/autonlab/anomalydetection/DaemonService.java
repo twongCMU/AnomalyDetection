@@ -156,14 +156,21 @@ public class DaemonService {
 	    ageMins = 0;
 	}
 
-	allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(dbHandle.getData(ageMins), AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
-	for (GenericPoint<String> valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
-	    for (GenericPoint<String> category : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
-		output.append("Category: " + category.toString() + ", Value: " + valueName);
-		output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(category).getValue1().size() + ")\n");
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> data = dbHandle.getData(ageMins);
+	if (data != null) {
+	    
+	    allHistogramsMap.put(nextHistogramMapID, HistoTuple.mergeWindows(data, AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS, AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS));
+	    for (GenericPoint<String> valueName : allHistogramsMap.get(nextHistogramMapID).keySet()) {
+		for (GenericPoint<String> category : allHistogramsMap.get(nextHistogramMapID).get(valueName).keySet()) {
+		    output.append("Category: " + category.toString() + ", Value: " + valueName);
+		    output.append(" (datapoints: " + allHistogramsMap.get(nextHistogramMapID).get(valueName).get(category).getValue1().size() + ")\n");
+		}
 	    }
+	    nextHistogramMapID++;
 	}
-	nextHistogramMapID++;
+	else {
+	    output.append("No data returned");
+	}
 
 	allHistogramsMapLock.unlock();
 
@@ -533,13 +540,21 @@ public class DaemonService {
 	//this will go into ID 1
 	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace);
 
-	for (GenericPoint<String> oneValuePoint: allHistogramsMap.get(0).keySet()) {
-	    for (GenericPoint<String> oneCategoryPoint : allHistogramsMap.get(0).get(oneValuePoint).keySet()) {
-		System.out.println(oneCategoryPoint.getCoord(0));
-		return getDataSVM(0, oneCategoryPoint.getCoord(0), valueCSV, 1, oneCategoryPoint.getCoord(0), valueCSV, null, null, null, refreshSec);
+	if (allHistogramsMap.get(0) != null &&
+	    allHistogramsMap.get(1) != null) {
+	    for (GenericPoint<String> oneValuePoint: allHistogramsMap.get(0).keySet()) {
+		for (GenericPoint<String> oneCategoryPoint : allHistogramsMap.get(0).get(oneValuePoint).keySet()) {
+		    System.out.println(oneCategoryPoint.getCoord(0));
+		    return getDataSVM(0, oneCategoryPoint.getCoord(0), valueCSV, 1, oneCategoryPoint.getCoord(0), valueCSV, null, null, null, refreshSec);
+		}
 	    }
 	}
-	return null;
+
+	// There is no data yet so reload the page every 2 seconds
+	StringBuilder output = new StringBuilder("<html>");
+	output.append("<head><meta http-equiv='refresh' content='2'></head>");
+	output.append("<body><pre>No data yet\n");
+	return Response.status(200).entity(output.toString()).build();
     }
 
     @GET

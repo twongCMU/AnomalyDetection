@@ -83,8 +83,8 @@ public class DataIOCassandraDB implements DataIO {
 
 	// this is a dumb way of doing this: We want the most recent timestamp in the database
 	// but we can't query it from Cassandra. We loop through every record and find the highest
-	DateTime endTime = new DateTime();
-	DateTime startTime = new DateTime();
+	DateTime endTime = null;
+	DateTime startTime = null;
 	if (minutesBack > 0) {
 	    String selectStatement = "SELECT time_stamp FROM " + _keyspace + ".packet ";
 	    ResultSet results = _session.execute(selectStatement);
@@ -101,16 +101,16 @@ public class DataIOCassandraDB implements DataIO {
 		    System.out.println("Read in " + rowCount + " rows");
 		}
 	    }
-	    endTime = new DateTime(highestDate.getTime());
-	    startTime = endTime.minusMinutes(minutesBack);
+	    if (highestDate != null) {
+		endTime = new DateTime(highestDate.getTime());
+		startTime = endTime.minusMinutes(minutesBack);
+	    }
+
+	    // This happens if the database is empty
+	    if (endTime == null || startTime == null) {
+		return null;
+	    }
 	}
-		
-
-	// use a value relevant to the test data. In the future, use empty constructor for current time
-
-
-	//System.out.println("YEAR is " + dateString);
-    //	DateTime ndTime = new DateTime("2014-05-12T13:54:12.000-04:00");
 
 	int getTextValues = 0;
 
@@ -245,6 +245,10 @@ public class DataIOCassandraDB implements DataIO {
 	    }
 	}
 	results = null;
+
+	if (trainMap.size() == 0) {
+	    return null;
+	}
 
 	return trainMap;
     }
