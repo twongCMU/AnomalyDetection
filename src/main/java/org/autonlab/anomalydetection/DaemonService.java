@@ -4,7 +4,7 @@ import com.datastax.driver.core.*;
 import com.savarese.spatial.*;
 
 import java.util.*; 
-import java.util.concurrent.locks.*;
+import java.util.concurrent.Semaphore;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
@@ -15,12 +15,15 @@ import org.apache.commons.math3.distribution.UniformRealDistribution;
 
 @Path("/")
 public class DaemonService {
+    // Locks don't work here. I'm not sure why but when I tried to use ReentrantLocks they never blocked
+    // while another REST call was holding it. However using a Semaphore works.
+    Semaphore allHistogramsMapSemaphore = new Semaphore(1);
+
     //                        ID                value                          category              scaling                 time       histogram
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>>> allHistogramsMap = new HashMap();
     static volatile HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, HashMap<Pair<Integer, Integer>, Integer>>> allHistogramsMapKeyRemap = new HashMap();
 
     static volatile int nextHistogramMapID = 0;
-    static volatile ReentrantLock allHistogramsMapLock = new ReentrantLock();
 
     /**
      * Get the histogram's number of dimensions and their names. This is so that calls to /evaluate can be constructed properly
@@ -43,10 +46,15 @@ public class DaemonService {
     @GET
     @Path("/getDatasetKeys")
     @Produces(MediaType.TEXT_HTML)
-    public Response getDatasetKeys() {
+    public Response getDatasetKeys() throws InterruptedException {
 	String output = new String();
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	for (Integer id : allHistogramsMap.keySet()) {
 	    output += "ID " + id + "<ul>";
@@ -65,7 +73,7 @@ public class DaemonService {
 	    output += "</ul>";
 	}
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output).build();
     }
@@ -75,12 +83,17 @@ public class DaemonService {
     @Produces(MediaType.TEXT_PLAIN)
     public Response getHistograms(@QueryParam("id") Integer id,
 				  @QueryParam("categoryCSV") String category,
-				  @QueryParam("valueCSV") String value) {
+				  @QueryParam("valueCSV") String value) throws InterruptedException {
 
 	GenericPoint<String> categoryPoint = getPointFromCSV(category);
 	GenericPoint<String> valuePoint = getPointFromCSV(value);
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	StringBuilder output = new StringBuilder();
 	int newID = recalculateByCategory(id, categoryPoint, valuePoint, output);
@@ -95,7 +108,7 @@ public class DaemonService {
 	    output.append(tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n");
 	}
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -106,9 +119,14 @@ public class DaemonService {
     @GET
     @Path("/getfile")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getFile(@QueryParam("filename") String filename) {
+    public Response getFile(@QueryParam("filename") String filename) throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 
@@ -122,7 +140,7 @@ public class DaemonService {
 	}
 	nextHistogramMapID++;
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -140,9 +158,14 @@ public class DaemonService {
 			  @QueryParam("categoryCSV") String categoryCSV,
 			  @QueryParam("value") String valueCSV,
 			  @QueryParam("ageMins") Integer ageMins,
-			  @QueryParam("keySpace") String keySpace) {
+			  @QueryParam("keySpace") String keySpace) throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, keySpace);
@@ -172,7 +195,7 @@ public class DaemonService {
 	    output.append("No data returned");
 	}
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -180,11 +203,16 @@ public class DaemonService {
     @GET
     @Path("/getfakedata")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getFakeData() {
+    public Response getFakeData() throws InterruptedException {
 	GenericPoint<String> valueType = new GenericPoint(1);
 	valueType.setCoord(0, "messagetype");
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	StringBuilder output = new StringBuilder("Dataset ID: " + nextHistogramMapID + "\n");
 
@@ -233,7 +261,7 @@ public class DaemonService {
 	allHistogramsMap.put(nextHistogramMapID, fakeDataFinal);
 	nextHistogramMapID++;
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -246,9 +274,14 @@ public class DaemonService {
     @GET
     @Path("/deleteone/{id}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response deleteOne(@PathParam("id") Integer id) {
+    public Response deleteOne(@PathParam("id") Integer id) throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	String output = "ok";
 	if (!allHistogramsMap.containsKey(id)) {
@@ -259,7 +292,7 @@ public class DaemonService {
 	}
 	SVMCalc.removeModelFromCache(id);
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output).build();
     }	    
@@ -272,13 +305,18 @@ public class DaemonService {
     @GET
     @Path("/deleteall")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response deleteAll() {
+    public Response deleteAll() throws InterruptedException {
 	String output = "ok";
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 	allHistogramsMap = new HashMap();
 	nextHistogramMapID = 0;
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output).build();
     }	    
@@ -295,13 +333,18 @@ public class DaemonService {
 			    @QueryParam("anomalyTrainID") Integer anomalyTrainID,
 			    @QueryParam("anomalyTrainCategoryCSV") String anomalyTrainCategory,
 			    @QueryParam("anomalyTrainValue") String anomalyTrainValue,
-			    @QueryParam("autoReload") Integer autoReloadSec) {
+			    @QueryParam("autoReload") Integer autoReloadSec) throws InterruptedException {
 
 	int calcTypeToUse;
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 	calcTypeToUse = AnomalyDetectionConfiguration.CALC_TYPE_TO_USE;
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	if (calcTypeToUse == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
 	    return getDataKDTree(trainID, trainCategory, trainValue, testID, testCategory, testValue);
@@ -322,7 +365,7 @@ public class DaemonService {
 				  @QueryParam("trainValue") String trainValue,
 				  @QueryParam("testID") Integer testID,
 				  @QueryParam("testCategoryCSV") String testCategory,
-				  @QueryParam("testValue") String testValue) {
+				  @QueryParam("testValue") String testValue) throws InterruptedException {
 	String output = "Calculation method: KDTree\n";
 
 	int error = 0;
@@ -365,11 +408,16 @@ public class DaemonService {
 	GenericPoint<String> testCategoryPoint = getPointFromCSV(testCategory);
 	GenericPoint<String> testValuePoint = getPointFromCSV(testValue);
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	output += KDTreeCalc.runOneTestKDTree(trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, null);
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output).build();
     }
@@ -378,12 +426,12 @@ public class DaemonService {
      * Simply convert a CSV of strings into a GenericPoint where each dimension was one of the CSV strings
      *
      * Relative to the rest of the code, this is not an expensive operation but when possible we call
-     * this outside of the allHistogramsMapLock
+     * this outside of the allHistogramsMapSemaphore
      *
      * @param csv
      * @return GenericPoint
      */
-    public GenericPoint<String> getPointFromCSV(String csv) {
+    public GenericPoint<String> getPointFromCSV(String csv) throws InterruptedException {
 	String[] sParts = csv.split(",");
 	Arrays.sort(sParts);
 	GenericPoint<String> point = new GenericPoint(sParts.length);
@@ -396,6 +444,9 @@ public class DaemonService {
     }
 
     /**
+     * The calling function must hold the semaphore
+     *
+     *
      * @param id The data index ID returned when the data was read in
      * @param categoryPoint category
      * @param valuePoint histogram values
@@ -403,11 +454,7 @@ public class DaemonService {
      *
      * @return the ID that contains the data with indexes valueCSV and categoryCSV (which may be different from the input id) or -1 if none
      */
-    public int recalculateByCategory(Integer id, GenericPoint<String> categoryPoint, GenericPoint<String> valuePoint, StringBuilder output) {
-
-	if (allHistogramsMapLock.isHeldByCurrentThread() == false) {
-	    throw new RuntimeException("Error: did not hold lock in recalculateByCategory");
-	}
+    public int recalculateByCategory(Integer id, GenericPoint<String> categoryPoint, GenericPoint<String> valuePoint, StringBuilder output) throws InterruptedException {
 
 	// If the data we want is already there
 	if (allHistogramsMap.get(id) == null) {
@@ -486,16 +533,14 @@ public class DaemonService {
     /**
      * Compare the string names in a GenericPoint. This is for the category names only and
      * not the histogram values
+     * The caller must hold the semaphore
      *
      * @param testPoint the point that may be a subset
      * @param bigPoint the point that may be a superset
      *
      * @return true if every coord in testPoint also exists in bigPoint, false otherwise
      */
-    public Boolean isPointSubset(GenericPoint<String> testPoint, GenericPoint<String> bigPoint) {
-	if (allHistogramsMapLock.isHeldByCurrentThread() == false) {
-	    throw new RuntimeException("Error: did not hold lock in isPointSubset");
-	}
+    public Boolean isPointSubset(GenericPoint<String> testPoint, GenericPoint<String> bigPoint) throws InterruptedException {
 
 	if (bigPoint.getDimensions() <  testPoint.getDimensions()) {
 	    return false;
@@ -528,11 +573,16 @@ public class DaemonService {
 			  @QueryParam("valueCSV") String valueCSV,
 			  @QueryParam("ageMins") Integer ageMins,
            		  @QueryParam("refreshSec") Integer refreshSec,
-			  @QueryParam("keySpace") String keySpace) {
+			  @QueryParam("keySpace") String keySpace) throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 	deleteAll(); //invalidate the existing data
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	//this will go into ID 0
 	getDb(hostname, categoryCSV, valueCSV, null, keySpace);
@@ -569,7 +619,7 @@ public class DaemonService {
 			       @QueryParam("anomalyTrainID") Integer anomalyTrainID,
 			       @QueryParam("anomalyTrainCategoryCSV") String anomalyTrainCategory,
 			       @QueryParam("anomalyTrainValue") String anomalyTrainValue,
-			       @QueryParam("autoReloadSec") Integer autoReloadSec) {
+			       @QueryParam("autoReloadSec") Integer autoReloadSec) throws InterruptedException {
 
 	StringBuilder output = new StringBuilder("<html>");
 	if (autoReloadSec != null && autoReloadSec > 0) {
@@ -589,12 +639,17 @@ public class DaemonService {
 	    anomalyTrainValuePoint = getPointFromCSV(anomalyTrainValue);
 	}
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	int newTrainID = recalculateByCategory(trainID, trainCategoryPoint, trainValuePoint, output);
 	if (newTrainID == -1) {
 	    output.append("ERROR: trainCategoryCSV (" + trainCategory + ") was not found and could not be calculated from existing data\n");
-	    allHistogramsMapLock.unlock();
+	    allHistogramsMapSemaphore.release();
 	    return Response.status(200).entity(output.toString()).build();
 	}
 	else if (newTrainID != trainID) {
@@ -604,7 +659,7 @@ public class DaemonService {
 	int newTestID = recalculateByCategory(testID, testCategoryPoint, testValuePoint, output);
 	if (newTestID == -1) {
 	    output.append("ERROR: testCategoryCSV  (" + testCategory + ") was not found and could not be calculated from existing data\n");
-	    allHistogramsMapLock.unlock();
+	    allHistogramsMapSemaphore.release();
 	    return Response.status(200).entity(output.toString()).build();
 	}
 	else if (newTestID != testID) {
@@ -615,7 +670,7 @@ public class DaemonService {
 	    int newAnomalyTrainID = recalculateByCategory(anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, output);
 	    if (newAnomalyTrainID == -1) {
 		output.append("ERROR: anomalyTrainCategoryCSV (" + anomalyTrainCategory + ") was not found and could not be calculated from existing data\n");
-		allHistogramsMapLock.unlock();
+		allHistogramsMapSemaphore.release();
 		return Response.status(200).entity(output.toString()).build();
 	    }
 	    else if (newAnomalyTrainID != anomalyTrainID) {
@@ -659,7 +714,7 @@ public class DaemonService {
 	    break;
 	}
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -676,7 +731,7 @@ public class DaemonService {
 				     @QueryParam("anomalyTrainID") Integer anomalyTrainID,
 				     @QueryParam("anomalyTrainCategoryCSV") String anomalyTrainCategory,
 				     @QueryParam("anomalyTrainValue") String anomalyTrainValue,
-				     @QueryParam("autoReloadSec") Integer autoReloadSec) {
+				     @QueryParam("autoReloadSec") Integer autoReloadSec) throws InterruptedException {
 
 	StringBuilder output = new StringBuilder("<html>");
 	if (autoReloadSec != null && autoReloadSec > 0) {
@@ -696,7 +751,12 @@ public class DaemonService {
 	    anomalyTrainValuePoint = getPointFromCSV(anomalyTrainValue);
 	}
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	int newTrainID = recalculateByCategory(trainID, trainCategoryPoint, trainValuePoint, output);
 	if (newTrainID == -1) {
@@ -763,14 +823,13 @@ public class DaemonService {
 	    break;
 	}
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output.toString()).build();
     }
 
     /**
-     * This function does not lock the allHistogramsMap. It assumes the caller will use it and therefore
-     * will handle the locking
+     * The caller must hold the semaphore
      *
      * I am not sure how useful this function is; functions that need this information seem to do
      * different things that defy lumping them all into a do-it-all function
@@ -781,12 +840,9 @@ public class DaemonService {
      *
      * @return true if there is a histogram for the input values, false if not
      */
-    public boolean verifyHistogram(Integer id, GenericPoint<String> category, GenericPoint<String> value) {
+    public boolean verifyHistogram(Integer id, GenericPoint<String> category, GenericPoint<String> value) throws InterruptedException {
 	boolean ret = true;
 
-	if (allHistogramsMapLock.isHeldByCurrentThread() == false) {
-	    throw new RuntimeException("verifyHistogram called without lock being held");
-	}
 	if (allHistogramsMap.get(id) == null ||
 	    allHistogramsMap.get(id).get(value) == null ||
 	    allHistogramsMap.get(id).get(value).get(category) == null) {
@@ -801,12 +857,17 @@ public class DaemonService {
      *
      * @param id
      */
-    public Pair<Integer, Integer> getStartAndEndTime(Integer id) {
+    public Pair<Integer, Integer> getStartAndEndTime(Integer id) throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	if (allHistogramsMap.get(id) == null) {
-	    allHistogramsMapLock.unlock();
+	    allHistogramsMapSemaphore.release();
 	    return null;
 	}
 
@@ -820,23 +881,28 @@ public class DaemonService {
 		Integer lastTime = allHistogramsMap.get(id).get(category).get(key).getValue1().get(size - 1).getValue0();
 		Pair<Integer, Integer> ret = new Pair(firstTime, lastTime);
 
-		allHistogramsMapLock.unlock();
+		allHistogramsMapSemaphore.release();
 		return ret;
 	    }
 	}
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 	return null;
     }
 
     @GET
     @Path("/testall/{categoryCSV}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDataAll(@PathParam("categoryCSV") String category) {
+    public Response getDataAll(@PathParam("categoryCSV") String category) throws InterruptedException {
 	int calcTypeToUse;
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 	calcTypeToUse = AnomalyDetectionConfiguration.CALC_TYPE_TO_USE;
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	if (calcTypeToUse == AnomalyDetectionConfiguration.CALC_TYPE_KDTREE) {
 	    return getDataAllKDTree(category);
@@ -852,15 +918,20 @@ public class DaemonService {
     @GET
     @Path("/testallKDTree/{categoryCSV}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDataAllKDTree(@PathParam("categoryCSV") String category) {
+    public Response getDataAllKDTree(@PathParam("categoryCSV") String category) throws InterruptedException {
 	StringBuilder output = new StringBuilder("Calculation method: KDTree\n");
 	GenericPoint<String> categoryPoint = getPointFromCSV(category);
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 	
 	output.append(KDTreeCalc.runAllTestKDTree(categoryPoint));
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -868,15 +939,20 @@ public class DaemonService {
     @GET
     @Path("/testallSVM/{categoryCSV}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getDataAllSVM(@PathParam("categoryCSV") String category) {
+    public Response getDataAllSVM(@PathParam("categoryCSV") String category) throws InterruptedException {
 	StringBuilder output = new StringBuilder("Calculation method: SVM\n");
 	GenericPoint<String> categoryPoint = getPointFromCSV(category);
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	output.append(SVMCalc.runAllTestSVM(categoryPoint));
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -891,16 +967,21 @@ public class DaemonService {
     @GET
     @Path("/setSampleWindowSecs/{newVal}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response setSampleWindowSecs(@PathParam("newVal") int newValue) {
+    public Response setSampleWindowSecs(@PathParam("newVal") int newValue) throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	if (newValue != AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS) {
 	    deleteAll(); //invalidate the existing data
 	}
 	AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS = newValue;
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity("Changes enacted. All data deleted.").build();
     }
@@ -908,13 +989,18 @@ public class DaemonService {
     @GET
     @Path("/getSampleWindowSecs")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getSampleWindowSecs() {
+    public Response getSampleWindowSecs() throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	String output = "" + AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS;
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output).build();
     }
@@ -929,16 +1015,21 @@ public class DaemonService {
     @GET
     @Path("/setSlideWindowSecs/{newVal}")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response setSlideWindowSecs(@PathParam("newVal") int newValue) {
+    public Response setSlideWindowSecs(@PathParam("newVal") int newValue) throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	if (newValue != AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS) {
 	    deleteAll(); //invalidate the existing data
 	}
 	AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS = newValue;
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity("Change enacted. All data deleted.").build();
     }
@@ -946,13 +1037,18 @@ public class DaemonService {
     @GET
     @Path("/getSlideWindowSecs")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response getSlideWindowSecs() {
+    public Response getSlideWindowSecs() throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	String output = "" + AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS;
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output).build();
     }
@@ -960,9 +1056,14 @@ public class DaemonService {
     @GET
     @Path("/setCalcType/{newVal}")
     @Produces(MediaType.TEXT_HTML)
-    public Response setCalcType(@PathParam("newVal") String newValue) {
+    public Response setCalcType(@PathParam("newVal") String newValue) throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	String output = "Ok. Calc type set to " + newValue;
 	int newIndex = Arrays.asList(AnomalyDetectionConfiguration.CALC_TYPE_NAMES).indexOf(newValue);
@@ -974,7 +1075,7 @@ public class DaemonService {
 	}
 	output += AnomalyDetectionConfiguration.printCalcTypeNameLinksHTML("");
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output).build();
     }
@@ -982,14 +1083,19 @@ public class DaemonService {
     @GET
     @Path("/getCalcType")
     @Produces(MediaType.TEXT_HTML)
-    public Response getCalcType() {
+    public Response getCalcType() throws InterruptedException {
 
-	allHistogramsMapLock.lock();
+	try {
+	    allHistogramsMapSemaphore.acquire();
+	}
+	catch (InterruptedException e) {
+	    throw e;
+	}
 
 	String output = "Calc type is " + AnomalyDetectionConfiguration.CALC_TYPE_NAMES[AnomalyDetectionConfiguration.CALC_TYPE_TO_USE];
 	output += "<br>" + AnomalyDetectionConfiguration.printCalcTypeNameLinksHTML("setCalcType/");
 
-	allHistogramsMapLock.unlock();
+	allHistogramsMapSemaphore.release();
 
 	return Response.status(200).entity(output).build();
     }
@@ -998,19 +1104,24 @@ public class DaemonService {
     @GET
     @Path("/setNumThreads/{newVal}")
     @Produces(MediaType.TEXT_HTML)
-    public Response setNumThreads(@PathParam("newVal") Integer newValue) {
+    public Response setNumThreads(@PathParam("newVal") Integer newValue) throws InterruptedException {
 	String output = "Number of threads was " + AnomalyDetectionConfiguration.NUM_THREADS + " and is now " + newValue;
 
 	if (AnomalyDetectionConfiguration.NUM_THREADS == newValue) {
 	    output = "Number of threads is already " + newValue + ". No change";
 	}
 	else {
-	    // grab the lock in the event that an SVM calculation is in progress
-	    allHistogramsMapLock.lock();
+	    // grab the semaphore in the event that an SVM calculation is in progress
+	    try {
+		allHistogramsMapSemaphore.acquire();
+	    }
+	    catch (InterruptedException e) {
+		throw e;
+	    }
 
 	    AnomalyDetectionConfiguration.NUM_THREADS = newValue;
 
-	    allHistogramsMapLock.unlock();
+	    allHistogramsMapSemaphore.release();
 	}
 
 	return Response.status(200).entity(output).build();
@@ -1023,7 +1134,7 @@ public class DaemonService {
     @GET
     @Path("/customTest")
     @Produces(MediaType.TEXT_PLAIN)
-    public Response customTest(@QueryParam("n") Integer n, @QueryParam("size") Integer s, @QueryParam("rn") Integer rn){//@QueryParam("id") Integer id,
+    public Response customTest(@QueryParam("n") Integer n, @QueryParam("size") Integer s, @QueryParam("rn") Integer rn) throws InterruptedException {//@QueryParam("id") Integer id,
 	//@QueryParam("csvKey") String csvKey) {
 
 	StringBuilder output = new StringBuilder("Custom Test\n\n");

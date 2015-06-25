@@ -6,6 +6,7 @@ import java.util.*;
 import org.joda.time.*;
 import org.javatuples.*;
 import java.text.DateFormat;
+
 public class DataIOCassandraDB implements DataIO {
     /*
      * if open a new session with every call, the code crashes
@@ -173,6 +174,8 @@ public class DataIOCassandraDB implements DataIO {
 		fieldMap = row.getMap("text_values", String.class, String.class);
 	    }
 
+	    // build the category here. We have to do this inside the loop because the category
+	    // contains the name's value that we see in the record
 	    int ii = 0;
 	    for (String oneField : _categoryFieldsList) {
 		String categoryString = oneField + ";";
