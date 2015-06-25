@@ -353,6 +353,7 @@ public class SVMRandomCalc {
 	}
 
 	/**
+	 * @param histogramData Object containing the histograms
 	 * @param trainID ID of the model to use to train on
 	 * @param trainKey Key index for the training set histograms
 	 * @param testID ID of the model to use to test on
@@ -362,7 +363,7 @@ public class SVMRandomCalc {
 	 *
 	 * @return some text that can be displayed to the user
 	 */
-	public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, GenericPoint<String> trainValue, Integer testID, GenericPoint<String> testKey, GenericPoint<String> testValue, Integer anomalyID, GenericPoint<String> anomalyKey, GenericPoint<String> anomalyValue, MultiValueMap results, int rn) {
+	public static StringBuilder runOneTestSVM(HistogramStore histogramData, Integer trainID, GenericPoint<String> trainKey, GenericPoint<String> trainValue, Integer testID, GenericPoint<String> testKey, GenericPoint<String> testValue, Integer anomalyID, GenericPoint<String> anomalyKey, GenericPoint<String> anomalyValue, MultiValueMap results, int rn) {
 	//public static StringBuilder runOneTestSVM(Integer trainID, GenericPoint<String> trainKey, Integer testID, GenericPoint<String> testKey, MultiValueMap results) {
 		StringBuilder output = new StringBuilder();
 
@@ -371,47 +372,52 @@ public class SVMRandomCalc {
 		//HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>> allModels;
 
 
-		if (DaemonService.allHistogramsMap.get(trainID) == null) {
-			output.append("Error: trainID " + trainID + " not found");
-			return output;
+		if (histogramData.isIDValid(trainID) == false) {
+		    output.append("Error: trainID " + trainID + " not found");
+		    return output;
 		}
-		if (DaemonService.allHistogramsMap.get(trainID).get(trainValue) == null) {
-			output.append("Error: trainValue " + trainValue + " not found");
-			return output;
+		if (histogramData.isValueValid(trainID, trainValue) == false) {
+		    output.append("Error: trainValue " + trainValue + " not found");
+		    return output;
 		}
-		if (DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey) == null) {
-			output.append("Error: trainIP, trainApp pair of " + trainKey.toString() + " for trainID " + trainID + " not found");
-			return output;
+		if (histogramData.isCategoryValid(trainID, trainValue, trainKey) == false) {
+		    output.append("Error: trainIP, trainApp pair of " + trainKey.toString() + " for trainID " + trainID + " not found");
+		    return output;
 		}
-		if (DaemonService.allHistogramsMap.get(testID) == null) {
-			output.append("Error: testID " + testID + " not found");
-			return output;
+		if (histogramData.isIDValid(testID) == false) {
+		    output.append("Error: testID " + testID + " not found");
+		    return output;
 		}
-		if (DaemonService.allHistogramsMap.get(testID).get(testValue) == null) {
-			output.append("Error: testValue " + testValue + " not found");
-			return output;
+		if (histogramData.isValueValid(testID, testValue) == false) {
+		    output.append("Error: testValue " + testValue + " not found");
+		    return output;
 		}
-		if (DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey) == null) {
-			output.append("Error: testKey of " + testKey.toString() + " for testID " + testID + " not found");
-			return output;
+		if (histogramData.isCategoryValid(testID, testValue, testKey) == false) {
+		    output.append("Error: testKey of " + testKey.toString() + " for testID " + testID + " not found");
+		    return output;
 		}
-		if (DaemonService.allHistogramsMap.get(anomalyID) != null) {
-			if (DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue) == null) {
-				output.append("Error: anomalyValue " + anomalyValue + " not found");
-				return output;
-			}
-			if (DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey) == null) {
-				output.append("Error: anomalyKey of " + anomalyKey.toString() + " for anomalyID " + anomalyID + " not found");
-				return output;
-			}
+		if (anomalyID != null) {
+		    if (histogramData.isIDValid(anomalyID) == false) {
+			output.append("Error: anomalyID " + anomalyID + " not found");
+			return output;
+		    }
+		    if (histogramData.isValueValid(anomalyID, anomalyValue) == false) {
+			output.append("Error: anomalyValue " + anomalyValue + " not found");
+			return output;
+		    }
+		    if (histogramData.isCategoryValid(anomalyID, anomalyValue, anomalyKey) == false) {
+			output.append("Error: anomalyKey of " + anomalyKey.toString() + " for anomalyID " + anomalyID + " not found");
+			return output;
+		    }
 		}
 		
+	
 		ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyHistogram = null;
 		if (anomalyID != null) {
-		    anomalyHistogram = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey).getValue1();
+		    anomalyHistogram = histogramData.getHistograms(anomalyID, anomalyValue, anomalyKey);
 		}
-		boolean changed = true;//HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey), anomalyHistogram);
-//		boolean changed = HistoTuple.upgradeWindowsDimensions(DaemonService.allHistogramsMap.get(trainID).get(trainKey), DaemonService.allHistogramsMap.get(testID).get(testKey));
+		boolean changed = true;
+		// boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, histogramData.getHistograms(trainID, trainValue, trainKey), histogramData.getHistograms(testID, testValue, testKey), anomalyHistogram);
 
 		_svmModelsCacheLock.lock();
 
@@ -428,10 +434,10 @@ public class SVMRandomCalc {
 		    // this calculation can take some time so we unlock the cache and we'll recheck before we save it to cache
 		    ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
 		    if (anomalyID != null) {
-			anomalyData = DaemonService.allHistogramsMap.get(anomalyID).get(anomalyValue).get(anomalyKey).getValue1();
+			anomalyData = histogramData.getHistograms(anomalyID, anomalyValue, anomalyKey);
 		    }
 		    Pair<GaussianRandomFeatures, svm_model> grf_svm =
-			SVMRandomCalc.generateModelOneClass(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), .9, anomalyData, .9, rn);
+			SVMRandomCalc.generateModelOneClass(histogramData.getHistograms(trainID, trainValue, trainKey), .9, anomalyData, .9, rn);
 			
 		    grf = grf_svm.getValue0(); 
 		    svmModel = grf_svm.getValue1();
@@ -480,7 +486,7 @@ public class SVMRandomCalc {
 
 
 		long st2 = System.nanoTime();
-		SVMRandomGaussian GFSTest = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS);
+		SVMRandomGaussian GFSTest = new SVMRandomGaussian(histogramData.getHistograms(testID, testValue, testKey), AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS);
 		svm_node[][] testFeatures = GFSTest.getData(); 
 
 		int index = 0;
@@ -495,7 +501,7 @@ public class SVMRandomCalc {
 		//		
 		//		System.out.println("--------------------------------");
 
-		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1()) {
+		for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramData.getHistograms(testID, testValue, testKey)) {
 			double[] values = new double[1];
 			double d = svm.svm_predict_values(svmModel, testFeatures[index], values);
 
@@ -525,90 +531,4 @@ public class SVMRandomCalc {
 		_svmModelsCache.remove(id);
 		_svmModelsCacheLock.unlock();
 	}
-
-	/**
-	 * Test every combination against every other combination
-	 */
-	public static StringBuilder runAllTestSVM(GenericPoint<String> valueType) {
-		StringBuilder output = new StringBuilder();
-
-		for (Integer keyID : DaemonService.allHistogramsMap.keySet()) {
-			for (Integer keyIDInner : DaemonService.allHistogramsMap.keySet()) {
-				if (!DaemonService.allHistogramsMap.get(keyID).containsKey(valueType) ||
-						!DaemonService.allHistogramsMap.get(keyIDInner).containsKey(valueType)) {
-					continue;
-				}
-				for (GenericPoint<String> key : DaemonService.allHistogramsMap.get(keyID).get(valueType).keySet()) {
-					for (GenericPoint<String> keyInner : DaemonService.allHistogramsMap.get(keyIDInner).get(valueType).keySet()) {
-						// A MultiValueMap is a HashMap where the value is an Collection of values (to handle duplicate keys)
-						MultiValueMap resultsHash = new MultiValueMap();
-
-						output.append("Highest 5 scores for ID " + keyID + " : <" + key.toString() + "> vs ID " + keyIDInner + " : <" + keyInner.toString() + ">\n");
-						runOneTestSVM(keyID, key, valueType, keyIDInner, keyInner, valueType, null, null, null, resultsHash, AnomalyDetectionConfiguration.SVM_D);
-
-						List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
-						Collections.sort(resultsHashList); // ascending order
-						Collections.reverse(resultsHashList); //descending order
-						int ii = 0;
-						for (Double score : resultsHashList) {
-							//if (ii == 0 && score == 0.0) {
-							//	output.append("[All scores are zero. Not printing]\n");
-							//	break;
-							//}
-							if (ii >= 5) {
-								break;
-							}
-							for (Pair<Integer, GenericPoint<Integer>> onePoint : ((Collection<Pair<Integer, GenericPoint<Integer>>>)resultsHash.getCollection(score))) {
-								Integer timestamp = onePoint.getValue0();
-								output.append(score + " at time " + timestamp + "( " + ((Collection<Pair<Integer, GenericPoint<Integer>>>)resultsHash.getCollection(score)).size() + " with this score)\n");
-								break;
-							}
-							ii++;
-						}
-					}
-				}
-			}
-		}
-		return output;
-	}
-//	/**
-//	 * Test every combination against every other combination
-//	 */
-//	public static StringBuilder runAllTestSVM() {
-//		StringBuilder output = new StringBuilder();
-//
-//		for (Integer keyID : DaemonService.allHistogramsMap.keySet()) {
-//			for (Integer keyIDInner : DaemonService.allHistogramsMap.keySet()) {
-//				for (GenericPoint<String> key : DaemonService.allHistogramsMap.get(keyID).keySet()) {
-//					for (GenericPoint<String> keyInner : DaemonService.allHistogramsMap.get(keyIDInner).keySet()) {
-//						// A MultiValueMap is a HashMap where the value is an Collection of values (to handle duplicate keys)
-//						MultiValueMap resultsHash = new MultiValueMap();
-//
-//						output.append("Highest 5 scores for ID " + keyID + " : <" + key.toString() + "> vs ID " + keyIDInner + " : <" + keyInner.toString() + ">\n");
-//						runOneTestSVM(keyID, key, keyIDInner, keyInner, resultsHash);
-//
-//						List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
-//						Collections.sort(resultsHashList); // ascending order
-//						Collections.reverse(resultsHashList); //descending order
-//						int ii = 0;
-//						for (Double score : resultsHashList) {
-//							//if (ii == 0 && score == 0.0) {
-//							//	output.append("[All scores are zero. Not printing]\n");
-//							//	break;
-//							//}
-//							if (ii >= 5) {
-//								break;
-//							}
-//							for (Integer timestamp : ((Collection<Integer>)resultsHash.getCollection(score))) {
-//								output.append(score + " at time " + timestamp + "( " + ((Collection<Integer>)resultsHash.getCollection(score)).size() + " with this score)\n");
-//								break;
-//							}
-//							ii++;
-//						}
-//					}
-//				}
-//			}
-//		}
-//		return output;
-//	}
 }

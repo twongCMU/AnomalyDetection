@@ -37,84 +37,35 @@ public class KDTreeCalc {
     }
 
    /**
-     * @param trainID ID of the model to use to train on
-     * @param trainKey Key index for the training set histograms
-     * @param testID ID of the model to use to test on
-     * @param testKey Key index for the test set histograms
-     * @param results If not null, every result will be recorded here as score->timestamp. We use a MultiValueMap so duplicate scores will still be recorded
-     */
-    public static String runOneTestKDTree(Integer trainID, GenericPoint<String> trainKey, GenericPoint<String> trainValue, Integer testID, GenericPoint<String> testKey, GenericPoint<String> testValue, MultiValueMap results) {
+    * @param histogramData Object containing the histograms
+    * @param trainID ID of the model to use to train on
+    * @param trainKey Key index for the training set histograms
+    * @param testID ID of the model to use to test on
+    * @param testKey Key index for the test set histograms
+    * @param results If not null, every result will be recorded here as score->timestamp. We use a MultiValueMap so duplicate scores will still be recorded
+    */
+    public static String runOneTestKDTree(HistogramStore histogramData, Integer trainID, GenericPoint<String> trainKey, GenericPoint<String> trainValue, Integer testID, GenericPoint<String> testKey, GenericPoint<String> testValue, MultiValueMap results) {
 	NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer> neighbor = new NearestNeighbors<Integer, GenericPoint<Integer>, java.lang.Integer>();
 
 	String output = new String();
 
-	HistoTuple.upgradeWindowsDimensions(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), null);
+	HistoTuple.upgradeWindowsDimensions(trainValue, histogramData.getHistograms(trainID, trainValue, trainKey), histogramData.getHistograms(testID, testValue, testKey), null);
 
-	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(trainValue, DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1());
+	KDTree<Integer, GenericPoint<Integer>, java.lang.Integer> trainTree = KDTreeCalc.GetKDTree(trainValue, histogramData.getHistograms(trainID, trainValue, trainKey));
 
 	// The GenericPoints are often duplicated so we could add a cache here but I'm not sure if performace would improve by that much. KDTrees are already log time
-	for (Pair<Integer, GenericPoint<Integer>> tempPair : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1()) {
+	for (Pair<Integer, GenericPoint<Integer>> tempPair : histogramData.getHistograms(testID, testValue, testKey)) {
 	    Integer histogramTime = (Integer)tempPair.getValue(0);
-	    GenericPoint<Integer> histogramData = (GenericPoint<Integer>)tempPair.getValue(1);
+	    GenericPoint<Integer> histogramValue = (GenericPoint<Integer>)tempPair.getValue(1);
 
-	    NearestNeighbors.Entry<Integer, GenericPoint<Integer>, java.lang.Integer>[] vals = neighbor.get(trainTree, histogramData, 1, false);
+	    NearestNeighbors.Entry<Integer, GenericPoint<Integer>, java.lang.Integer>[] vals = neighbor.get(trainTree, histogramValue, 1, false);
 
 	    if (results != null) {
 		results.put(vals[0].getDistance(), histogramTime);
 	    }
-	    output += "time " + histogramTime + " distance for " + histogramData.toString() + " is " + vals[0].getDistance() + "\n";
+	    output += "time " + histogramTime + " distance for " + histogramValue.toString() + " is " + vals[0].getDistance() + "\n";
 	}
 
-	return output;
-    }
-
-    /**
-     * Test every combination against every other combinatino
-     */
-    public static StringBuilder runAllTestKDTree(GenericPoint<String> valueType) {
-	StringBuilder output = new StringBuilder();
-
-	for (Integer keyID : DaemonService.allHistogramsMap.keySet()) {
-	    for (Integer keyIDInner : DaemonService.allHistogramsMap.keySet()) {
-		if (!DaemonService.allHistogramsMap.get(keyID).containsKey(valueType) ||
-		    !DaemonService.allHistogramsMap.get(keyIDInner).containsKey(valueType)) {
-		    continue;
-		}
-		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMap = KDTreeCalc.makeKDTree(valueType, DaemonService.allHistogramsMap.get(keyID).get(valueType), null);
-		HashMap<GenericPoint<String>,KDTree<Integer, GenericPoint<Integer>, java.lang.Integer>> newMapInner = KDTreeCalc.makeKDTree(valueType, DaemonService.allHistogramsMap.get(keyIDInner).get(valueType), null);
-
-		// iterate through all combinations of <IP, App names>
-		for (GenericPoint<String> key : newMap.keySet()) {
-		    for (GenericPoint<String> keyInner : newMapInner.keySet()) {
-			// track Score -> timestamp
-			// A MultiValueMap is a HashMap where the value is an Collection of values (to handle duplicate keys)
-			MultiValueMap resultsHash = new MultiValueMap();
-
-			output.append("Highest 3 scores for ID " + keyID + " : <" + key.toString() + "> vs ID " + keyIDInner + " : <" + keyInner.toString() + ">\n");
-			// intentionally ignore the return string since we're generating our own display info later
-			KDTreeCalc.runOneTestKDTree(keyID, key, valueType, keyIDInner, keyInner, valueType, resultsHash);
-
-			List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
-			Collections.sort(resultsHashList);
-			Collections.reverse(resultsHashList);
-			int ii = 0;
-			for (Double score : resultsHashList) {
-			    if (ii == 0 && score == 0.0) {
-				output.append("[All scores are zero. Not printing]\n");
-				break;
-			    }
-			    if (ii >= 3) {
-				break;
-			    }
-			    for (Integer timestamp : ((Collection<Integer>)resultsHash.getCollection(score))) {
-				output.append(score + " at time " + timestamp + "\n");
-			    }
-			    ii++;
-			}
-		    }
-		}
-	    }
-	}
 	return output;
     }
 }
