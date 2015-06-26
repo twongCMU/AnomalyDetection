@@ -2,7 +2,6 @@ package org.autonlab.anomalydetection;
 
 import com.savarese.spatial.*;
 import java.util.*;
-import java.util.concurrent.locks.*;
 import libsvm.*;
 import org.apache.commons.collections.map.*;
 import org.javatuples.*; //Tuples, Pair
@@ -17,9 +16,6 @@ public class SVMCalc {
      // cache of processed models. This is shared across concurrent accesses so we need to protect it with a lock
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, svm_model>>> _svmModelsCache = new HashMap();
 
-    // XYZ I don't think we need this lock. The cache is only accessed when we're running a test and we have to lock the histograms already
-    static volatile ReentrantLock _svmModelsCacheLock = new ReentrantLock();
-  
     private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
 	TreeMap<Double, Double> nuValues = new TreeMap();
 	System.out.println("YYY -------------------------");
@@ -249,7 +245,6 @@ public class SVMCalc {
 	}
 	boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, histogramData.getHistograms(trainID, trainValue, trainKey), histogramData.getHistograms(testID, testValue, testKey), anomalyHistogram);
 
-	_svmModelsCacheLock.lock();
 
 	if (changed) {
 	    _svmModelsCache.remove(trainID);
@@ -259,16 +254,13 @@ public class SVMCalc {
 	if (_svmModelsCache.get(trainID) == null ||
 	    _svmModelsCache.get(trainID).get(trainValue) == null ||
 	    _svmModelsCache.get(trainID).get(trainValue).get(trainKey) == null) {
-	    _svmModelsCacheLock.unlock();
 
-	    // this calculation can take some time so we unlock the cache and we'll recheck before we save it to cache
 	    ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
 	    if (anomalyID != null) {
 		anomalyData = histogramData.getHistograms(anomalyID, anomalyValue, anomalyKey);
 	    }
 	    svmModel = SVMCalc.generateModel(histogramData.getHistograms(trainID, trainValue, trainKey), .9, anomalyData, .9);
 
-	    _svmModelsCacheLock.lock();
 	    if (_svmModelsCache.get(trainID) == null) {
 		_svmModelsCache.put(trainID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, svm_model>>());
 	    }
@@ -284,7 +276,6 @@ public class SVMCalc {
 	    System.out.println("SVM Model cache hit");
 
 	}
-	_svmModelsCacheLock.unlock();
 
 	// test the training set against itself to get a scaling factor
 	double anomalyScale = histogramData.getScalingFactor(trainID, trainValue, trainKey);
@@ -303,7 +294,7 @@ public class SVMCalc {
 
 		// this code returns a lower score for more anomalous so we flip it to match kdtree
 		prediction *= -1;
-		System.out.println("prediction is " + prediction);
+		//		System.out.println("prediction is " + prediction);
 		if (anomalyScale < prediction) {
 		    anomalyScale = prediction;
 		}
@@ -354,8 +345,6 @@ public class SVMCalc {
     }
 
     public static void removeModelFromCache(int id) {
-	_svmModelsCacheLock.lock();
 	_svmModelsCache.remove(id);
-	_svmModelsCacheLock.unlock();
     }
 }

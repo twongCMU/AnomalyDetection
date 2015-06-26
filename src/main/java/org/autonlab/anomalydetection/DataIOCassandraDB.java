@@ -8,36 +8,20 @@ import org.javatuples.*;
 import java.text.DateFormat;
 
 public class DataIOCassandraDB implements DataIO {
-    /*
-     * if open a new session with every call, the code crashes
-     * after 20 or so opens saying that we're out of threads. I don't know why and it
-     * persists even if we close the session and null stuff out. I think it is a bug
-     * in the driver. Having this cache allows us to reuse the sessions and avoid the
-     * crash
-     */
-    private static HashMap<Pair<String,String>, Session> _sessionHash = new HashMap();
-
     private Session _session = null;
     private String _keyspace;
     private String _hostname;
-    private int _counter;
     private ArrayList<String> _categoryFieldsList;
     private ArrayList<String> _valueFieldsList;
+    private Cluster _cluster;
 
     public DataIOCassandraDB(String hostname, String keyspace) {
-	_session = _sessionHash.get(new Pair<String, String>(hostname, keyspace));
-	if (_session == null) {
-	    Cluster cluster = Cluster.builder().addContactPoint(hostname).build();
-	    _session = cluster.connect();
-	    _sessionHash.put(new Pair<String, String>(hostname, keyspace), _session);
-	}
-	else {
-	    System.out.println("Session cache hit");
-	}
+	_cluster = Cluster.builder().addContactPoint(hostname).build();
+	_session = _cluster.connect();
 
 	_keyspace = keyspace;
 	_hostname = hostname;
-	_counter = 0;
+
 	_categoryFieldsList = new ArrayList<String>();
 	_categoryFieldsList.add("source_addr");
 	_categoryFieldsList.add("text_values.endpoint");
@@ -200,7 +184,6 @@ public class DataIOCassandraDB implements DataIO {
 		category.setCoord(ii, categoryString);
 		ii++;
 	    }
-	   
 	    if (!_valueFieldsList.get(0).equals("time_stamp")) {
 		throw new RuntimeException("First value field was not time_stamp");
 	    }
@@ -233,6 +216,7 @@ public class DataIOCassandraDB implements DataIO {
 		// When we get to the point where we can customize the values we save, we might need to overwrite this cached value
 		ii++;
 	    }
+
 	    value = value.substring(0, value.length() - 1); // to drop the trailing comma appended above
 
 	    if (!trainMap.containsKey(valueNamePoint)) {
@@ -241,11 +225,15 @@ public class DataIOCassandraDB implements DataIO {
 	    if (!trainMap.get(valueNamePoint).containsKey(category)) {
 		trainMap.get(valueNamePoint).put(category, new ArrayList<HistoTuple>());
 	    }
-	    trainMap.get(valueNamePoint).get(category).add(new HistoTuple(dateSecs, value, valueNamePoint));
+	    HistoTuple newTuple = new HistoTuple(dateSecs, value, valueNamePoint);
+
+	    trainMap.get(valueNamePoint).get(category).add(newTuple);
+
 	    rowCount++;
 	    if ((rowCount % 1000) == 0) {
 		System.out.println("Read in " + rowCount + " rows");
 	    }
+
 	}
 	results = null;
 
@@ -264,8 +252,8 @@ public class DataIOCassandraDB implements DataIO {
     }
 
     public void close() {
-	_sessionHash.remove(new Pair<String, String>(_hostname, _keyspace));
 	_session.close();
+	_cluster.close();
 	_session = null;
     }
 }

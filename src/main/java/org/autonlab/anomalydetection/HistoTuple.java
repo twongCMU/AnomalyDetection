@@ -1,7 +1,6 @@
 package org.autonlab.anomalydetection;
 
 import java.util.*;
-import java.util.concurrent.locks.*;
 import org.javatuples.*;
 import com.savarese.spatial.*;
 
@@ -16,7 +15,6 @@ public class HistoTuple {
      */
     static volatile HashMap<GenericPoint<String>, HashMap<String, Integer>> _valueMap = new HashMap();
 
-    static volatile ReentrantLock _histoTupleDataLock = new ReentrantLock(); //this protects all above static data
     /*
      * we use the volatile keyword for the above static values because each REST daemon call
      * starts a new thread 
@@ -42,8 +40,6 @@ public class HistoTuple {
 	_msgIndex = -1;
 	_wasCounted = false; 
 
-	_histoTupleDataLock.lock();
-
 	if (!_valueMap.containsKey(valueType)) {
 	    _valueMap.put(valueType, new HashMap());
 	}
@@ -55,7 +51,6 @@ public class HistoTuple {
 	    _msgIndex = _valueMap.get(valueType).size() - 1; // -1 because _valueMap.size() increased in the previous line
 	}
 
-	_histoTupleDataLock.unlock();
     }
 
      /**
@@ -92,9 +87,7 @@ public class HistoTuple {
      * @return the number of unique value seen
      */
     public static int getDimensions(GenericPoint<String> valueType) {
-	_histoTupleDataLock.lock();
 	int size = _valueMap.get(valueType).size();
-	_histoTupleDataLock.lock();
 	return size;
     }
 
@@ -104,13 +97,11 @@ public class HistoTuple {
     public static String getDimensionNames() {
 	String output = new String();
 
-	_histoTupleDataLock.lock();
 	for (GenericPoint<String> valueType : _valueMap.keySet()) {
 	    for (String keyVal : _valueMap.get(valueType).keySet()) {
 		output += valueType + " : " +  _valueMap.get(valueType).get(keyVal) + " " + keyVal + "\n";
 	    }
 	}
-	_histoTupleDataLock.unlock();
 
 	return output;
     }
@@ -129,9 +120,6 @@ public class HistoTuple {
 
 	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> ret = new HashMap();
 
-	// if a different REST thread is also loading data we don't want to have the dimensions change while we're using or changing it
-	// if there are performance problems with holding a lock this long it might be ok to do it inside the outer for loop
-	_histoTupleDataLock.lock();
 
 	for (GenericPoint<String> valueName : listMap.keySet()) {
 
@@ -167,7 +155,6 @@ public class HistoTuple {
 
 		// this check also allows us to safely do list.get(0) later on
 		if (list.size() == 0) {
-		    _histoTupleDataLock.unlock();
 		    throw new RuntimeException("Got no tuples from arraylist");
 		}
 
@@ -230,7 +217,6 @@ public class HistoTuple {
 		    }
 
 		    if (tailIndex > headIndex) {
-			_histoTupleDataLock.unlock();
 			throw new RuntimeException("tailIndex (" + tailIndex + ") is higher than headIndex (" + headIndex + ")");
 		    }
 
@@ -264,8 +250,6 @@ public class HistoTuple {
 	    }
 	}
 
-	_histoTupleDataLock.unlock();
-
 	return ret;
     }
 
@@ -274,13 +258,11 @@ public class HistoTuple {
 	boolean retB = false;
 	boolean retC = false;
 
-	_histoTupleDataLock.lock();	
 	retA = upgradeWindowsDimensionsOne(valueType, histogramA);
 	retB = upgradeWindowsDimensionsOne(valueType, histogramB);
 	if (histogramC != null) {
 	    retC = upgradeWindowsDimensionsOne(valueType, histogramC);
 	}
-	_histoTupleDataLock.unlock();
 
 	if (retA == true || retB == true || retC == true) {
 	    return true;
@@ -290,17 +272,13 @@ public class HistoTuple {
 
 
     /**
-     * Caller must hold _histoTupleDataLock
      */
     private static boolean upgradeWindowsDimensionsOne(GenericPoint<String> valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
 
-	if (_histoTupleDataLock.isHeldByCurrentThread() == false) {
-	    throw new RuntimeException("upgradeWindowsDimensionsOne called without lock being held");
-	}
 	if (histogram.size() == 0) {
 	    return false;
 	}
-	System.out.println(_valueMap.size() + " XYZ " + histogram.size());
+
 	if (histogram.get(0).getValue1().getDimensions() == _valueMap.get(valueType).size()) {
 	    return false;
 	}
