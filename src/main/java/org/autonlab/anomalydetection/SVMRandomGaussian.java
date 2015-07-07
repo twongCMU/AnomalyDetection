@@ -154,25 +154,14 @@ public class SVMRandomGaussian implements Runnable {
 					_retNodeLock.unlock();
 					continue;
 				}
-//				else {
-//					_retNode[index] = new svm_node[_D];
-//				}
 
 			}
 			_retNodeLock.unlock();
 
-			if (index >= _histograms.size()) 
+			if (index >= _histograms.size())
 				break;
+			
 			_retNode[index] = _gff.computeGaussianFourierFeatures_SVM(oneHist);
-
-//			double[] f = _gff.computeGaussianFourierFeatures(oneHist);
-//			_retNode[index] = new svm_node[_D];
-//			for (int j = 0; j < _D; j++) {
-//				_retNode[index][j] = new svm_node();
-//				_retNode[index][j].index = j+1;
-//				_retNode[index][j].value = f[j];
-//			}
-
 
 			index++;
 		}

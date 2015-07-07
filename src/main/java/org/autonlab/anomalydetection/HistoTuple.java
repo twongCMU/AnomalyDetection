@@ -300,8 +300,6 @@ public class HistoTuple {
 	if (histogram.size() == 0) {
 	    return false;
 	}
-	System.out.println(_valueMap.size() + " XYZ " + histogram.size());
-	System.out.println(_valueMap.get(valueType).size());
 	if (histogram.get(0).getValue1().getDimensions() == _valueMap.get(valueType).size()) {
 	    return false;
 	}

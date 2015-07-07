@@ -48,7 +48,7 @@ public class SVMRandomCalc {
 			GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy, int rn) {
 
 		// For quiet SVM
-		//svm.svm_set_print_string_function(new QuietPrint());
+		svm.svm_set_print_string_function(new QuietPrint());
 
 		TreeMap<Double, Double> nuValues = new TreeMap<Double,Double>();
 		System.out.println("YYY -------------------------");
@@ -99,36 +99,34 @@ public class SVMRandomCalc {
 		svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
 		svmParameter.gamma = AnomalyDetectionConfiguration.SVM_GAMMA;
 		
-		// TODO: Need to fix allCrossValidate for only one single SVM for both normal and anomaly. 
-		// the library uses kfold
-		//svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, null, null, targetAnomalyAccuracy);
-		//		if (svmParameter.nu == -1) {
-		//			throw new RuntimeException("nu was not set");
-		//		}
-		//		System.out.println("YYY picked a nu of " + svmParameter.nu);
-		//
-		//		// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
-		//		// or somehow have so small a nu that it stops being relevant
-		//		int expandTimes = 0;
-		//		while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
-		//			System.out.println("YYY expanding");
-		//			for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
-		//				for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
-		//					nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
-		//				}
-		//			}
-		//
-		//			// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
-		//			// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
-		//			// problem we can do something smarter
-		//			nuValues.put(svmParameter.nu, -1.0);
-		//
-		//			AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
-		//			svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
-		//			expandTimes++;
-		//		}
+		svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, null, null, targetAnomalyAccuracy);
+				if (svmParameter.nu == -1) {
+					throw new RuntimeException("nu was not set");
+				}
+				System.out.println("YYY picked a nu of " + svmParameter.nu);
+		
+				// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
+				// or somehow have so small a nu that it stops being relevant
+				int expandTimes = 0;
+				while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
+					System.out.println("YYY expanding");
+					for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
+						for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
+							nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
+						}
+					}
+		
+					// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
+					// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
+					// problem we can do something smarter
+					nuValues.put(svmParameter.nu, -1.0);
+		
+					AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
+					svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
+					expandTimes++;
+				}
 
-		svmParameter.nu = 0.1;
+//		svmParameter.nu = 0.1;
 		System.out.println("YYY selected nu of " + svmParameter.nu);
 		Pair <GaussianRandomFeatures, svm_model> gffSVMPair = new Pair<GaussianRandomFeatures, svm_model> (grf, svm.svm_train(svmProblem, svmParameter));
 		return gffSVMPair;
@@ -193,32 +191,32 @@ public class SVMRandomCalc {
 		
 		// TODO: Need to fix allCrossValidate for only one single SVM for both normal and anomaly. 
 		// the library uses kfold
-		//svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, null, null, targetAnomalyAccuracy);
-		//		if (svmParameter.nu == -1) {
-		//			throw new RuntimeException("nu was not set");
-		//		}
-		//		System.out.println("YYY picked a nu of " + svmParameter.nu);
-		//
-		//		// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
-		//		// or somehow have so small a nu that it stops being relevant
-		//		int expandTimes = 0;
-		//		while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
-		//			System.out.println("YYY expanding");
-		//			for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
-		//				for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
-		//					nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
-		//				}
-		//			}
-		//
-		//			// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
-		//			// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
-		//			// problem we can do something smarter
-		//			nuValues.put(svmParameter.nu, -1.0);
-		//
-		//			AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
-		//			svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
-		//			expandTimes++;
-		//		}
+//		svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, null, null, targetAnomalyAccuracy);
+//				if (svmParameter.nu == -1) {
+//					throw new RuntimeException("nu was not set");
+//				}
+//				System.out.println("YYY picked a nu of " + svmParameter.nu);
+//		
+//				// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
+//				// or somehow have so small a nu that it stops being relevant
+//				int expandTimes = 0;
+//				while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
+//					System.out.println("YYY expanding");
+//					for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
+//						for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
+//							nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
+//						}
+//					}
+//		
+//					// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
+//					// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
+//					// problem we can do something smarter
+//					nuValues.put(svmParameter.nu, -1.0);
+//		
+//					AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
+//					svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
+//					expandTimes++;
+//				}
 
 		svmParameter.nu = 0.1;
 
@@ -464,7 +462,7 @@ public class SVMRandomCalc {
 			}
 			// this can happen if the data is very simliar or there isn't a lot of it.  all of the results end up as "Infinity"
 			if (anomalyScale <= 1e-3) {
-				System.out.println("Calculated scaling factor of " + anomalyScale);
+				System.out.println("Calculated scaling factor of " + anomalyScale + " too small. Changing to 1.0.");
 				anomalyScale = 1.0;
 			}
 			// the documentation for Pair doesn't say this but for some reason setAt0 doesn't overwrite the value, it returns a copy of the Pair with the new value
@@ -482,121 +480,23 @@ public class SVMRandomCalc {
 		SVMRandomGaussian GFSTest = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1(), rn, grf, AnomalyDetectionConfiguration.NUM_THREADS);
 		svm_node[][] testFeatures = GFSTest.getData(); 
 		int index = 0;
-		//		System.out.println("QUICK TESTS: -------------------");
-		//		
-		//		GenericPoint<Integer> p1 = DaemonService.allHistogramsMap.get(testID).get(testKey).get(2).getValue1();
-		//		GenericPoint<Integer> p2 = DaemonService.allHistogramsMap.get(testID).get(testKey).get(15).getValue1();
-		//
-		//		System.out.println("RBF Kernel: " +gff.gaussianKernel(p1, p2));
-		//		System.out.println("Linear Kernel: " + gff.linearKernel(gff.computeGaussianFourierFeatures(p1), gff.computeGaussianFourierFeatures(p2)));
-//		ArrayList<Pair<Integer, GenericPoint<Integer>>> ahists = DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1();
-//		ArrayList<Pair<Integer, GenericPoint<Integer>>> bhists = DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1();
-//		// bhists = ahists;
-//		
-//		output.append("\n\nLinear Random Kernel\n");
-//		double [] lkernel = new double[ahists.size()]; 
-//		for (int i = 0; i < ahists.size(); ++i) {
-//			for (int j = 0; j < bhists.size(); ++j) {
-//				lkernel[i] = GaussianRandomFeatures.linearKernel(grf.computeGaussianFourierFeatures(ahists.get(i).getValue1()),
-//												grf.computeGaussianFourierFeatures(bhists.get(j).getValue1()));
-//				output.append(String.format("%.5f", lkernel[i]) + ' ');
-//			}
-//			output.append('\n');
-//		}
-//		output.append("\n\nRBF Kernel\n");
-//		double [] rkernel = new double[ahists.size()]; 
-//		for (int i = 0; i < ahists.size(); ++i) {
-//			for (int j = 0; j < bhists.size(); ++j) {
-//				rkernel[i] = grf.gaussianKernel(ahists.get(i).getValue1(), bhists.get(j).getValue1());
-//				output.append(String.format("%.5f", rkernel[i]) + ' ');
-//			}
-//			output.append('\n');
-//		}
-//			
-//		output.append("\n\n");
 
-				//              getFak
-		//		System.out.println("--------------------------------");
-		//		System.out.println("--------------------------------");		
-//		int drfe3im = bhists.get(0).getValue1().getDimensions();
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1()) {
 			double[] values = new double[1];
 			double d = svm.svm_predict_values(svmModel, testFeatures[index], values);
-//			svm_node[] bnode = grf.computeGaussianFourierFeatures_SVM(onePoint.getValue1());
-//			double[] bnode = grf.computeGaussianFourierFeatures(onePoint.getValue1());
-//			svm_node[] bnode_svm = new svm_node[bnode.length];
-//			for (int k = 0; k < bnode_svm.length; ++k) {
-//				bnode_svm[k] = new svm_node();
-//				bnode_svm[k].index = k+1;
-//				bnode_svm[k].value = bnode[k];
-//			}
-//
-//			double d = svm.svm_predict_values(svmModel, bnode, values);
 
 			double prediction = values[0];
 
 			// this code returns a lower score for more anomalous so we flip it to match kdtree
-			prediction *= -1;
+			prediction *= -1;///anomalyScale;
 
-//			output.append(index + ": score " + String.format("%.3f",prediction) +  " and predicted " + d + " for " + onePoint.getValue1().toString()+ "\n");
+			output.append(index + ": score " + String.format("%.3f",prediction) +  " and predicted " + d + " for " + onePoint.getValue1().toString()+ "\n");
 
 			if (results != null) {
 				results.put(prediction, onePoint);
 			}
 			index++;
 		}
-
-		// output.append("\n\nSVectors\n");
-		// bhists = ahists;
-//		int dim = bhists.get(0).getValue1().getDimensions();
-//		double[][] SV = new double[svmModel.l][svmModel.SV[0].length];
-//		for (int k = 0; k < svmModel.l; ++k) {
-//			for (int l = 0; l < svmModel.SV[k].length; ++l) {
-//				SV[k][l] = svmModel.SV[k][l].value;
-////			 	if (l < 10)
-////			 		output.append(String.format("%.4f",svmModel.SV[k][l].value) + " ");
-//			 }
-////			 output.append('\n');
-//		}
-//		output.append("\n\nSVSVKernel\n");
-//		for (int j = 0; j < svmModel.l; ++j) {
-//			for (int i = 0; i < svmModel.l; ++i) {
-//				double rk = GaussianRandomFeatures.linearKernel(SV[i], SV[j]);
-//				output.append(String.format("%.5f", rk) + ' ');
-//				}
-//			output.append('\n');
-//		}
-//		output.append("\n\nRHO: " + svmModel.rho[0] + "\n");
-//		
-//		output.append("\n\nSV Kernel\n");
-//		for (int i = 0; i < testFeatures.length; ++i) {
-////			for (int j = 0; j < svmModel.l; ++j) {
-//				// Constructing svm_node to pass into 
-////				GenericPoint<Integer> bhist = bhists.get(i).getValue1();
-//				svm_node [] bhist = testFeatures[i]; 
-////				double[] bnode = new double[dim];
-//				double[] bnode = new double[bhist.length];
-//				for (int k = 0; k < bhist.length; ++k)
-//					//bnode[k] = bhist.getCoord(k);
-//					bnode[k] = bhist[k].value;
-//
-//				for (int j = 0; j < svmModel.l; ++j) {
-//	//				double rk = GaussianRandomFeatures.linearKernel(grf.computeGaussianFourierFeatures(bnode), SV[j]);
-//					double rk = GaussianRandomFeatures.linearKernel(bnode, SV[j]);
-//					output.append(String.format("%.5f", rk) + ", ");
-//				}
-//			output.append('\n');
-//		}
-//		output.append('\n' + testFeatures[0].length + '\n');
-//
-//		output.append("\n\nSV Coeffs\n");
-//		for (int i = 0; i < svmModel.l; ++i)
-//			output.append(String.format("%.5f", svmModel.sv_coef[0][i]) + ", ");
-//		output.append("\n");
-//		output.append("\nSV Indices\n");
-//				for (int i = 0; i < svmModel.l; ++i)
-//			output.append(svmModel.sv_indices[i]+ " ");
-//		output.append("\n\n");
 
 		return output;
 	}

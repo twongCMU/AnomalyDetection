@@ -20,8 +20,8 @@ public class SVMCalc {
 
 	private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
 	
-	// // For quiet SVM
-	// svm.svm_set_print_string_function(new QuietPrint());
+	 // For quiet SVM
+	 svm.svm_set_print_string_function(new QuietPrint());
 
 	TreeMap<Double, Double> nuValues = new TreeMap();
 	System.out.println("YYY -------------------------");
@@ -325,7 +325,7 @@ public class SVMCalc {
 
 		// this can happen if the data is very simliar or there isn't a lot of it.  all of the results end up as "Infinity"
 		if (anomalyScale <= 1e-3) {
-			System.out.println("Calculated scaling factor of " + anomalyScale);
+			System.out.println("Calculated scaling factor of " + anomalyScale + " too small. Changing to 1.0.");
 			anomalyScale = 1.0;
 		}
 		// the documentation for Pair doesn't say this but for some reason setAt0 doesn't overwrite the value, it returns a copy of the Pair with the new value
@@ -335,55 +335,6 @@ public class SVMCalc {
 	else {
 		System.out.println("Using cached scaling factor of " + anomalyScale);
 	}
-
-////	// output.append("\n\nSVectors\n");
-//	ArrayList<Pair<Integer, GenericPoint<Integer>>> bhists = DaemonService.allHistogramsMap.get(testID).get(testValue).get(testKey).getValue1();
-//	int dim = bhists.get(0).getValue1().getDimensions();
-//	double[][] SV = new double[svmModel.l][dim];
-//	for (int k = 0; k < svmModel.l; ++k) {
-//		for (int l = 0; l < dim; ++l) {
-//			SV[k][l] = svmModel.SV[k][l].value;
-////			 if (l < 10)
-////				 output.append(String.format("%.0f",svmModel.SV[k][l].value) + " ");
-//	 	}
-////	s 	output.append('\n');
-//	 }
-//	
-//	output.append("\n\nRHO: " + svmModel.rho[0] + "\n");
-//	
-//	output.append("\n\nSV Kernel\n");
-//	for (int i = 0; i < bhists.size(); ++i) {
-////		for (int j = 0; j < svmModel.l; ++j) {
-//
-//		// Constructing svm_node to pass into 
-//		GenericPoint<Integer> bhist = bhists.get(i).getValue1();
-//		double[] bnode = new double[dim];
-//		for (int k = 0; k < dim; ++k)
-//			bnode[k] = bhist.getCoord(k);
-//
-//		 for (int j = 0; j < svmModel.l; ++j) {
-//			double rk = GaussianRandomFeatures.gaussianKernel(bnode, SV[j], AnomalyDetectionConfiguration.SVM_GAMMA);
-//			output.append(String.format("%.5f", rk) + ", ");
-//		}
-//		output.append('\n');
-//	}
-////	output.append("\n\nSVSVKernel\n");
-////	for (int j = 0; j < svmModel.l; ++j) {
-////		for (int i = 0; i < svmModel.l; ++i) {
-////			double rk = GaussianRandomFeatures.gaussianKernel(SV[i], SV[j], AnomalyDetectionConfiguration.SVM_GAMMA);
-////			output.append(String.format("%.5f", rk) + ' ');
-////			}
-////		output.append('\n');
-////	}
-////
-//	output.append("\n\nSV Coeffs\n");
-//	for (int i = 0; i < svmModel.l; ++i)
-//		output.append(String.format("%.5f", svmModel.sv_coef[0][i]) + ", ");
-//	output.append("\n\n");
-//	output.append("\nSV Indices\n");
-//			for (int i = 0; i < svmModel.l; ++i)
-//		output.append(svmModel.sv_indices[i] + " ");
-//	output.append("\n\n");
 
 	// If we're running many instances of similar test data against the same training data
 	// we might want to implement a cache that's per-training set and save it externally
@@ -400,10 +351,9 @@ public class SVMCalc {
 		double prediction = values[0];
 
 		// this code returns a lower score for more anomalous so we flip it to match kdtree
-		prediction *= -1;
+		prediction *= -1;//anomalyScale;
 
-		//prediction /= anomalyScale;
-//		output.append(index + ": score " + String.format("%.3f",prediction) + " and predicted " + d + " for " + onePoint.getValue1().toString() + "\n");
+		output.append(index + ": score " + String.format("%.3f",prediction) + " and predicted " + d + " for " + onePoint.getValue1().toString() + "\n");
 
 		if (results != null) {
 		results.put(prediction, onePoint);
