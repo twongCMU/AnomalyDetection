@@ -87,7 +87,7 @@ public class SVMCalc {
 		expandTimes++;
 	}
 
-	svmParameter.nu = 0.1;
+//	svmParameter.nu = 0.1;
 	System.out.println("YYY selected nu of " + svmParameter.nu);
 	return svm.svm_train(svmProblem, svmParameter);
 	}
@@ -302,7 +302,7 @@ public class SVMCalc {
 
 	// test the training set against itself to get a scaling factor
 	double anomalyScale = DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue0();
-	if (anomalyScale <= 1e-3) {
+	if (true) {
 		SVMKernel svmKernel = new SVMKernel(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
 		svm_node[][] bar = svmKernel.getData();
 
@@ -324,7 +324,7 @@ public class SVMCalc {
 		}
 
 		// this can happen if the data is very simliar or there isn't a lot of it.  all of the results end up as "Infinity"
-		if (anomalyScale <= 1e-3) {
+		if (anomalyScale <= 1e-5) {
 			System.out.println("Calculated scaling factor of " + anomalyScale + " too small. Changing to 1.0.");
 			anomalyScale = 1.0;
 		}
@@ -351,7 +351,7 @@ public class SVMCalc {
 		double prediction = values[0];
 
 		// this code returns a lower score for more anomalous so we flip it to match kdtree
-		prediction *= -1;//anomalyScale;
+		prediction *= -1/anomalyScale;
 
 		output.append(index + ": score " + String.format("%.3f",prediction) + " and predicted " + d + " for " + onePoint.getValue1().toString() + "\n");
 

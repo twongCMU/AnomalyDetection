@@ -100,31 +100,31 @@ public class SVMRandomCalc {
 		svmParameter.gamma = AnomalyDetectionConfiguration.SVM_GAMMA;
 		
 		svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, null, null, targetAnomalyAccuracy);
-				if (svmParameter.nu == -1) {
-					throw new RuntimeException("nu was not set");
+		if (svmParameter.nu == -1) {
+			throw new RuntimeException("nu was not set");
+		}
+		System.out.println("YYY picked a nu of " + svmParameter.nu);
+
+		// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
+		// or somehow have so small a nu that it stops being relevant
+		int expandTimes = 0;
+		while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
+			System.out.println("YYY expanding");
+			for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
+				for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
+					nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
 				}
-				System.out.println("YYY picked a nu of " + svmParameter.nu);
-		
-				// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
-				// or somehow have so small a nu that it stops being relevant
-				int expandTimes = 0;
-				while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
-					System.out.println("YYY expanding");
-					for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
-						for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
-							nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
-						}
-					}
-		
-					// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
-					// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
-					// problem we can do something smarter
-					nuValues.put(svmParameter.nu, -1.0);
-		
-					AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
-					svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
-					expandTimes++;
-				}
+			}
+
+			// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
+			// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
+			// problem we can do something smarter
+			nuValues.put(svmParameter.nu, -1.0);
+
+			AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
+			svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
+			expandTimes++;
+		}
 
 //		svmParameter.nu = 0.1;
 		System.out.println("YYY selected nu of " + svmParameter.nu);
@@ -440,7 +440,8 @@ public class SVMRandomCalc {
 		if (rn <= 0) rn = AnomalyDetectionConfiguration.SVM_D;
 		// test the training set against itself to get a scaling factor
 		double anomalyScale = DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue0();
-		if (anomalyScale <= 1e-3) {
+//		if (anomalyScale <= 1e-3) {
+		if (true) {
 			SVMRandomGaussian svmSRG = new SVMRandomGaussian(DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue1(), rn, grf, AnomalyDetectionConfiguration.NUM_THREADS);
 			svm_node[][] bar = svmSRG.getData();
 
@@ -461,7 +462,7 @@ public class SVMRandomCalc {
 				index++;
 			}
 			// this can happen if the data is very simliar or there isn't a lot of it.  all of the results end up as "Infinity"
-			if (anomalyScale <= 1e-3) {
+			if (anomalyScale <= 1e-5) {
 				System.out.println("Calculated scaling factor of " + anomalyScale + " too small. Changing to 1.0.");
 				anomalyScale = 1.0;
 			}
@@ -488,7 +489,7 @@ public class SVMRandomCalc {
 			double prediction = values[0];
 
 			// this code returns a lower score for more anomalous so we flip it to match kdtree
-			prediction *= -1;///anomalyScale;
+			prediction *= -1/anomalyScale;
 
 			output.append(index + ": score " + String.format("%.3f",prediction) +  " and predicted " + d + " for " + onePoint.getValue1().toString()+ "\n");
 
