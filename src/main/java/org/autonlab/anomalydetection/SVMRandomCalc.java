@@ -126,7 +126,7 @@ public class SVMRandomCalc {
 			expandTimes++;
 		}
 
-//		svmParameter.nu = 0.1;
+		svmParameter.nu = 0.1;
 		System.out.println("YYY selected nu of " + svmParameter.nu);
 		Pair <GaussianRandomFeatures, svm_model> gffSVMPair = new Pair<GaussianRandomFeatures, svm_model> (grf, svm.svm_train(svmProblem, svmParameter));
 		return gffSVMPair;
@@ -462,7 +462,7 @@ public class SVMRandomCalc {
 				index++;
 			}
 			// this can happen if the data is very simliar or there isn't a lot of it.  all of the results end up as "Infinity"
-			if (anomalyScale <= 1e-5) {
+			if (anomalyScale <= 1e-3) {
 				System.out.println("Calculated scaling factor of " + anomalyScale + " too small. Changing to 1.0.");
 				anomalyScale = 1.0;
 			}
