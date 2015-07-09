@@ -137,7 +137,6 @@ public class SVMRandomGaussian implements Runnable {
 		 */
 		while (index < _histograms.size()) {
 			GenericPoint<Integer> oneHist = null;
-
 			// look for the first unprocessed output row or decide that we're done
 			_retNodeLock.lock();
 			while (index < _histograms.size() && _retNode[index] != null)
@@ -155,22 +154,14 @@ public class SVMRandomGaussian implements Runnable {
 					_retNodeLock.unlock();
 					continue;
 				}
-				else {
-					_retNode[index] = new svm_node[_D];
-				}
 
 			}
 			_retNodeLock.unlock();
 
-			if (index >= _histograms.size()) 
+			if (index >= _histograms.size())
 				break;
-
-			double[] f = _gff.computeGaussianFourierFeatures(oneHist);
-			for (int j = 0; j < _D; j++) {
-				_retNode[index][j] = new svm_node();
-				_retNode[index][j].index = j+1;
-				_retNode[index][j].value = f[j];
-			}
+			
+			_retNode[index] = _gff.computeGaussianFourierFeatures_SVM(oneHist);
 
 			index++;
 		}

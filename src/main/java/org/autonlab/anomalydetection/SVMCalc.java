@@ -1,13 +1,17 @@
 package org.autonlab.anomalydetection;
 
 import com.savarese.spatial.*;
+
 import java.util.*;
+
 import libsvm.*;
+
 import org.apache.commons.collections.map.*;
 import org.javatuples.*; //Tuples, Pair
 
 /**
  * We use a chi-squared kernel. k(x,y) = 1- (sum[1->n, (xi-yi)^2 / .5(xi+yi)])
+ * or an RBF kernel. k(x,y) = exp(-gamma*sum[1->n, (xi-yi)^2])
  * See http://crsouza.blogspot.com/2010/03/kernel-functions-for-machine-learning.html
  */
 // MultiValueMap is not thread safe
@@ -47,6 +51,7 @@ public class SVMCalc {
 	svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_KERNEL_TYPE;
 	svmParameter.cache_size = AnomalyDetectionConfiguration.SVM_CACHE_SIZE;
 	svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
+	svmParameter.gamma = AnomalyDetectionConfiguration.SVM_GAMMA;
 	// the library uses kfold
 	svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, targetAnomalyAccuracy);
 	if (svmParameter.nu == -1) {
@@ -113,28 +118,28 @@ public class SVMCalc {
 
 	    int total_correct = 0;
 	    for (int i = 0; i < svmProblem.l; i++) {
-		if (crossValidationResults[i] == svmProblem.y[i]) {
-		    total_correct++;
-		}
+			if (crossValidationResults[i] == svmProblem.y[i]) {
+			    total_correct++;
+			}
 	    }
 
 	    int totalCorrectAnomaly = -1;
 	    if (histogramsAnomaly != null) {
-		svm_model trainModel = svm.svm_train(svmProblem, svmParameter);
-		totalCorrectAnomaly = 0;
-		int index = 0;
-		for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramsAnomaly) {
-		    double[] values = new double[1];
-		    svm.svm_predict_values(trainModel, svmProblemAnomaly.x[index], values);
-		    double prediction = values[0];
-
-		    // this code returns a lower score for more anomalous so we flip it to match kdtree
-		    prediction *= -1;
-		    if (prediction >= 0) {
-			totalCorrectAnomaly++;
-		    }
-		    index++;
-		}
+			svm_model trainModel = svm.svm_train(svmProblem, svmParameter);
+			totalCorrectAnomaly = 0;
+			int index = 0;
+			for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramsAnomaly) {
+			    double[] values = new double[1];
+			    svm.svm_predict_values(trainModel, svmProblemAnomaly.x[index], values);
+			    double prediction = values[0];
+	
+			    // this code returns a lower score for more anomalous so we flip it to match kdtree
+			    prediction *= -1;
+			    if (prediction >= 0) {
+			    	totalCorrectAnomaly++;
+			    }
+			    index++;
+			}
 	    }
 
 	    double accuracy = (1.0 * total_correct)/(1.0 * svmProblem.l);
@@ -142,8 +147,8 @@ public class SVMCalc {
 
 	    double accuracyAnomaly = -1;
 	    if (totalCorrectAnomaly != -1) {
-		accuracyAnomaly = (1.0 * totalCorrectAnomaly) / (1.0 * svmProblemAnomaly.l);
-		System.out.print("YYY Cross Validation Accuracy for Anomaly = " + accuracyAnomaly + " for nu " + nu + "\n");  
+			accuracyAnomaly = (1.0 * totalCorrectAnomaly) / (1.0 * svmProblemAnomaly.l);
+			System.out.print("YYY Cross Validation Accuracy for Anomaly = " + accuracyAnomaly + " for nu " + nu + "\n");  
 	    }
 
 	    // these two cases can eventually be collapsed into one case but I'm not sure where this nu calculation via anomaly will go in the fugure
@@ -279,7 +284,7 @@ public class SVMCalc {
 
 	// test the training set against itself to get a scaling factor
 	double anomalyScale = histogramData.getScalingFactor(trainID, trainValue, trainKey);
-	if (anomalyScale < 0.0) {
+	if (anomalyScale <= 1e-3) {
 	    SVMKernel svmKernel = new SVMKernel(histogramData.getHistograms(trainID, trainValue, trainKey), histogramData.getHistograms(trainID, trainValue, trainKey), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
 	    svm_node[][] bar = svmKernel.getData();
 
@@ -302,8 +307,9 @@ public class SVMCalc {
 	    }
 
 	    // this can happen if the data is very simliar or there isn't a lot of it. If we do nothing all of the results end up as "Infinity"
-	    if (anomalyScale == 0.0) {
-		anomalyScale = 1.0;
+	    if (anomalyScale <= 1e-3) {
+	    	System.out.println("Calculated scaling factor of " + anomalyScale + " too small. Changing to 1.0.");
+	    	anomalyScale = 1.0;
 	    }
 
 	    // the documentation for Pair doesn't say this but for some reason setAt0 doesn't overwrite the value, it returns a copy of the Pair with the new value
@@ -325,7 +331,7 @@ public class SVMCalc {
 	for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramData.getHistograms(testID, testValue, testKey)) {
 	    double[] values = new double[1];
 
-	    svm.svm_predict_values(svmModel, bar[index], values);
+	    double d = svm.svm_predict_values(svmModel, bar[index], values);
 	    double prediction = values[0];
 
 	    // this code returns a lower score for more anomalous so we flip it to match kdtree
@@ -333,7 +339,8 @@ public class SVMCalc {
 
 	    prediction /= anomalyScale;
 
-	    output.append(index + ": predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data \n");
+//	    output.append(index + ": predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data \n");
+	    output.append("Pred: " + d + ".\t Dec: " + prediction + " for " + onePoint.getValue1().toString() + "\n");
 
 	    if (results != null) {
 		results.put(prediction, onePoint);

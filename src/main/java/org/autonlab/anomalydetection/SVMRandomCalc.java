@@ -13,12 +13,6 @@ import org.javatuples.*; //Tuples, Pair
 /**
  * Using the the randomized features at:
  * http://www.eecs.berkeley.edu/~brecht/papers/07.rah.rec.nips.pdf
- * 
- * Using a Gaussian Kernel --> draw features from the D-dimensional standard normal.
- * 
- * A few points:
- * 1. Add points to existing dot-product of histograms?
- * 2. Make new dot-product entirely? --> going with this first.
  */
 // MultiValueMap is not thread safe
 // also, NU_START_POW_LOW is modified
@@ -28,24 +22,6 @@ public class SVMRandomCalc {
 			new HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>>>>();
 	static volatile Lock _svmModelsCacheLock = new ReentrantLock();
 
-	//	public static HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>> 
-	//	makeSVMModel(HashMap<GenericPoint<String>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> histograms, 
-	//			StringBuilder output, double targetAccuracy) {
-	//
-	//		HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>> newMap = 
-	//				new HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>>();
-	//
-	//		ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
-	//		if (DaemonService.anomalyID >= 0) {
-	//			anomalyData = DaemonService.allHistogramsMap.get(DaemonService.anomalyID).get(DaemonService.anomalyKey);
-	//		}
-	//		for (GenericPoint<String> keyAddr : histograms.keySet()) {
-	//			// change 99.9 to be a parameter or maybe input to the rest call that sets the other anomaly key info
-	//			newMap.put(keyAddr, generateModel(histograms.get(keyAddr), targetAccuracy, anomalyData, 99.9));
-	//		}
-	//
-	//		return newMap;
-	//	}
 
 	public static svm_node[][] append(svm_node[][] a, svm_node[][] b) {
 		svm_node[][] result = new svm_node[a.length + b.length][];
@@ -96,7 +72,6 @@ public class SVMRandomCalc {
 		svmProblem.x = (svmrg.getData());
 
 		svm_problem svmProblemAnomaly = null;
-		// TODO: Wouldn't you want to add this to the same svmProblem as before?
 		if (histogramsAnomaly != null) {
 			svmProblemAnomaly = new svm_problem();
 			svmProblemAnomaly.l = histogramsAnomaly.size();
@@ -115,36 +90,34 @@ public class SVMRandomCalc {
 		svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
 		svmParameter.gamma = AnomalyDetectionConfiguration.SVM_GAMMA;
 		
-		// TODO: Need to fix allCrossValidate for only one single SVM for both normal and anomaly. 
 		// the library uses kfold
-		//svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, null, null, targetAnomalyAccuracy);
-		//		if (svmParameter.nu == -1) {
-		//			throw new RuntimeException("nu was not set");
-		//		}
-		//		System.out.println("YYY picked a nu of " + svmParameter.nu);
-		//
-		//		// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
-		//		// or somehow have so small a nu that it stops being relevant
-		//		int expandTimes = 0;
-		//		while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
-		//			System.out.println("YYY expanding");
-		//			for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
-		//				for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
-		//					nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
-		//				}
-		//			}
-		//
-		//			// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
-		//			// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
-		//			// problem we can do something smarter
-		//			nuValues.put(svmParameter.nu, -1.0);
-		//
-		//			AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
-		//			svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
-		//			expandTimes++;
-		//		}
+		svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, null, null, targetAnomalyAccuracy);
+		if (svmParameter.nu == -1) {
+			throw new RuntimeException("nu was not set");
+		}
+		System.out.println("YYY picked a nu of " + svmParameter.nu);
 
-		svmParameter.nu = 0.5;
+		// I don't know what limits we should set for expanding but I just don't want to get stuck in an infinite loop
+		// or somehow have so small a nu that it stops being relevant
+		int expandTimes = 0;
+		while (svmParameter.nu == nuValues.firstKey() && expandTimes < 5) {
+			System.out.println("YYY expanding");
+			for (double testNU : AnomalyDetectionConfiguration.NU_BASE_LIST) {
+				for (int testPow = AnomalyDetectionConfiguration.NU_START_POW_LOW; testPow > AnomalyDetectionConfiguration.NU_START_POW_LOW - AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT; testPow--) {
+					nuValues.put(testNU * Math.pow(10, testPow), -1.0); // negative indicates that we still need to calculate it
+				}
+			}
+
+			// The previous nu could still be the best option. We set this to -1 so allCrossValidate reconsiders it
+			// It is a hack because it causes us to re-do the work of calculating it. If this becomes a performance
+			// problem we can do something smarter
+			nuValues.put(svmParameter.nu, -1.0);
+
+			AnomalyDetectionConfiguration.NU_START_POW_LOW -= AnomalyDetectionConfiguration.NU_EXPAND_INCREMENT;
+			svmParameter.nu = allCrossValidate(svmProblem, svmParameter, nuValues, targetCrossTrainAccuracy, histogramsAnomaly, svmProblemAnomaly, 0.0);
+			expandTimes++;
+		}
+
 
 		System.out.println("YYY selected nu of " + svmParameter.nu);
 		Pair <GaussianRandomFeatures, svm_model> gffSVMPair = new Pair<GaussianRandomFeatures, svm_model> (grf, svm.svm_train(svmProblem, svmParameter));
@@ -236,7 +209,7 @@ public class SVMRandomCalc {
 		//			expandTimes++;
 		//		}
 
-		svmParameter.nu = 0.5;
+		svmParameter.nu = 0.1;
 
 		System.out.println("YYY selected nu of " + svmParameter.nu);
 		Pair <GaussianRandomFeatures, svm_model> gffSVMPair = new Pair<GaussianRandomFeatures, svm_model> (grf, svm.svm_train(svmProblem, svmParameter));
@@ -416,10 +389,8 @@ public class SVMRandomCalc {
 		if (anomalyID != null) {
 		    anomalyHistogram = histogramData.getHistograms(anomalyID, anomalyValue, anomalyKey);
 		}
-		boolean changed = true;
-		// boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, histogramData.getHistograms(trainID, trainValue, trainKey), histogramData.getHistograms(testID, testValue, testKey), anomalyHistogram);
-
-		_svmModelsCacheLock.lock();
+		boolean changed = HistoTuple.upgradeWindowsDimensions(trainValue, histogramData.getHistograms(trainID, trainValue, trainKey), histogramData.getHistograms(testID, testValue, testKey), anomalyHistogram);
+//		_svmModelsCacheLock.lock();
 
 		if (changed) {
 			_svmModelsCache.remove(trainID);
@@ -429,7 +400,7 @@ public class SVMRandomCalc {
 		if (_svmModelsCache.get(trainID) == null ||
 		    _svmModelsCache.get(trainID).get(trainValue) == null ||
 		    _svmModelsCache.get(trainID).get(trainValue).get(trainKey) == null) {
-		    _svmModelsCacheLock.unlock();
+//		    _svmModelsCacheLock.unlock();
 
 		    // this calculation can take some time so we unlock the cache and we'll recheck before we save it to cache
 		    ArrayList<Pair<Integer, GenericPoint<Integer>>> anomalyData = null;
@@ -441,8 +412,8 @@ public class SVMRandomCalc {
 			
 		    grf = grf_svm.getValue0(); 
 		    svmModel = grf_svm.getValue1();
-		    System.out.println("ZZZ grf " + grf);
-		    _svmModelsCacheLock.lock();
+
+//		    _svmModelsCacheLock.lock();
 		    if (_svmModelsCache.get(trainID) == null) {
 			_svmModelsCache.put(trainID, new HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<GaussianRandomFeatures, svm_model>>>());
 		    }
@@ -460,46 +431,54 @@ public class SVMRandomCalc {
 		    System.out.println("SVM Model cache hit");
 
 		}
-//		allModels = _svmModelsCache.get(trainID);
-//		if (allModels == null) {
-//			_svmModelsCacheLock.unlock();
-//
-//			// this calculation can take some time so we unlock
-//			long st = System.nanoTime();
-//			allModels = SVMRandomCalc.makeSVMModel(DaemonService.allHistogramsMap.get(trainID), output, 1.0);
-//			long et = System.nanoTime();
-//			double dur = (double)(et-st)/1000000000;
-//			System.out.println("Time to create model: " + dur);
-//
-//			_svmModelsCacheLock.lock();
-//			_svmModelsCache.put(trainID, allModels);
-//		}
-//		else {
-//			System.out.println("SVM Model cache hit");
-//
-//		}
-		_svmModelsCacheLock.unlock();
+
+//		_svmModelsCacheLock.unlock();
+		if (rn <= 0) rn = AnomalyDetectionConfiguration.SVM_D;
+		// test the training set against itself to get a scaling factor
+		double anomalyScale = histogramData.getScalingFactor(trainID, trainValue, trainKey);// DaemonService.allHistogramsMap.get(trainID).get(trainValue).get(trainKey).getValue0();
+		if (anomalyScale <= 1e-3) {
+			SVMRandomGaussian svmSRG = new SVMRandomGaussian(histogramData.getHistograms(trainID, trainValue, trainKey), rn, grf, AnomalyDetectionConfiguration.NUM_THREADS);
+			svm_node[][] bar = svmSRG.getData();
+
+			int index = 0;
+			anomalyScale = 0.0;
+			/* loop through the histograms to generate the predictions */
+			for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramData.getHistograms(trainID, trainValue, trainKey)) {
+				double[] values = new double[1];
+
+				svm.svm_predict_values(svmModel, bar[index], values);
+				double prediction = values[0];
+
+				// this code returns a lower score for more anomalous so we flip it to match kdtree
+				prediction *= -1;
+//				System.out.println("prediction is " + prediction);
+				if (anomalyScale < prediction)
+					anomalyScale = prediction;
+				index++;
+			}
+			// this can happen if the data is very simliar or there isn't a lot of it.  all of the results end up as "Infinity"
+			if (anomalyScale <= 1e-3) {
+				System.out.println("Calculated scaling factor of " + anomalyScale + " too small. Changing to 1.0.");
+				anomalyScale = 1.0;
+			}
+			// the documentation for Pair doesn't say this but for some reason setAt0 doesn't overwrite the value, it returns a copy of the Pair with the new value
+			histogramData.setScalingFactor(trainID, trainValue, trainKey, anomalyScale);
+			System.out.println("Calculated scaling factor of " + anomalyScale);
+		}
+		else {
+			System.out.println("Using cached scaling factor of " + anomalyScale);
+		}
 
 		// If we're running many instances of similar test data against the same training data
 		// we might want to implement a cache that's per-training set and save it externally
 		// rather than the current scheme of only caching within an instance of SVMKernel
 
 
-		long st2 = System.nanoTime();
 		SVMRandomGaussian GFSTest = new SVMRandomGaussian(histogramData.getHistograms(testID, testValue, testKey), AnomalyDetectionConfiguration.SVM_D, grf, AnomalyDetectionConfiguration.NUM_THREADS);
 		svm_node[][] testFeatures = GFSTest.getData(); 
 
 		int index = 0;
 
-		//		System.out.println("QUICK TESTS: -------------------");
-		//		
-		//		GenericPoint<Integer> p1 = DaemonService.allHistogramsMap.get(testID).get(testKey).get(2).getValue1();
-		//		GenericPoint<Integer> p2 = DaemonService.allHistogramsMap.get(testID).get(testKey).get(15).getValue1();
-		//
-		//		System.out.println("RBF Kernel: " +gff.gaussianKernel(p1, p2));
-		//		System.out.println("Linear Kernel: " + gff.linearKernel(gff.computeGaussianFourierFeatures(p1), gff.computeGaussianFourierFeatures(p2)));
-		//		
-		//		System.out.println("--------------------------------");
 
 		for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramData.getHistograms(testID, testValue, testKey)) {
 			double[] values = new double[1];
@@ -508,9 +487,9 @@ public class SVMRandomCalc {
 			double prediction = values[0];
 
 			// this code returns a lower score for more anomalous so we flip it to match kdtree
-			prediction *= -1;
+			prediction *= -1/anomalyScale;
 
-
+//			output.append(index + ": predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data \n");
 			output.append("Pred: " + d + ".\t Dec: " + prediction + " for " + onePoint.getValue1().toString() + "\n");
 
 			if (results != null) {
@@ -519,16 +498,12 @@ public class SVMRandomCalc {
 			index++;
 		}
 
-		long et2 = System.nanoTime();
-		double dur2 = (double)(et2-st2)/1000000000;
-		System.out.println("Time to test: " + dur2);
-
 		return output;
 	}
 
 	public static void removeModelFromCache(int id) {
-		_svmModelsCacheLock.lock();
+//		_svmModelsCacheLock.lock();
 		_svmModelsCache.remove(id);
-		_svmModelsCacheLock.unlock();
+//		_svmModelsCacheLock.unlock();
 	}
 }

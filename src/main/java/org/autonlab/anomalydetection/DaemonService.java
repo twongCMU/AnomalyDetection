@@ -13,6 +13,7 @@ import javax.ws.rs.core.*;
 import org.apache.commons.collections.map.*;
 import org.javatuples.*;
 import org.apache.commons.math3.distribution.UniformRealDistribution;
+import org.apache.commons.math3.distribution.UniformIntegerDistribution;
 
 @Path("/")
 public class DaemonService {
@@ -806,7 +807,7 @@ public class DaemonService {
 
 	StringBuilder output = new StringBuilder("Custom Test\n\n");
 		
-	output.append(getFakeData2(n,s,rn).getEntity());
+//	output.append(getFakeData2(n,s,rn).getEntity());
 	getFakeData2(n,s,rn);
 	//		String filename="/usr0/home/sibiv/Research/Data/GRE.out";
 	//		DataIOFile foo = new DataIOFile(filename);
@@ -830,7 +831,7 @@ public class DaemonService {
 
 	output.append("\n\nSVM RANDOM:\n");
 	long startTime1 = System.nanoTime();
-	output.append(SVMRandomCalc.runOneTestSVM(histogramData, id, trainKey, trainValue, id, testKey, testValue, id-1, trainKeyA, trainValueA, null, -1).toString());
+	output.append(SVMRandomCalc.runOneTestSVM(histogramData, id, trainKey, trainValue, id, testKey, testValue, id-1, trainKeyA, trainValueA, null, rn).toString());
 	long endTime1 = System.nanoTime();
 	double duration = (double)(endTime1 - startTime1)/1000000000;
 	output.append("\n\nTime taken:\n" + (duration));
@@ -856,7 +857,7 @@ public class DaemonService {
 
 	
 	UniformRealDistribution urd = new UniformRealDistribution (0.0, 1.0);
-
+	UniformIntegerDistribution uid = new UniformIntegerDistribution(0,5);
 		
 	output.append("Anomaly data:\n\n");
 	int hs = (int) s/2; // half size
@@ -868,8 +869,8 @@ public class DaemonService {
 	for (int i = 0; i < n; i += 1) {
 	    GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
 	    for (int j = 0; j < s; j += 1) { // Randomly fill first quarter with 0s and 1s (anomalies)
-		if (j < qs && urd.sample() > 0.5)
-		    fakePoint.setCoord(j, 1);
+		if (j < qs)
+		    fakePoint.setCoord(j, uid.sample());
 		else
 		    fakePoint.setCoord(j, 0);
 
@@ -889,7 +890,8 @@ public class DaemonService {
 		
 	Integer new_id = histogramData.putHistogramSet(anomalyData);
 	output.append("Dataset ID: " + new_id + "\n");
-		
+	
+	boolean useOnes = false;
 	output.append("Train data:\n\n");
 	HashMap<GenericPoint<String> ,HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> fakeData = new HashMap();
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> training = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
@@ -900,10 +902,8 @@ public class DaemonService {
 	    for (int j = 0; j < s; j += 1) { // Randomly fill second half with 1s and 0s
 		if (j < hs)
 		    fakePoint.setCoord(j, 0);
-		else if (urd.sample() > 0.5)
-		    fakePoint.setCoord(j, 1);
 		else
-		    fakePoint.setCoord(j, 0);
+			fakePoint.setCoord(j, uid.sample());
 
 	    }
 	    output.append(fakePoint.toString() + "\n");
@@ -928,17 +928,17 @@ public class DaemonService {
 	    GenericPoint<Integer> fakePoint = new GenericPoint<Integer>(s);
 	    if (i < normal_n) {
 		for (int j = 0; j < s; j += 1) { // Randomly fill second half with 1s and 0s
-		    if (j < hs || urd.sample() < 0.5)
-			fakePoint.setCoord(j, 0);
-		    else
-			fakePoint.setCoord(j, 1);
-		}
+			if (j < hs)
+				fakePoint.setCoord(j, 0);
+			else
+				fakePoint.setCoord(j, uid.sample());
+			}
 	    } else {
 		for (int j = 0; j < s; j += 1) { // Randomly fill first quarter with 0s and 1s (anomalies)
-		    if (j < qs && urd.sample() > 0.5)
-			fakePoint.setCoord(j, 1);
-		    else
-			fakePoint.setCoord(j, 0);
+			if (j < qs)
+				fakePoint.setCoord(j, uid.sample());
+			else
+				fakePoint.setCoord(j, 0);
 
 		}
 	    }
@@ -955,10 +955,14 @@ public class DaemonService {
 	fakeData.get(value2).put(key2, new Pair(0.0, testing));
 	output.append("Key: a2, b2 (" + testing.size() + ")\n");
 		
-	// generate some fake HistoTuples. these are unused but the code would crash without them
-	HistoTuple foo = new HistoTuple(1, "fake1", value);
-	HistoTuple foo2 = new HistoTuple(2, "fake2", value);
-		
+	// generate some fake HistoTuples. these are unused but the code would crash without themnew HistoTuple (k, String("fake" + k), value);
+	HistoTuple foos[] = new HistoTuple[s];
+	for (int k = 0; k < s; k++)
+		foos[k] = new HistoTuple (k, "fake" + k, value);
+	// // generate some fake HistoTuples. these are unused but the code would crash without them
+	// HistoTuple foo = new HistoTuple(1, "fake1", valueType);
+	// HistoTuple foo2 = new HistoTuple(2, "fake2", valueType);
+	
 	histogramData.putHistogramSet(fakeData);
 		
 	//output.append(allHistogramsMap.get(0).get(key2).get(0).toString());
