@@ -489,6 +489,7 @@ public class DaemonService {
 	    anomalyTrainValuePoint = getPointFromCSV(anomalyTrainValue);
 	}
 
+	/* if the data we want isn't stored, perhaps we can calculate it from other existing data */
 	int newTrainID = histogramData.recalculateByCategory(trainID, trainCategoryPoint, trainValuePoint, output);
 	if (newTrainID == -1) {
 	    output.append("ERROR: trainCategoryCSV (" + trainCategory + ") was not found and could not be calculated from existing data\n");

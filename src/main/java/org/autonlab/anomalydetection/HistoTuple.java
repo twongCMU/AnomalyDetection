@@ -272,6 +272,9 @@ public class HistoTuple {
 
 
     /**
+     * When a HistoTuple is made, it is set with the current number of dimensions. Later, the number of dimensions may
+     * change and a new HistoTuple will have a greater number of dimensions. To run tests between two HistoTuples 
+     * they must have the same dimensions, and this function upgrades an old HistoTuple to the current number of dimensions.
      */
     private static boolean upgradeWindowsDimensionsOne(GenericPoint<String> valueType, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogram) {
 
