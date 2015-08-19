@@ -17,6 +17,14 @@ public class SVMCalc {
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, svm_model>>> _svmModelsCache = new HashMap();
 
     private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
+	return generateModelMain(histograms, targetCrossTrainAccuracy, histogramsAnomaly, targetAnomalyAccuracy, svm_parameter.ONE_CLASS);
+    }
+
+    private static svm_model generateModelOneVsAll(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
+	return generateModelMain(histograms, targetCrossTrainAccuracy, histogramsAnomaly, targetAnomalyAccuracy, svm_parameter.NU_SVC);
+    }
+
+    private static svm_model generateModelMain(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy, Integer classifierType) {
 	TreeMap<Double, Double> nuValues = new TreeMap();
 	System.out.println("YYY -------------------------");
 	// generate a list of nu values to try (we can add to this later)
@@ -43,7 +51,7 @@ public class SVMCalc {
 	}
 
 	svm_parameter svmParameter = new svm_parameter();
-	svmParameter.svm_type = svm_parameter.ONE_CLASS;
+	svmParameter.svm_type = classifierType;
 	svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_KERNEL_TYPE;
 	svmParameter.cache_size = AnomalyDetectionConfiguration.SVM_CACHE_SIZE;
 	svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
