@@ -24,15 +24,29 @@ public class AnomalyPrediction {
 	if (anomalyData == null) {
 	    anomalyData = new HashMap();
 
-	    Random randomGenerator = new Random();
+	    Pair<Integer, Integer> tempKey0 = new Pair(0,0);
+	    Pair<Integer, Integer> tempKey1 = new Pair(1,0);
+	    Pair<Integer, Integer> tempKey2 = new Pair(1,1);
+	    Pair<Integer, Integer> tempKey3 = new Pair(0,1);
+		    anomalyData.put(tempKey0, new ArrayList());
+		    anomalyData.put(tempKey1, new ArrayList());
+		    anomalyData.put(tempKey2, new ArrayList());
+		    anomalyData.put(tempKey3, new ArrayList());
+	    int state = 0;
 	    for (Pair<Integer, GenericPoint<Integer>> fakeAnomaly : histogramDataForFakeAnomalies) {
-		int annotation = randomGenerator.nextInt(2);
-		int state = randomGenerator.nextInt(2);
-		Pair<Integer, Integer> tempKey = new Pair(state, annotation);
+		/*
+		Pair<Integer, Integer> tempKey = new Pair(state & 0x0001, state & 0x0002);
+		state++;
+
 		if (!anomalyData.containsKey(tempKey)) {
 		    anomalyData.put(tempKey, new ArrayList());
 		}
 		anomalyData.get(tempKey).add(fakeAnomaly);
+		*/
+		anomalyData.get(tempKey0).add(fakeAnomaly);
+		anomalyData.get(tempKey1).add(fakeAnomaly);
+		anomalyData.get(tempKey2).add(fakeAnomaly);
+		anomalyData.get(tempKey3).add(fakeAnomaly);
 	    }
 
 	    for (Pair<Integer, Integer> tempKey  : anomalyData.keySet()) {
@@ -65,6 +79,7 @@ public class AnomalyPrediction {
 	    combinedData.addAll(one);
 	    combinedData.addAll(all);
 	    SVMKernel svmKernel = new SVMKernel(anomalyObservedDataPackaged, combinedData, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, 1);
+	   
 	    svm_node[][] bar = svmKernel.getData();
 
 	    /* now we have the training data model, run the anomaly against it
@@ -72,14 +87,14 @@ public class AnomalyPrediction {
 	    double[] values = new double[1];
 
 	    // XYZ should I expect the bar to only have a single row in it?
-	    svm.svm_predict_values(svmModel, bar[0], values);
-	    double prediction = values[0];
+	    double prediction = svm.svm_predict_values(svmModel, bar[0], values);
+	    //double prediction = values[0];
 
 	    // this code returns a lower score for more anomalous so we flip it to match kdtree
-	    prediction *= -1;
+	    //prediction *= -1;
 
 	    if (output != null) {
-		output.append("Prediction " + tempPair.getValue0() + "," + tempPair.getValue1() + ": score " + prediction + " for anomaly " + anomalyObservedData.getValue1().toString() + " with data \n");
+		output.append("Prediction " + tempPair.getValue0() + "," + tempPair.getValue1() + ": class " + prediction + " with score " + values[0] + " for anomaly " + anomalyObservedData.getValue1().toString() + " with data \n");
 	    }
 
 	    if (results != null) {

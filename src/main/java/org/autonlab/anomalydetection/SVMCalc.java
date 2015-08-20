@@ -367,9 +367,10 @@ public class SVMCalc {
 		results.put(prediction, onePoint);
 	    }
 
-	    if (prediction > .75) {
-		System.out.println("OH NOES");
+	    if (prediction != 0.0) {
+		//		System.out.println("OH NOES");
 		AnomalyPrediction.predictAnomalyType(onePoint, null, output, histogramData.getHistograms(testID, testValue, testKey));
+		//	return output;
 	    }
 	    index++;
 	}
