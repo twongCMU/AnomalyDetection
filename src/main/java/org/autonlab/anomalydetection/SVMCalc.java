@@ -16,15 +16,15 @@ public class SVMCalc {
      // cache of processed models. This is shared across concurrent accesses so we need to protect it with a lock
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, svm_model>>> _svmModelsCache = new HashMap();
 
-    private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
-	return generateModelMain(histograms, targetCrossTrainAccuracy, histogramsAnomaly, targetAnomalyAccuracy, svm_parameter.ONE_CLASS);
+    public static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
+	return generateModelMain(histograms, null, targetCrossTrainAccuracy, histogramsAnomaly, targetAnomalyAccuracy, svm_parameter.ONE_CLASS);
     }
 
-    private static svm_model generateModelOneVsAll(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
-	return generateModelMain(histograms, targetCrossTrainAccuracy, histogramsAnomaly, targetAnomalyAccuracy, svm_parameter.NU_SVC);
+    public static svm_model generateModelOneVsAll(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsClass1, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsClass2, double targetCrossTrainAccuracy) {
+	return generateModelMain(histogramsClass1, histogramsClass2, targetCrossTrainAccuracy, null, 0.0, svm_parameter.NU_SVC);
     }
 
-    private static svm_model generateModelMain(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy, Integer classifierType) {
+    private static svm_model generateModelMain(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsClass1, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsClass2, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy, Integer classifierType) {
 	TreeMap<Double, Double> nuValues = new TreeMap();
 	System.out.println("YYY -------------------------");
 	// generate a list of nu values to try (we can add to this later)
@@ -35,11 +35,31 @@ public class SVMCalc {
 	}
 
 	// fill in the svm_problem with the histogram data points
+	int histSize = histogramsClass1.size();
+	if (histogramsClass2 != null) {
+	    histSize += histogramsClass2.size();
+	}
 	svm_problem svmProblem = new svm_problem();
-	svmProblem.l = histograms.size();
-	svmProblem.y = new double[histograms.size()];
+	svmProblem.l = histSize;
+	svmProblem.y = new double[histSize];
 	Arrays.fill(svmProblem.y, 1.0); // all of our training data is non-anomalous
-	svmProblem.x =  (new SVMKernel(histograms, histograms, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+	if (histogramsClass2 != null) {
+	    for (int i = histogramsClass1.size(); i < histSize; i++) {
+		svmProblem.y[i] = 2.0;
+	    }
+	}
+
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsCombined = null;
+
+	if (histogramsClass2 == null) {
+	    histogramsCombined = histogramsClass1;
+	}
+	else {
+	    histogramsCombined = new ArrayList();
+	    histogramsCombined.addAll(histogramsClass1);
+	    histogramsCombined.addAll(histogramsClass2);
+	}
+	svmProblem.x =  (new SVMKernel(histogramsCombined, histogramsCombined, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 
 	svm_problem svmProblemAnomaly = null;
 	if (histogramsAnomaly != null) {
@@ -47,7 +67,7 @@ public class SVMCalc {
 	    svmProblemAnomaly.l = histogramsAnomaly.size();
 	    svmProblemAnomaly.y = new double[histogramsAnomaly.size()];
 	    Arrays.fill(svmProblemAnomaly.y, -1.0); // set all of this data to anomalous
-	    svmProblemAnomaly.x =  (new SVMKernel(histogramsAnomaly, histograms, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+	    svmProblemAnomaly.x =  (new SVMKernel(histogramsAnomaly, histogramsCombined, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 	}
 
 	svm_parameter svmParameter = new svm_parameter();
@@ -345,6 +365,11 @@ public class SVMCalc {
 
 	    if (results != null) {
 		results.put(prediction, onePoint);
+	    }
+
+	    if (prediction > .75) {
+		System.out.println("OH NOES");
+		AnomalyPrediction.predictAnomalyType(onePoint, null, output, histogramData.getHistograms(testID, testValue, testKey));
 	    }
 	    index++;
 	}
