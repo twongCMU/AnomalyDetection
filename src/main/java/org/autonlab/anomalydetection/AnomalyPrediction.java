@@ -102,4 +102,10 @@ public class AnomalyPrediction {
 	    }
 	}
     }
+
+    /* we have defined two types of patterns
+     * /
+    public static void patternAnomalyType(Pair<Integer, GenericPoint<Integer>> anomalyObservedData) {
+    
+    }
 }
