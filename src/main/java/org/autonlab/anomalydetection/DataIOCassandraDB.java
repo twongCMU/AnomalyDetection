@@ -71,7 +71,7 @@ public class DataIOCassandraDB implements DataIO {
 	DateTime endTime = null;
 	DateTime startTime = null;
 	if (minutesBack > 0) {
-	    String selectStatement = "SELECT time_stamp FROM " + _keyspace + ".packet ";
+	    String selectStatement = "SELECT time_stamp FROM " + _keyspace + ".packet_twong ";
 	    ResultSet results = _session.execute(selectStatement);
 	    int rowCount = 0;
 	    for (Row row: results) {
@@ -138,7 +138,7 @@ public class DataIOCassandraDB implements DataIO {
 	}
 
 	selectStatement = selectStatement.substring(0, selectStatement.length() - 1); // drop the trailing comma from above
-	selectStatement += " FROM " + _keyspace + ".packet";
+	selectStatement += " FROM " + _keyspace + ".packet_twong";
 	if (minutesBack > 0) {
 	    selectStatement += " WHERE time_stamp > '" + startTime + "' AND time_stamp < '" + endTime + "' ALLOW FILTERING";
 	}
@@ -247,7 +247,7 @@ public class DataIOCassandraDB implements DataIO {
     public void putData(String categoryCSV, int dateSecs, String messageType) {
     // from group meeting, we're going to write to a different db not the cassandra one so we won't reimplement this in a dynamic category friendly way 
     // until we know more details
-    //	_session.execute("INSERT INTO " + _keyspace + ".packet (time_stamp, source_addr, text_values, dest_addr) VALUES (" + dateSecs + ",'" + ipAddress + "',{'messagetype' : '" + messageType + "', 'endpoint' : '" + appName + "'}, '" + _counter + "')");
+    //	_session.execute("INSERT INTO " + _keyspace + ".packet_twong (time_stamp, source_addr, text_values, dest_addr) VALUES (" + dateSecs + ",'" + ipAddress + "',{'messagetype' : '" + messageType + "', 'endpoint' : '" + appName + "'}, '" + _counter + "')");
     //_counter++;
     }
 

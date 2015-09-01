@@ -37,7 +37,7 @@ public class DataIOWriteAnomaly {
 	String output = new String();
 
 	for (int predictionValue = 0; predictionValue < 4; predictionValue++) {
-	    for (int i = 0; i < 100; i++) {
+	    for (int i = 0; i < 1; i++) {
 		JSONObject obj = new JSONObject();
 		obj.put("detectionTimeWindowStart", "");
 		obj.put("detectionTimeWindowEnd", "");

@@ -5,7 +5,7 @@ import libsvm.*;
 public class AnomalyDetectionConfiguration {
 
     // number of CPU threads to use when doing parallel computation
-    static int NUM_THREADS = 4;
+    static int NUM_THREADS = 3;
 
     // The width of time in which we count datapoints - can be changed via REST call
     static int SAMPLE_WINDOW_SECS = 1800;
@@ -54,5 +54,5 @@ public class AnomalyDetectionConfiguration {
 	return output;
     }
 
-    static final String ANOMALY_REST_URL_PREFIX = "localhost/essence-services";
+    static final String ANOMALY_REST_URL_PREFIX = "http://10.21.1.24/essence-services";
 }
