@@ -972,4 +972,12 @@ public class DaemonService {
 	    n += v[i]*v[i];
 	return Math.sqrt(n);
     }
+
+    @GET
+    @Path("/testFunction")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response testFunction() {
+	DataIOWriteAnomaly foo = new DataIOWriteAnomaly();
+	return Response.status(200).entity(foo.writeFakeAnomalies()).build();
+    }
 }

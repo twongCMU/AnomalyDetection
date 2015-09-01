@@ -1,6 +1,7 @@
 package org.autonlab.anomalydetection;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.ListIterator;
 
@@ -9,6 +10,13 @@ import java.net.URI;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
+
+import org.json.simple.JSONObject;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONValue;
+
+import org.javatuples.*;
+import com.savarese.spatial.*;
 
 public class DataIOWriteAnomaly {
 
@@ -19,265 +27,195 @@ public class DataIOWriteAnomaly {
 	client = Client.create();
     }
 
-    public void firstEmail(int email, int mode)
+    public void closeConnection()
     {
-	WebResource webResource = client.resource("firstemail/" + email + "/" + mode);
-	String ret = webResource.accept("text/plain").get(String.class);
-	if (!ret.equals("ok")) {
-	    throw new RuntimeException("firstEmail " + ret);
-	}
+	client.destroy();
     }
 
-    public int emailInteresting()
+    public String writeFakeAnomalies() 
     {
-	WebResource webResource = client.resource("emailinteresting");
-	return Integer.parseInt(webResource.accept("text/plain").get(String.class));
-    }
+	String output = new String();
 
-    public int emailBoring()
-    {
-	WebResource webResource = client.resource("emailboring");
-	return Integer.parseInt(webResource.accept("text/plain").get(String.class));
-    }
+	for (int predictionValue = 0; predictionValue < 4; predictionValue++) {
+	    for (int i = 0; i < 100; i++) {
+		JSONObject obj = new JSONObject();
+		obj.put("detectionTimeWindowStart", "");
+		obj.put("detectionTimeWindowEnd", "");
+		obj.put("trainingTimeWindowStart", "");
+		obj.put("trainingTimeWindowStart", "");
+		obj.put("sourceType", new Integer(1));
+		// 10.90.94.9 or 10.80.1.148
+		obj.put("sourceValue", "10.90.94.9");
+		obj.put("targetType", new Integer(1));
+		obj.put("algorithm", "svm_chi_squared_1.0");
+		obj.put("score", new Double(100.0));
+		obj.put("patternIndex", null);
 
-    public void setAlpha(double newAlpha)
-    {
-	WebResource webResource = client.resource("setalpha/" + newAlpha);
-	String ret = webResource.accept("text/plain").get(String.class);
-	if (!ret.equals("ok")) {
-	    throw new RuntimeException("set alpha returned " + ret);
-	}
-    }
+		JSONObject normalEntries0 = new JSONObject();
+		normalEntries0.put("sequenceNumber", new Integer(0));
+		normalEntries0.put("targetValue", "10.90.94.9");
+		normalEntries0.put("minCount", new Integer(320 + (predictionValue * 20)));
+		normalEntries0.put("maxCount", new Integer(320 + (predictionValue * 20)));
+		normalEntries0.put("meanCount", new Integer(320 + (predictionValue * 20)));
+		normalEntries0.put("standardDeviation", new Double(0.0));
 
-    public int getStartPoint()
-    {
-	WebResource webResource = client.resource("getStartPoint");
-	return Integer.parseInt(webResource.accept("text/plain").get(String.class));
-    }
+		JSONObject normalEntries1 = new JSONObject();
+		normalEntries1.put("sequenceNumber", new Integer(1));
+		normalEntries1.put("targetValue", "10.80.1.148");
+		normalEntries1.put("minCount", new Integer(0));
+		normalEntries1.put("maxCount", new Integer(0));
+		normalEntries1.put("meanCount", new Integer(0));
+		normalEntries1.put("standardDeviation", new Double(0.0));
 
-    public double resetLabel(int index, int value)
-    {
-	WebResource webResource = client.resource("resetLabel/" + index + "/" + value);
-	return Double.parseDouble(webResource.accept("text/plain").get(String.class));
-    }
+		JSONArray normalEntriesArray = new JSONArray();
+		normalEntriesArray.add(normalEntries0);
+		normalEntriesArray.add(normalEntries1);
 
-    public void setLabel(int value)
-    {
-	WebResource webResource = client.resource("setLabelCurrent/" + value);
-	String ret = webResource.accept("text/plain").get(String.class);
-	if (!ret.equals("ok")) {
-	    throw new RuntimeException("setLabelCurrent returned " + ret);
-	}
-    }
+		obj.put("normalEntries", normalEntriesArray);
 
-    public int getNextEmail()
-    {
-	WebResource webResource = client.resource("getNextEmail");
-	return Integer.parseInt(webResource.accept("text/plain").get(String.class));
-    }
+		JSONObject anomalyEntries0 = new JSONObject();
+		anomalyEntries0.put("sequenceNumber", new Integer(0));
+		anomalyEntries0.put("targetValue", "10.90.94.9");
+		anomalyEntries0.put("count", new Integer(320 + (predictionValue * 20)));
 
-    public int pickRandomLabeledEmail()
-    {
-	WebResource webResource = client.resource("pickRandomLabeledEmail");
-	return Integer.parseInt(webResource.accept("text/plain").get(String.class));
-    }
+		JSONObject anomalyEntries1 = new JSONObject();
+		anomalyEntries1.put("sequenceNumber", new Integer(0));
+		anomalyEntries1.put("targetValue", "10.80.1.148");
+		anomalyEntries1.put("count", new Integer(0));
 
-    public double getLabel(int email)
-    {
-	WebResource webResource = client.resource("getLabel/" + email);
-	return Double.parseDouble(webResource.accept("text/plain").get(String.class));
-    }
+		JSONArray anomalyEntriesArray = new JSONArray();
+		anomalyEntriesArray.add(anomalyEntries0);
+		anomalyEntriesArray.add(anomalyEntries1);
 
-    /**
-     * Translate from a user ID to a username string
-     *
-     * @param userID The user ID to look up
-     *
-     * @return the username
-     */
-    public String getUserNameFromID(int userID)
-    {
-	WebResource webResource = client.resource("getUserNameFromID/" + userID);
-	return webResource.accept("text/plain").get(String.class);
-    }
- 
-    /**
-     * Get a linked list of message subjects sent from one user ID to another user ID
-     *
-     * @param userIDFrom User ID of the user who sent the emails
-     * @param userIDTo User ID of the user who received the emails
-     *
-     * @return Linked list of email message subjects sorted by timestamp of the form <messageid> : <timestamp> : <subject>
-     */
-    public LinkedList<String> getMessagesFromUserToUser(int userIDFrom, int userIDTo)
-    {
-	WebResource webResource = client.resource("getMessagesFromUserToUser/" + userIDFrom + "/" + userIDTo);
+		JSONArray predictedCausesArray = new JSONArray();
+		predictedCausesArray.add(new Integer(predictionValue & 0x0001));
+		obj.put("predictedCauses", predictedCausesArray);
 
-	String[] messages = webResource.accept("text/plain").get(String.class).split("[\\r\\n]+");
+		JSONArray predictedStatesArray = new JSONArray();
+		predictedStatesArray.add(new Integer((predictionValue & 0x0002)>>1));
+		obj.put("predictedStates", predictedStatesArray);
 
-	LinkedList<String> retList = new LinkedList<String>();
-	for (int i = 0; i < messages.length; i++) {
-	    retList.add(messages[i]);
-	}
-
-	return retList;
-    }
-
-    /**
-     * Get a message subject from a message ID
-     *
-     * @param messageID ID of the message to retrieve
-     *
-     * @return Message subject
-     */
-    public String getEmailSubjectFromMessageID(int messageID)
-    {
-	WebResource webResource = client.resource("getEmailSubjectFromMessageID/" + messageID);
-	return webResource.accept("text/plain").get(String.class);
-    }
-
-    /**
-     * Get a message body from a message ID
-     *
-     * @param messageID ID of the message to retrieve
-     *
-     * @return Message body contents with some other email info prepended to it
-     */
-    public String getEmailBodyFromMessageID(int messageID)
-    {
-	WebResource webResource = client.resource("getEmailBodyFromMessageID/" + messageID);
-	return webResource.accept("text/plain").get(String.class);
-    }
-
-    /**
-     * Initialize total number of email messages. Call this before functions that use it
-     *
-     * @return total number of email messages
-     */
-    public int getTotalEmailCount()
-    {
-	WebResource webResource = client.resource("getTotalEmailCount");
-	return Integer.parseInt(webResource.accept("text/plain").get(String.class));
-    }
-
-
-    /**
-     * Get arrays of email timestamps and senderIDs
-     * The index of the array is the email message ID. The timestamp is seconds from epoch
-     *
-     * @return 2 item array with the first item being the array of timestamps and the second the array of senderIDs
-     */
-    public int[][] getEmailTimesAndSenders()
-    {
-	int emailCount = this.getTotalEmailCount();
-	int[][] returnVals = new int[2][];
-	int[] emailTime = new int[emailCount];
-	 int[] emailSender = new int[emailCount];
-
-	WebResource webResource = client.resource("getEmailTimesAndSenders");
-	String[] messages = webResource.accept("text/plain").get(String.class).split("[\\r\\n]+");
-
-	for (int i = 0; i < messages.length; i++) {
-	    // format: messageID messageTime senderID
-	    String[] retColumns = messages[i].split(" ");
-	    emailTime[Integer.parseInt(retColumns[0])] = Integer.parseInt(retColumns[1]);
-	    emailSender[Integer.parseInt(retColumns[0])] = Integer.parseInt(retColumns[2]);
-	}
-
-	return returnVals;
-    }
-
-    public LinkedList<Integer> getUsersByEmail(int email)
-    {
-	WebResource webResource = client.resource("getUsersByEmail/" + email);
-	String[] messages = webResource.accept("text/plain").get(String.class).split("[\\r\\n]+");
-
-	LinkedList<Integer> retList = new LinkedList<Integer>();
-	for (int i = 0; i < messages.length; i++) {
-	    retList.add(Integer.parseInt(messages[i]));
-	}
-
-	return retList;
-    }
-
-    public int getSenderByEmail(int email)
-    {
-	WebResource webResource = client.resource("getSenderByEmail/" + email);
-	return Integer.parseInt(webResource.accept("text/plain").get(String.class));
-    }
-
-    public String getTimeByEmail(int email)
-    {
-	WebResource webResource = client.resource("getTimeByEmail/" + email);
-	return webResource.accept("text/plain").get(String.class);
-    }
-
-    public String getSubjectByEmail(int email)
-    {
-	WebResource webResource = client.resource("getSubjectByEmail/" + email);
-	return webResource.accept("text/plain").get(String.class);
-    }
-
-    public LinkedList<String> getEmailsByKeyword(String word)
-    {
-	WebResource webResource = client.resource("getEmailsByKeyword/" + word);
-	String[] messages = webResource.accept("text/plain").get(String.class).split("[\\r\\n]+");
-
-	LinkedList<String> retList = new LinkedList<String>();
-	for (int i = 0; i < messages.length; i++) {
-	    retList.add(messages[i]);
-	}
-
-	return retList;
-    }
-
-    public LinkedList<String> getEmailsByKeywordSubject(String word)
-    {
-	WebResource webResource = client.resource("getEmailsByKeywordSubject/" + word);
-	String[] messages = webResource.accept("text/plain").get(String.class).split("[\\r\\n]+");
-
-	LinkedList<String> retList = new LinkedList<String>();
-	for (int i = 0; i < messages.length; i++) {
-	    retList.add(messages[i]);
-	}
-
-	return retList;
-    }
-
-    /**
-     * Get an ArrayList of Integer Linked Lists. The array index is the messageID, and the linked list of
-     * integers is the variable number of unique and sorted recipient user IDs for that message
-     *
-     * An ArrayList was used rather than a generic array due to compiler issues with the LinkedList<Integer> type
-     *
-     * @return ArrayList of LinkedList of recipient user IDs
-     */
-    public ArrayList<LinkedList<Integer>> getEmailRecipients()
-    {
-	int emailCount = this.getTotalEmailCount();
-	ArrayList<LinkedList<Integer>> emailRecipients = new ArrayList<LinkedList<Integer>>(emailCount);
-
-	int i;
-	for (i = 0; i < emailCount; i++) {
-	    emailRecipients.add(null);
-	    LinkedList<Integer> tempList = getEmailRecipientsByEmail(i);
-	    emailRecipients.add(i, tempList);
-	}
-	return emailRecipients;
-    }
-
-    public LinkedList<Integer> getEmailRecipientsByEmail(int email)
-    {
-	WebResource webResource = client.resource("getEmailRecipientsByEmail/" + email);
-	String[] recipients = webResource.accept("text/plain").get(String.class).split("[\\r\\n]+");
-
-	LinkedList<Integer> retList = new LinkedList<Integer>();
-	for (int i = 0; i < recipients.length; i++) {
-	    if (!recipients[i].isEmpty()) {
-		retList.add(Integer.parseInt(recipients[i]));
+		WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly");
+		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, obj.toString());
+		output += response.getEntity(String.class) + "\n\n";
 	    }
 	}
+	return output;
+    }
 
-	return retList;
+    public String writeAnomaly(String testStart, String testEnd, String trainStart, String trainEnd,
+			       Integer sourceType, String sourceValue, Integer targetType,
+			       String algorithm, Double score, Integer[] patternIndex,
+			       String[] trainingTargetValue, Integer[] trainingMinCount,
+			       Integer[] trainingMaxCount, Integer[] trainingMeanCount,
+			       Double[] trainingStandardDeviation, String[] anomalyValue,
+			       String[] anomalyCount, Integer[] predictedCauses,
+			       Integer[] predictedStates) {
+
+	JSONObject obj = new JSONObject();
+	obj.put("detectionTimeWindowStart", testStart);
+	obj.put("detectionTimeWindowEnd", testEnd);
+	obj.put("trainingTimeWindowStart", trainStart);
+	obj.put("trainingTimeWindowStart", trainEnd);
+	obj.put("sourceType", sourceType);
+	// 10.90.94.9 or 10.80.1.148
+	obj.put("sourceValue", sourceValue);
+	obj.put("targetType", targetType);
+	obj.put("algorithm", algorithm);
+	obj.put("score", score);
+	obj.put("patternIndex", patternIndex);
+
+	JSONArray normalEntriesArray = new JSONArray();
+	for (int i = 0; i < trainingTargetValue.length; i++) {
+	    JSONObject normalEntries = new JSONObject();
+	    normalEntries.put("sequenceNumber", new Integer(i));
+	    normalEntries.put("targetValue", trainingTargetValue[i]);
+	    normalEntries.put("minCount", trainingMinCount[i]);
+	    normalEntries.put("maxCount", trainingMaxCount[i]);
+	    normalEntries.put("meanCount", trainingMeanCount[i]);
+	    normalEntries.put("standardDeviation", trainingStandardDeviation[i]);
+	    normalEntriesArray.add(normalEntries);
+	}
+	obj.put("normalEntries", normalEntriesArray);
+
+	JSONArray anomalyEntriesArray = new JSONArray();
+	for (int i = 0; i < anomalyValue.length; i++) {
+	    JSONObject anomalyEntries = new JSONObject();
+	    anomalyEntries.put("sequenceNumber",new Integer(i));
+	    anomalyEntries.put("targetValue", anomalyValue[i]);
+	    anomalyEntries.put("count", anomalyCount[i]);
+	    anomalyEntriesArray.add(anomalyEntries);
+	}
+
+	JSONArray predictedCausesArray = new JSONArray();
+	for (Integer oneCause : predictedCauses) {
+	    predictedCausesArray.add(oneCause);
+	}
+	obj.put("predictedCauses",predictedCausesArray);
+
+	JSONArray predictedStatesArray = new JSONArray();
+	for (Integer oneState : predictedStates) {
+	    predictedStatesArray.add(oneState);
+	}
+	obj.put("predictedStates",predictedStatesArray);
+	String output = new String(obj.toString());
+	output += "\n";
+
+	return output;
+    }
+    // "svm_chi_squared_1.0"
+    public HashMap<Pair<Integer, Integer>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> getAnomalies(
+			String testStart, String testEnd, String trainStart, String trainEnd,
+			String sourceValue, Integer targetType, String algorithm,
+			Integer userState, Integer userCause)
+    {
+	String ret = new String();
+	/*
+	JSONObject obj = new JSONObject();
+	obj.put("detectionTimeWindowStart", testStart);
+	obj.put("detectionTimeWindowEnd", testEnd);
+	obj.put("trainingTimeWindowStart", trainStart);
+	obj.put("trainingTimeWindowStart", trainEnd);
+	obj.put("sourceType", sourceType);
+	obj.put("targetType", targetType);
+	obj.put("algorithm", algorithm);
+	obj.put("userState", userState);
+	obj.put("userCause", userCause);
+
+
+	WebResource webResource = client.resource("states/" + obj.toString());
+	String ret = webResource.accept("text/plain").get(String.class);
+	*/
+
+	String testState = "[{\"id\":1,\"state\":\"1\"}]";
+	Object retObj = JSONValue.parse(testState);
+	JSONArray retArray = (JSONArray)retObj;
+
+
+	HashMap<Pair<Integer, Integer>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalyData = new HashMap();
+
+	for (int i = 0; i < retArray.size(); i++) {
+	    Object oneObj = retArray.get(i);
+	    JSONObject oneJObj = (JSONObject)oneObj;
+
+	    Integer cause = Integer.parseInt(oneJObj.get("userCause").toString());
+	    Integer state = Integer.parseInt(oneJObj.get("userState").toString());
+
+	    Pair<Integer, Integer> key = new Pair(cause, state);
+	    if (!anomalyData.containsKey(key)) {
+		anomalyData.put(key, new ArrayList());
+	    }
+
+	    JSONArray anomalyEntries =(JSONArray)oneJObj.get("anomalyEntries");
+	    GenericPoint<Integer> point = new GenericPoint(anomalyEntries.size());
+	    for (int j = 0; j < anomalyEntries.size(); j++) {
+		JSONObject oneAnomaly = (JSONObject)anomalyEntries.get(i);
+		Integer count = Integer.parseInt(oneAnomaly.get("count").toString());
+		point.setCoord(i, count);
+	    }
+	    // Using timestamps of 0 for now. Not sure if it matters yet
+	    anomalyData.get(key).add(new Pair(0, point));
+	}
+	return anomalyData;
     }
 }

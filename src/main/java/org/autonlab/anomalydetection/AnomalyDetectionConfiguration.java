@@ -53,4 +53,6 @@ public class AnomalyDetectionConfiguration {
 	output += "</ul>\n";
 	return output;
     }
+
+    static final String ANOMALY_REST_URL_PREFIX = "localhost/essence-services/anomaly";
 }
