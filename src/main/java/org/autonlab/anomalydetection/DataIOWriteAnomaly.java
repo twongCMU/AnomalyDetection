@@ -39,17 +39,17 @@ public class DataIOWriteAnomaly {
 	for (int predictionValue = 0; predictionValue < 4; predictionValue++) {
 	    for (int i = 0; i < 1; i++) {
 		JSONObject obj = new JSONObject();
-		obj.put("detectionTimeWindowStart", "");
-		obj.put("detectionTimeWindowEnd", "");
-		obj.put("trainingTimeWindowStart", "");
-		obj.put("trainingTimeWindowStart", "");
+		obj.put("detectionTimeWindowStart", new Long(1399912491000L));
+		obj.put("detectionTimeWindowEnd", new Long(1399912451000L));
+		obj.put("trainingTimeWindowStart", new Long(1399830841000L));
+		obj.put("trainingTimeWindowEnd", new Long(1399917252000L));
 		obj.put("sourceType", new Integer(1));
 		// 10.90.94.9 or 10.80.1.148
 		obj.put("sourceValue", "10.90.94.9");
 		obj.put("targetType", new Integer(1));
 		obj.put("algorithm", "svm_chi_squared_1.0");
 		obj.put("score", new Double(100.0));
-		obj.put("patternIndex", null);
+		obj.put("patternIndex", 1);
 
 		JSONObject normalEntries0 = new JSONObject();
 		normalEntries0.put("sequenceNumber", new Integer(0));
@@ -86,6 +86,7 @@ public class DataIOWriteAnomaly {
 		JSONArray anomalyEntriesArray = new JSONArray();
 		anomalyEntriesArray.add(anomalyEntries0);
 		anomalyEntriesArray.add(anomalyEntries1);
+		obj.put("anomalyEntries", anomalyEntriesArray);
 
 		JSONArray predictedCausesArray = new JSONArray();
 		predictedCausesArray.add(new Integer(predictionValue & 0x0001));
@@ -94,7 +95,7 @@ public class DataIOWriteAnomaly {
 		JSONArray predictedStatesArray = new JSONArray();
 		predictedStatesArray.add(new Integer((predictionValue & 0x0002)>>1));
 		obj.put("predictedStates", predictedStatesArray);
-
+		System.out.println(obj.toString() + "\n");
 		WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly");
 		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, obj.toString());
 		output += response.getEntity(String.class) + "\n\n";
@@ -116,7 +117,7 @@ public class DataIOWriteAnomaly {
 	obj.put("detectionTimeWindowStart", testStart);
 	obj.put("detectionTimeWindowEnd", testEnd);
 	obj.put("trainingTimeWindowStart", trainStart);
-	obj.put("trainingTimeWindowStart", trainEnd);
+	obj.put("trainingTimeWindowEnd", trainEnd);
 	obj.put("sourceType", sourceType);
 	// 10.90.94.9 or 10.80.1.148
 	obj.put("sourceValue", sourceValue);
@@ -146,6 +147,7 @@ public class DataIOWriteAnomaly {
 	    anomalyEntries.put("count", anomalyCount[i]);
 	    anomalyEntriesArray.add(anomalyEntries);
 	}
+	obj.put("anomalyEntries", anomalyEntriesArray);
 
 	JSONArray predictedCausesArray = new JSONArray();
 	for (Integer oneCause : predictedCauses) {
@@ -175,7 +177,7 @@ public class DataIOWriteAnomaly {
 	obj.put("detectionTimeWindowStart", testStart);
 	obj.put("detectionTimeWindowEnd", testEnd);
 	obj.put("trainingTimeWindowStart", trainStart);
-	obj.put("trainingTimeWindowStart", trainEnd);
+	obj.put("trainingTimeWindowEnd", trainEnd);
 	obj.put("sourceType", sourceType);
 	obj.put("targetType", targetType);
 	obj.put("algorithm", algorithm);
