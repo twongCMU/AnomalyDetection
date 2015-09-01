@@ -54,5 +54,5 @@ public class AnomalyDetectionConfiguration {
 	return output;
     }
 
-    static final String ANOMALY_REST_URL_PREFIX = "localhost/essence-services/anomaly";
+    static final String ANOMALY_REST_URL_PREFIX = "localhost/essence-services";
 }
