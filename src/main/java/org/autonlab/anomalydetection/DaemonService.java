@@ -1014,7 +1014,7 @@ public class DaemonService {
     }
 
     @GET
-    @Path("/testFunction")
+    @Path("/populateAnomalies")
     @Produces(MediaType.TEXT_PLAIN)
     public Response testFunction() {
 	DataIOWriteAnomaly foo = new DataIOWriteAnomaly();
