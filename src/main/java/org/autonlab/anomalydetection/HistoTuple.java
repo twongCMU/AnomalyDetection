@@ -27,6 +27,10 @@ public class HistoTuple {
     // we need this so we don't remove it if it was never in it in the first place
     boolean _wasCounted; 
 
+    public static void resetMap () {
+	_valueMap = new HashMap();
+    }
+
     /**
      * Make a new histoTuple
      *

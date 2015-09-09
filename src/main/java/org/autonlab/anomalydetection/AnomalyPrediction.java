@@ -16,40 +16,41 @@ public class AnomalyPrediction {
      * @param anomalyObservedData
      * Then, for each pair of annotation and type we do a 1 vs all
      */
-    public static void predictAnomalyType(Pair<Integer, GenericPoint<Integer>> anomalyObservedData, MultiValueMap results, StringBuilder output, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramDataForFakeAnomalies) {
+    public static void predictAnomalyType(Pair<Integer, GenericPoint<Integer>> anomalyObservedData,
+					  MultiValueMap results, StringBuilder output) {
 	// XYZ upgrade dimensions if needed
 	// XYZ scale scores
 
-	/*
-	GenericPoint<Integer> fakePoint0 = new GenericPoint(320,0);
+	
+	GenericPoint<Integer> fakePoint0 = new GenericPoint(0, 280);
 	Pair<Integer, GenericPoint<Integer>> fakeAnomaly0 = new Pair(0, fakePoint0);
 
-	GenericPoint<Integer> fakePoint1 = new GenericPoint(340,0);
+	GenericPoint<Integer> fakePoint1 = new GenericPoint(0, 300);
 	Pair<Integer, GenericPoint<Integer>> fakeAnomaly1 = new Pair(0, fakePoint1);
 
-	GenericPoint<Integer> fakePoint2 = new GenericPoint(360,0);
+	GenericPoint<Integer> fakePoint2 = new GenericPoint(0, 320);
 	Pair<Integer, GenericPoint<Integer>> fakeAnomaly2 = new Pair(0, fakePoint2);
 
-	GenericPoint<Integer> fakePoint3 = new GenericPoint(380,0);
+	GenericPoint<Integer> fakePoint3 = new GenericPoint(0, 340);
 	Pair<Integer, GenericPoint<Integer>> fakeAnomaly3 = new Pair(0, fakePoint3);
-	*/
+	
 
 	// fill in some fake data
 	if (anomalyData == null) {
-	    DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
-	    anomalyData = dataConn.getAnomalies("", "", "", "",
-						"", null, "", 
+	    /*   DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
+	    anomalyData = dataConn.getAnomalies(-1L, -1L, -1L, -1L,
+						"", -1, "", 
 						null, null);
 	    dataConn.closeConnection();
 	    dataConn = null;
-	    
+	    */
 
-	    /*
+	    
 	    anomalyData = new HashMap();
-	    Pair<Integer, Integer> tempKey0 = new Pair(0,0);
-	    Pair<Integer, Integer> tempKey1 = new Pair(1,0);
-	    Pair<Integer, Integer> tempKey2 = new Pair(1,1);
-	    Pair<Integer, Integer> tempKey3 = new Pair(0,1);
+	    Pair<Integer, Integer> tempKey0 = new Pair(1,0);
+	    Pair<Integer, Integer> tempKey1 = new Pair(1,1);
+	    Pair<Integer, Integer> tempKey2 = new Pair(1,2);
+	    Pair<Integer, Integer> tempKey3 = new Pair(1,3);
 		    anomalyData.put(tempKey0, new ArrayList());
 		    anomalyData.put(tempKey1, new ArrayList());
 		    anomalyData.put(tempKey2, new ArrayList());
@@ -62,9 +63,9 @@ public class AnomalyPrediction {
 		anomalyData.get(tempKey3).add(fakeAnomaly3);
 	    }
 
-	    output.append ("Fake data:\n0,0: [320, 0]\n1,0: [340, 0]\n1,1: [360, 0]\n0,1: [380, 0]\n");
-	    output.append("Best match has class=1.0 score 1.0. Over or under a score of 1.0 mean a deviation from the best match\n\n\n");
-	    */
+	    output.append ("Fake data:\n0: [280, 0]\n1: [300, 0]\n2: [320, 0]\n3: [340, 0]\n");
+	    //	    output.append("Best match has class=1.0 score 1.0. Over or under a score of 1.0 mean a deviation from the best match\n\n\n");
+	    
 	}
 
 	// Cycle through each possible prediction and see if the anomalyObservedData is similar to it
@@ -104,14 +105,36 @@ public class AnomalyPrediction {
 	    // this code returns a lower score for more anomalous so we flip it to match kdtree
 	    //prediction *= -1;
 
-	    if (output != null) {
-		output.append("Prediction " + tempPair.getValue0() + "," + tempPair.getValue1() + ": class " + prediction + " with score " + values[0] + " for anomaly " + anomalyObservedData.getValue1().toString() + " with data \n");
+	    if (prediction == 1.0) {
+		if (output != null) {
+		    //output.append("Prediction " + tempPair.getValue0() + "," + tempPair.getValue1() + ": class " + prediction + " with score " + values[0] + " for anomaly " + anomalyObservedData.getValue1().toString() + " with data \n");
+		    Integer statusID = tempPair.getValue0();
+		    Integer causeID = tempPair.getValue1();
+
+		    String causeString = null;
+		    //causeString = dataConn.getCause(causeID);
+		    if (causeString == null) {
+			causeString = causeID + "";
+		    }
+		    output.append("Predicted cause: " + causeID + " with confidence: ");
+		    if (Math.abs(1.0 - values[0]) < .15) {
+			output.append("HIGH");
+		    }
+		    else if (Math.abs(1.0-values[0]) < .5) {
+			output.append("Moderate");
+		    }
+		    else {
+			output.append("Low");
+		    }
+		    output.append(" (" + ((int)(Math.abs(1.0 - values[0])*1000.0))/1000.0 + ")\n");
+		}
 	    }
 
 	    if (results != null) {
 		results.put(prediction, tempPair);
 	    }
 	}
+	output.append("\n");
     }
 
     /* 

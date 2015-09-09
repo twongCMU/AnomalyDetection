@@ -361,15 +361,16 @@ public class SVMCalc {
 
 	    prediction /= anomalyScale;
 
-	    output.append(index + ": predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data \n");
+	    output.append(index + ": Anomaly score: " + prediction + " for data " + onePoint.getValue1().toString() + "\n");
 
 	    if (results != null) {
 		results.put(prediction, onePoint);
 	    }
 
-	    if (prediction != 0.0) {
+	    if (prediction > 1.0) {
 		//		System.out.println("OH NOES");
-		AnomalyPrediction.predictAnomalyType(onePoint, null, output, histogramData.getHistograms(testID, testValue, testKey));
+		output.append("This seems suspicious, so predicting the cause of this anomaly\n");
+		AnomalyPrediction.predictAnomalyType(onePoint, null, output);
 		//	return output;
 	    }
 	    index++;
