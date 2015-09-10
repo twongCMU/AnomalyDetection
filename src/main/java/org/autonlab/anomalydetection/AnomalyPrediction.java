@@ -21,7 +21,7 @@ public class AnomalyPrediction {
 	// XYZ upgrade dimensions if needed
 	// XYZ scale scores
 
-	
+	/*	
 	GenericPoint<Integer> fakePoint0 = new GenericPoint(0, 280);
 	Pair<Integer, GenericPoint<Integer>> fakeAnomaly0 = new Pair(0, fakePoint0);
 
@@ -34,18 +34,18 @@ public class AnomalyPrediction {
 	GenericPoint<Integer> fakePoint3 = new GenericPoint(0, 340);
 	Pair<Integer, GenericPoint<Integer>> fakeAnomaly3 = new Pair(0, fakePoint3);
 	
-
+	*/
 	// fill in some fake data
+
 	if (anomalyData == null) {
-	    /*   DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
+	    DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
 	    anomalyData = dataConn.getAnomalies(-1L, -1L, -1L, -1L,
 						"", -1, "", 
 						null, null);
 	    dataConn.closeConnection();
 	    dataConn = null;
-	    */
 
-	    
+	    /*
 	    anomalyData = new HashMap();
 	    Pair<Integer, Integer> tempKey0 = new Pair(1,0);
 	    Pair<Integer, Integer> tempKey1 = new Pair(1,1);
@@ -64,13 +64,13 @@ public class AnomalyPrediction {
 	    }
 
 	    output.append ("Fake data:\n0: [280, 0]\n1: [300, 0]\n2: [320, 0]\n3: [340, 0]\n");
+	    */
 	    //	    output.append("Best match has class=1.0 score 1.0. Over or under a score of 1.0 mean a deviation from the best match\n\n\n");
 	    
 	}
 
 	// Cycle through each possible prediction and see if the anomalyObservedData is similar to it
 	for (Pair<Integer, Integer> tempPair : anomalyData.keySet()) {
-	    
 	    ArrayList<Pair<Integer, GenericPoint<Integer>>> one = anomalyData.get(tempPair);
 	    ArrayList<Pair<Integer, GenericPoint<Integer>>> all = new ArrayList();
 	    for (Pair<Integer, Integer> tempAllPair : anomalyData.keySet()) {

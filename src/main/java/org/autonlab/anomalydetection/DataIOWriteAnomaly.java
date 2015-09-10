@@ -39,7 +39,7 @@ public class DataIOWriteAnomaly {
     public String writeFakeAnomalies() 
     {
 	String output = new String();
-	int numToCreate = 1;
+	int numToCreate = 50;
 
 	for (int predictionValue = 0; predictionValue < 4; predictionValue++) {
 	    for (int i = 0; i < numToCreate; i++) {
@@ -54,12 +54,12 @@ public class DataIOWriteAnomaly {
 		Double score = new Double(100.0);
 		Integer patternIndex = 1;
 		String[] trainingTargetValue = { "10.90.94.9", "10.80.1.148" };
-		Integer[] trainingMinCount = { 320 + (predictionValue * 20), 0 };
-		Integer[] trainingMaxCount = { 320 + (predictionValue * 20), 0 };
-		Integer[] trainingMeanCount = { 320 + (predictionValue * 20), 0 };
+		Integer[] trainingMinCount = { 0, 320 + (predictionValue * 20)};
+		Integer[] trainingMaxCount = { 0, 320 + (predictionValue * 20)};
+		Integer[] trainingMeanCount = { 0,  320 + (predictionValue * 20)};
 		Double[] trainingStandardDeviation = { 0.0, 0.0 };
 		String[] anomalyValue = { "10.90.94.9", "10.80.1.148" };
-		Integer[] anomalyCount = { 320 + (predictionValue * 20), 0 };
+		Integer[] anomalyCount = { 0, 320 + (predictionValue * 20)};
 		Integer[] predictedCauses = { (1 + predictionValue) };
 		Integer[] predictedStates = { 2 };
 		output += writeAnomaly(testStart, testEnd, trainStart, trainEnd,
@@ -71,7 +71,7 @@ public class DataIOWriteAnomaly {
 				       anomalyCount,  predictedCauses,
 				       predictedStates);
 	    }
-	    output += "Sent " + numToCreate + " anomalies with data [" + (320 + (predictionValue * 20)) + ",0] and cause " + (1 + predictionValue) + "\n";
+	    output += "Sent " + numToCreate + " anomalies with data [0, " + (320 + (predictionValue * 20)) + "] and cause " + (1 + predictionValue) + "\n";
 	}
 	return output;
     }
@@ -171,7 +171,14 @@ public class DataIOWriteAnomaly {
 
 	String output = new String();
 	for (Pair<Integer, Integer> bar : anomalies.keySet()) {
-	    output += bar.getValue0() + ", " + bar.getValue1();
+	    output += bar.getValue0() + ", " + bar.getValue1() + "\n";
+	    for (Pair<Integer, GenericPoint<Integer>> oneData : anomalies.get(bar)) {
+		output += "[";
+		for (int i = 0; i < oneData.getValue1().getDimensions(); i++) {
+		    output += oneData.getValue1().getCoord(i) + ",";
+		}
+		output += "]\n";
+	    }
 	}
 
 	return output;
@@ -207,14 +214,14 @@ public class DataIOWriteAnomaly {
 	    arg += "&algorithm=" + algorithm;
 	}
 	
-	if (userCause > 0) {
+	if (userCause != null && userCause > 0) {
 	    arg += "&userCause=" + userCause;
 	}
 
-	if (userState > 0) {
+	if (userState != null && userState > 0) {
 	    arg += "&userState=" + userState;
 	}
-
+	System.out.println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX " +arg + "\n");
 	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly/query/?" + arg);
 	ret = webResource.accept("application/json").get(String.class);
 	System.out.println(ret + "\n\n");
@@ -233,8 +240,11 @@ public class DataIOWriteAnomaly {
 	    Object oneObj = retArray.get(i);
 	    JSONObject oneJObj = (JSONObject)oneObj;
 
-	    Integer cause = Integer.parseInt(oneJObj.get("userCause").toString());
-	    Integer state = Integer.parseInt(oneJObj.get("userState").toString());
+	    JSONObject oneCause = (JSONObject)oneJObj.get("userCause");
+	    Integer cause = Integer.parseInt(oneCause.get("id").toString());
+
+	    JSONObject oneState = (JSONObject)oneJObj.get("userState");
+	    Integer state = Integer.parseInt(oneState.get("id").toString());
 
 	    Pair<Integer, Integer> key = new Pair(cause, state);
 	    if (!anomalyData.containsKey(key)) {
@@ -244,9 +254,10 @@ public class DataIOWriteAnomaly {
 	    JSONArray anomalyEntries =(JSONArray)oneJObj.get("anomalyEntries");
 	    GenericPoint<Integer> point = new GenericPoint(anomalyEntries.size());
 	    for (int j = 0; j < anomalyEntries.size(); j++) {
-		JSONObject oneAnomaly = (JSONObject)anomalyEntries.get(i);
+		JSONObject oneAnomaly = (JSONObject)anomalyEntries.get(j);
 		Integer count = Integer.parseInt(oneAnomaly.get("count").toString());
-		point.setCoord(i, count);
+		Integer sequenceNumber = Integer.parseInt(oneAnomaly.get("sequenceNumber").toString());
+		point.setCoord(sequenceNumber, count);
 	    }
 	    // Using timestamps of 0 for now. Not sure if it matters yet
 	    anomalyData.get(key).add(new Pair(0, point));

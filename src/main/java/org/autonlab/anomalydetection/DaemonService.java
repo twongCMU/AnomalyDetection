@@ -411,7 +411,7 @@ public class DaemonService {
 	allHistogramsMapLock.writeLock().lock();
 
 	if (hostname != null) {
-	    AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX = "http://hostname/essence-services";
+	    AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX = "http://" + hostname + "/essence-services";
 	}
 
 	deleteAll(); //invalidate the existing data
