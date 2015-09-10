@@ -110,6 +110,19 @@ public class HistoTuple {
 	return output;
     }
 
+    public static String[] getDimensionNamesArray() {
+	String[] ret = null;
+	// making a bad assumption here that there is only one valuetype
+	for (GenericPoint<String> valueType : _valueMap.keySet()) {
+	    ret = new String[_valueMap.get(valueType).size()];
+	    for (String keyVal : _valueMap.get(valueType).keySet()) {
+		ret[_valueMap.get(valueType).get(keyVal)] = keyVal;
+	    }
+	}
+
+	return ret;
+    }
+
     /**
      * This code works for any number of dimensions
      * This code assumes that the input file is ordered by time

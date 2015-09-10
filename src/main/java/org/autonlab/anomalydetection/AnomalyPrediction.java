@@ -15,8 +15,12 @@ public class AnomalyPrediction {
     /**
      * @param anomalyObservedData
      * Then, for each pair of annotation and type we do a 1 vs all
+     *
+     * ret[0] = predicted statusID;
+     * ret[1] = predicted causeID;
+     * ret[2] = raw score;
      */
-    public static void predictAnomalyType(Pair<Integer, GenericPoint<Integer>> anomalyObservedData,
+    public static Double[] predictAnomalyType(Pair<Integer, GenericPoint<Integer>> anomalyObservedData,
 					  MultiValueMap results, StringBuilder output) {
 	// XYZ upgrade dimensions if needed
 	// XYZ scale scores
@@ -69,6 +73,11 @@ public class AnomalyPrediction {
 	    
 	}
 
+	Double[] ret = new Double[3];
+	ret[0] = -1.0;
+	ret[1] = -1.0;
+	ret[2] = -1.0;
+
 	// Cycle through each possible prediction and see if the anomalyObservedData is similar to it
 	for (Pair<Integer, Integer> tempPair : anomalyData.keySet()) {
 	    ArrayList<Pair<Integer, GenericPoint<Integer>>> one = anomalyData.get(tempPair);
@@ -105,6 +114,8 @@ public class AnomalyPrediction {
 	    // this code returns a lower score for more anomalous so we flip it to match kdtree
 	    //prediction *= -1;
 
+	    double best_score = 1000;
+
 	    if (prediction == 1.0) {
 		if (output != null) {
 		    //output.append("Prediction " + tempPair.getValue0() + "," + tempPair.getValue1() + ": class " + prediction + " with score " + values[0] + " for anomaly " + anomalyObservedData.getValue1().toString() + " with data \n");
@@ -127,6 +138,12 @@ public class AnomalyPrediction {
 			output.append("Low");
 		    }
 		    output.append(" (" + ((int)(Math.abs(1.0 - values[0])*1000.0))/1000.0 + ")\n");
+		    if (best_score > Math.abs(1.0 - values[0])) {
+			best_score = Math.abs(1.0 - values[0]);
+			ret[0] = statusID.doubleValue();
+			ret[1] = causeID.doubleValue();
+			ret[2] = values[0];
+		    }
 		}
 	    }
 
@@ -135,6 +152,8 @@ public class AnomalyPrediction {
 	    }
 	}
 	output.append("\n");
+
+	return ret;
     }
 
     /* 

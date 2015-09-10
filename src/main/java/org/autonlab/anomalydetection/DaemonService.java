@@ -548,14 +548,14 @@ public class DaemonService {
 	}
 
 	MultiValueMap resultsHash = new MultiValueMap();
-	try {
+	//	try {
 	    StringBuilder ret = null;
 	    ret = SVMCalc.runOneTestSVM(histogramData, trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, resultsHash);
 	    output.append(ret.toString());
-	}
-	catch (Exception ex) {
+	    /*}
+		catch (Exception ex) {
 	    System.out.println("Caught excpetion. Data changing");
-	}
+	    }*/
 
 
 	List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());

@@ -348,6 +348,14 @@ public class SVMCalc {
 	SVMKernel svmKernel = new SVMKernel(histogramData.getHistograms(testID, testValue, testKey), histogramData.getHistograms(trainID, trainValue, trainKey), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
 	svm_node[][] bar = svmKernel.getData();
 
+	String anomalyString = "";
+	if (testKey.getDimensions() > 0) {
+	    anomalyString = testKey.getCoord(0).split(";")[1];
+	    // this is of the form type;value and we just want the value
+	    
+	}
+
+
 	int index = 0;
 	/* loop through the histograms to generate the predictions */
 	for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramData.getHistograms(testID, testValue, testKey)) {
@@ -368,9 +376,25 @@ public class SVMCalc {
 	    }
 
 	    if (prediction > 1.0) {
-		//		System.out.println("OH NOES");
 		output.append("This seems suspicious, so predicting the cause of this anomaly\n");
-		AnomalyPrediction.predictAnomalyType(onePoint, null, output);
+		Double[] ret = AnomalyPrediction.predictAnomalyType(onePoint, null, output);
+		DataIOWriteAnomaly writeAnomaly = new DataIOWriteAnomaly();
+		int dim = onePoint.getValue1().getDimensions();
+		Integer[] onePointToArray = new Integer[dim];
+		for (int i = 0; i < dim; i++) {
+		    onePointToArray[i] = onePoint.getValue1().getCoord(i);
+		}
+		Integer[] predictedCauses = { ret[1].intValue() };
+		Integer[] predictedStates = { ret[0].intValue() };
+		output.append(writeAnomaly.writeAnomaly(0L, 0L, 0L, 0L,
+							1,anomalyString, 1, 
+							"svm_chi_squared_1.0", ret[2], -1,
+							null, null,
+							null, null,
+							null, HistoTuple.getDimensionNamesArray(),
+							onePointToArray, predictedCauses,
+							predictedStates));
+		    
 		//	return output;
 	    }
 	    index++;
