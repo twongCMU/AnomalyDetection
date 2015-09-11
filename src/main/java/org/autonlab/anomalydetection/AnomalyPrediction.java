@@ -116,11 +116,13 @@ public class AnomalyPrediction {
 
 	    double best_score = 1000;
 
-	    if (prediction == 1.0) {
+	    Integer statusID = tempPair.getValue0();
+	    Integer causeID = tempPair.getValue1();
+
+	    if (prediction == 1.0 && causeID >= 0) {
 		if (output != null) {
 		    //output.append("Prediction " + tempPair.getValue0() + "," + tempPair.getValue1() + ": class " + prediction + " with score " + values[0] + " for anomaly " + anomalyObservedData.getValue1().toString() + " with data \n");
-		    Integer statusID = tempPair.getValue0();
-		    Integer causeID = tempPair.getValue1();
+
 
 		    String causeString = null;
 		    //causeString = dataConn.getCause(causeID);
@@ -129,7 +131,7 @@ public class AnomalyPrediction {
 		    }
 		    output.append("Predicted cause: " + causeID + " with confidence: ");
 		    if (Math.abs(1.0 - values[0]) < .15) {
-			output.append("HIGH");
+			output.append("High");
 		    }
 		    else if (Math.abs(1.0-values[0]) < .5) {
 			output.append("Moderate");
@@ -137,7 +139,8 @@ public class AnomalyPrediction {
 		    else {
 			output.append("Low");
 		    }
-		    output.append(" (" + ((int)(Math.abs(1.0 - values[0])*1000.0))/1000.0 + ")\n");
+		    // output.append(" (" + ((int)(Math.abs(1.0 - values[0])*1000.0))/1000.0 + ")\n");
+		    output.append("\n");
 		    if (best_score > Math.abs(1.0 - values[0])) {
 			best_score = Math.abs(1.0 - values[0]);
 			ret[0] = statusID.doubleValue();
