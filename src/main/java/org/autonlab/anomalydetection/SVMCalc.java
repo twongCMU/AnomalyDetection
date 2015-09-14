@@ -384,8 +384,19 @@ public class SVMCalc {
 		for (int i = 0; i < dim; i++) {
 		    onePointToArray[i] = onePoint.getValue1().getCoord(i);
 		}
-		Integer[] predictedCauses = { ret[1].intValue() };
-		Integer[] predictedStates = { ret[0].intValue() };
+		Integer[] predictedCauses = null;
+
+		Integer[] predictedStates = null;
+
+		if (ret[1] >= 0.0) {
+		    predictedCauses = new Integer[1];
+		    predictedCauses[0] = ret[1].intValue();
+		}
+		if (ret[0] >= 0.0) {
+		    predictedStates = new Integer[1];
+		    predictedStates[0] = ret[0].intValue();
+		}
+
 		output.append(writeAnomaly.writeAnomaly(0L, 0L, 0L, 0L,
 							1,anomalyString, 1, 
 							"svm_chi_squared_1.0", ret[2], -1,
@@ -394,8 +405,9 @@ public class SVMCalc {
 							null, HistoTuple.getDimensionNamesArray(),
 							onePointToArray, predictedCauses,
 							predictedStates));
-		    
-		//	return output;
+		if (predictedCauses == null || predictedStates == null) {
+		    output.append("No predicted cause was made. This happens when there is not yet enough user feedback.\n\n");
+		}
 	    }
 	    index++;
 	}

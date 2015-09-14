@@ -130,18 +130,22 @@ public class DataIOWriteAnomaly {
 	obj.put("anomalyEntries", anomalyEntriesArray);
 
 	JSONArray predictedCausesArray = new JSONArray();
-	for (Integer oneCause : predictedCauses) {
-	    JSONObject predictedCausesEntry = new JSONObject();
-	    predictedCausesEntry.put("id", new Integer(oneCause));
-	    predictedCausesArray.add(predictedCausesEntry);
+	if (predictedCauses != null) {
+	    for (Integer oneCause : predictedCauses) {
+		JSONObject predictedCausesEntry = new JSONObject();
+		predictedCausesEntry.put("id", new Integer(oneCause));
+		predictedCausesArray.add(predictedCausesEntry);
+	    }
 	}
 	obj.put("predictedCauses",predictedCausesArray);
 
 	JSONArray predictedStatesArray = new JSONArray();
-	for (Integer oneState : predictedStates) {
-	    JSONObject predictedStatesEntry = new JSONObject();
-	    predictedStatesEntry.put("id", oneState);
-	    predictedStatesArray.add(predictedStatesEntry);
+	if (predictedStates != null) {
+	    for (Integer oneState : predictedStates) {
+		JSONObject predictedStatesEntry = new JSONObject();
+		predictedStatesEntry.put("id", oneState);
+		predictedStatesArray.add(predictedStatesEntry);
+	    }
 	}
 	obj.put("predictedStates",predictedStatesArray);
 	String output = new String();
@@ -152,7 +156,7 @@ public class DataIOWriteAnomaly {
 	ClientResponse response = webResource.type("application/json").post(ClientResponse.class, obj.toString());
 	String writeRes = response.getEntity(String.class);
 	if (!writeRes.equals("A new anomaly and alert have been created")) {
-	    output += writeRes + "\n\n\n";
+	    output += "\nUnexpected response from writing anomaly: " + writeRes + "\n\n\n";
 	}
 
 	return output;

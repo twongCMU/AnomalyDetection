@@ -154,7 +154,9 @@ public class AnomalyPrediction {
 		results.put(prediction, tempPair);
 	    }
 	}
-	output.append("\n");
+	if (ret[0] >= 0) {
+	    output.append("\n");
+	}
 
 	return ret;
     }
