@@ -20,7 +20,15 @@ public class SVMCalc {
      // cache of processed models. This is shared across concurrent accesses so we need to protect it with a lock
     static volatile HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, svm_model>>> _svmModelsCache = new HashMap();
 
-    private static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
+    public static svm_model generateModel(ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy) {
+	return generateModelMain(histograms, null, targetCrossTrainAccuracy, histogramsAnomaly, targetAnomalyAccuracy, svm_parameter.ONE_CLASS);
+    }
+
+    public static svm_model generateModelOneVsAll(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsClass1, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsClass2, double targetCrossTrainAccuracy) {
+	return generateModelMain(histogramsClass1, histogramsClass2, targetCrossTrainAccuracy, null, 0.0, svm_parameter.NU_SVC);
+    }
+
+    private static svm_model generateModelMain(ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsClass1, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsClass2, double targetCrossTrainAccuracy, ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsAnomaly, double targetAnomalyAccuracy, Integer classifierType) {
 	TreeMap<Double, Double> nuValues = new TreeMap();
 	System.out.println("YYY -------------------------");
 	// generate a list of nu values to try (we can add to this later)
@@ -31,11 +39,31 @@ public class SVMCalc {
 	}
 
 	// fill in the svm_problem with the histogram data points
+	int histSize = histogramsClass1.size();
+	if (histogramsClass2 != null) {
+	    histSize += histogramsClass2.size();
+	}
 	svm_problem svmProblem = new svm_problem();
-	svmProblem.l = histograms.size();
-	svmProblem.y = new double[histograms.size()];
+	svmProblem.l = histSize;
+	svmProblem.y = new double[histSize];
 	Arrays.fill(svmProblem.y, 1.0); // all of our training data is non-anomalous
-	svmProblem.x =  (new SVMKernel(histograms, histograms, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+	if (histogramsClass2 != null) {
+	    for (int i = histogramsClass1.size(); i < histSize; i++) {
+		svmProblem.y[i] = 2.0;
+	    }
+	}
+
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> histogramsCombined = null;
+
+	if (histogramsClass2 == null) {
+	    histogramsCombined = histogramsClass1;
+	}
+	else {
+	    histogramsCombined = new ArrayList();
+	    histogramsCombined.addAll(histogramsClass1);
+	    histogramsCombined.addAll(histogramsClass2);
+	}
+	svmProblem.x =  (new SVMKernel(histogramsCombined, histogramsCombined, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 
 	svm_problem svmProblemAnomaly = null;
 	if (histogramsAnomaly != null) {
@@ -43,11 +71,11 @@ public class SVMCalc {
 	    svmProblemAnomaly.l = histogramsAnomaly.size();
 	    svmProblemAnomaly.y = new double[histogramsAnomaly.size()];
 	    Arrays.fill(svmProblemAnomaly.y, -1.0); // set all of this data to anomalous
-	    svmProblemAnomaly.x =  (new SVMKernel(histogramsAnomaly, histograms, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
+	    svmProblemAnomaly.x =  (new SVMKernel(histogramsAnomaly, histogramsCombined, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS)).getData();
 	}
 
 	svm_parameter svmParameter = new svm_parameter();
-	svmParameter.svm_type = svm_parameter.ONE_CLASS;
+	svmParameter.svm_type = classifierType;
 	svmParameter.kernel_type = AnomalyDetectionConfiguration.SVM_KERNEL_TYPE;
 	svmParameter.cache_size = AnomalyDetectionConfiguration.SVM_CACHE_SIZE;
 	svmParameter.eps = AnomalyDetectionConfiguration.SVM_EPS;
@@ -326,6 +354,14 @@ public class SVMCalc {
 	SVMKernel svmKernel = new SVMKernel(histogramData.getHistograms(testID, testValue, testKey), histogramData.getHistograms(trainID, trainValue, trainKey), AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, AnomalyDetectionConfiguration.NUM_THREADS);
 	svm_node[][] bar = svmKernel.getData();
 
+	String anomalyString = "";
+	if (testKey.getDimensions() > 0) {
+	    anomalyString = testKey.getCoord(0).split(";")[1];
+	    // this is of the form type;value and we just want the value
+	    
+	}
+
+
 	int index = 0;
 	/* loop through the histograms to generate the predictions */
 	for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramData.getHistograms(testID, testValue, testKey)) {
@@ -339,11 +375,46 @@ public class SVMCalc {
 
 	    prediction /= anomalyScale;
 
-//	    output.append(index + ": predicted " + prediction + " for " + onePoint.getValue1().toString() + " with data \n");
-	    output.append("Pred: " + d + ".\t Dec: " + prediction + " for " + onePoint.getValue1().toString() + "\n");
+
+	    output.append(index + ": Anomaly score: " + prediction + " for data " + onePoint.getValue1().toString() + "\n");
 
 	    if (results != null) {
 		results.put(prediction, onePoint);
+	    }
+
+	    if (prediction > 1.0) {
+		output.append("This seems suspicious, so predicting the cause of this anomaly\n");
+		Double[] ret = AnomalyPrediction.predictAnomalyType(onePoint, null, output);
+		DataIOWriteAnomaly writeAnomaly = new DataIOWriteAnomaly();
+		int dim = onePoint.getValue1().getDimensions();
+		Integer[] onePointToArray = new Integer[dim];
+		for (int i = 0; i < dim; i++) {
+		    onePointToArray[i] = onePoint.getValue1().getCoord(i);
+		}
+		Integer[] predictedCauses = null;
+
+		Integer[] predictedStates = null;
+
+		if (ret[1] >= 0.0) {
+		    predictedCauses = new Integer[1];
+		    predictedCauses[0] = ret[1].intValue();
+		}
+		if (ret[0] >= 0.0) {
+		    predictedStates = new Integer[1];
+		    predictedStates[0] = ret[0].intValue();
+		}
+
+		output.append(writeAnomaly.writeAnomaly(0L, 0L, 0L, 0L,
+							1,anomalyString, 1, 
+							"svm_chi_squared_1.0", ret[2], -1,
+							null, null,
+							null, null,
+							null, HistoTuple.getDimensionNamesArray(),
+							onePointToArray, predictedCauses,
+							predictedStates));
+		if (predictedCauses == null || predictedStates == null) {
+		    output.append("No predicted cause was made. This happens when there is not yet enough user feedback.\n\n");
+		}
 	    }
 	    index++;
 	}

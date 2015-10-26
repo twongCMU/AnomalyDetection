@@ -116,20 +116,21 @@ public class DaemonService {
 			  @QueryParam("categoryCSV") String categoryCSV,
 			  @QueryParam("value") String valueCSV,
 			  @QueryParam("ageMins") Integer ageMins,
-			  @QueryParam("keySpace") String keySpace) throws InterruptedException {
+			  @QueryParam("keySpace") String keySpace,
+			  @QueryParam("table") String table) throws InterruptedException {
 
 	allHistogramsMapLock.writeLock().lock();
 
-	StringBuilder output = getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace);
+	StringBuilder output = getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table);
 
 	allHistogramsMapLock.writeLock().unlock();
 	return Response.status(200).entity(output.toString()).build();
     }
 
-    public StringBuilder getDb(String hostname, String categoryCSV, String valueCSV, Integer ageMins, String keySpace) {
+    public StringBuilder getDb(String hostname, String categoryCSV, String valueCSV, Integer ageMins, String keySpace, String table) {
 	StringBuilder output = new StringBuilder("");
 
-	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, keySpace);
+	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, keySpace, table);
 
 	if (categoryCSV != null) {
 	    dbHandle.setCategoryFields(categoryCSV);
@@ -405,23 +406,49 @@ public class DaemonService {
 			  @QueryParam("valueCSV") String valueCSV,
 			  @QueryParam("ageMins") Integer ageMins,
            		  @QueryParam("refreshSec") Integer refreshSec,
-			  @QueryParam("keySpace") String keySpace) throws InterruptedException {
+ 			  @QueryParam("keySpace") String keySpace,
+ 			  @QueryParam("table") String table) throws InterruptedException {
 
 	allHistogramsMapLock.writeLock().lock();
 
+	if (hostname != null) {
+	    AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX = "http://" + hostname + "/essence-services";
+	}
+
 	deleteAll(); //invalidate the existing data
 
+	/* 
+	 * There is a bug that I haven't tracked down.
+	 * If we run this demo first on an empty database, then stream to it, somehow
+	 * this breaks the SVM library. I surmised that it was related to this HistoTuple
+	 * getting out of sync when the database was empty and then now growing correctly
+	 * when there was data. So, this fixes the problem but I don't understand the
+	 * reason it was broken in the first place.
+	 */
+	HistoTuple.resetMap();
+
 	//this will go into ID 0
-	getDb(hostname, categoryCSV, valueCSV, null, keySpace);
+	getDb(hostname, categoryCSV, valueCSV, null, keySpace, table);
 
 	//this will go into ID 1
-	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace);
+	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table);
 
+	GenericPoint<String> oneCategoryPointSource = null;
+	GenericPoint<String> oneCategoryPointDest = null;
 	if (histogramData.isIDValid(0) && histogramData.isIDValid(1)) {
 	    for (GenericPoint<String> oneValuePoint: histogramData.getValueList(0)) {
 		for (GenericPoint<String> oneCategoryPoint : histogramData.getCategoryList(0, oneValuePoint)) {
-		    System.out.println(oneCategoryPoint.getCoord(0));
-		    StringBuilder output = getDataSVM(0, oneCategoryPoint.getCoord(0), valueCSV, 1, oneCategoryPoint.getCoord(0), valueCSV, null, null, null, refreshSec);
+		    System.out.println(oneCategoryPoint.getCoord(0) + "ABC");
+		    if (oneCategoryPointSource == null) {
+			oneCategoryPointSource = oneCategoryPoint;
+			continue;
+		    }
+		    if (oneCategoryPointDest == null) {
+			oneCategoryPointDest = oneCategoryPoint;
+		    }
+
+		    //StringBuilder output = getDataSVM(0, oneCategoryPoint.getCoord(0), valueCSV, 1, oneCategoryPoint.getCoord(0), valueCSV, null, null, null, refreshSec);
+		    StringBuilder output = getDataSVM(0, oneCategoryPointSource.getCoord(0), valueCSV, 1, oneCategoryPointDest.getCoord(0), valueCSV, null, null, null, refreshSec);
 
 		    allHistogramsMapLock.writeLock().unlock();
 		    return Response.status(200).entity(output.toString()).build();
@@ -490,6 +517,7 @@ public class DaemonService {
 	    anomalyTrainValuePoint = getPointFromCSV(anomalyTrainValue);
 	}
 
+	/* if the data we want isn't stored, perhaps we can calculate it from other existing data */
 	int newTrainID = histogramData.recalculateByCategory(trainID, trainCategoryPoint, trainValuePoint, output);
 	if (newTrainID == -1) {
 	    output.append("ERROR: trainCategoryCSV (" + trainCategory + ") was not found and could not be calculated from existing data\n");
@@ -521,13 +549,25 @@ public class DaemonService {
 	}
 
 	MultiValueMap resultsHash = new MultiValueMap();
-	output.append(SVMCalc.runOneTestSVM(histogramData, trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, resultsHash));
+	try {
+	    StringBuilder ret = null;
+	    ret = SVMCalc.runOneTestSVM(histogramData, trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, resultsHash);
+	    output.append(ret.toString());
+	}
+	catch (Exception ex) {
+	    System.out.println("Caught excpetion. Data changing");
+	}
+
 
 	List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 	Collections.sort(resultsHashList); // ascending order
 	Collections.reverse(resultsHashList); //descending order
 	int ii = 0;
-	Double score = resultsHashList.get(0);
+	
+	Double score = 0.0;
+	if (resultsHashList.size() > 0) {
+	    score = resultsHashList.get(0);
+	}
 
 	Pair<Integer, Integer> trainTime = histogramData.getStartAndEndTime(trainID);
 	Pair<Integer, Integer> anomalyTrainTime = null;
@@ -536,7 +576,7 @@ public class DaemonService {
 	}
 	Pair<Integer, Integer> testTime = histogramData.getStartAndEndTime(testID);
 
-
+	/*
 	for (Pair<Integer, GenericPoint<Integer>> onePoint : ((Collection<Pair<Integer, GenericPoint<Integer>>>)resultsHash.getCollection(score))) {
 	    Integer timestamp = onePoint.getValue0();
 	    output.append("\n====== Highest Anomaly Info =====\n"); //right now we just say the highest scoring point is anomaly just to make sure we can print the info
@@ -548,13 +588,14 @@ public class DaemonService {
 		output.append(" * Anomaly training data: " + anomalyTrainID + "," + anomalyTrainCategoryPoint.toString() + "," + anomalyTrainValuePoint.toString() + " time range: " + anomalyTrainTime.getValue0() + " to " + anomalyTrainTime.getValue1() + "\n");
 	    }
 	    output.append(" * Testing data: " + testID + "," + testCategoryPoint.toString() + "," + testValuePoint.toString() + " time range: " + testTime.getValue0() + " to " + testTime.getValue1() + "\n");
-	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + trainID + "&categoryCSV=" + trainCategory + "&valueCSV=" + trainValue + ">link to training dataset</a>\n");
+	    output.append("<a href=http://10.21.1.24:8080/AnomalyDetection/rest/getHistograms?id=" + trainID + "&categoryCSV=" + trainCategory + "&valueCSV=" + trainValue + ">link to training dataset</a>\n");
 	    if (anomalyTrainID != null) {
-		output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&categoryCSV=" + anomalyTrainCategory + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
+		output.append("<a href=http://10.21.1.24:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&categoryCSV=" + anomalyTrainCategory + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
 	    }
-	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + testID + "&categoryCSV=" + testCategory + "&valueCSV=" + testValue + ">link to testing dataset</a>\n");
+	    output.append("<a href=http://10.21.1.24:8080/AnomalyDetection/rest/getHistograms?id=" + testID + "&categoryCSV=" + testCategory + "&valueCSV=" + testValue + ">link to testing dataset</a>\n");
 	    break;
 	}
+	*/
 	return output;
     }
 
@@ -650,11 +691,11 @@ public class DaemonService {
 		output.append(" * Anomaly training data: " + anomalyTrainID + "," + anomalyTrainCategoryPoint.toString() + "," + anomalyTrainValuePoint.toString() + " time range: " + anomalyTrainTime.getValue0() + " to " + anomalyTrainTime.getValue1() + "\n"); 
 	    }
 	    output.append(" * Testing data: " + testID + "," + testCategoryPoint.toString() + "," + testValuePoint.toString() + " time range: " + testTime.getValue0() + " to " + testTime.getValue1() + "\n");
-	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + trainID + "&categoryCSV=" + trainCategory + "&valueCSV=" + trainValue + ">link to training dataset</a>\n");
+	    output.append("<a href=http://10.21.1.24:8080/AnomalyDetection/rest/getHistograms?id=" + trainID + "&categoryCSV=" + trainCategory + "&valueCSV=" + trainValue + ">link to training dataset</a>\n");
 	    if (anomalyTrainID != null) {
-		output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&categoryCSV=" + anomalyTrainCategory + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
+		output.append("<a href=http://10.21.1.24:8080/AnomalyDetection/rest/getHistograms?id=" + anomalyTrainID + "&categoryCSV=" + anomalyTrainCategory + "&valueCSV=" + anomalyTrainValue + ">link to anomaly training dataset</a>\n");
 	    }
-	    output.append("<a href=http://localhost:8080/AnomalyDetection/rest/getHistograms?id=" + testID + "&categoryCSV=" + testCategory + "&valueCSV=" + testValue + ">link to testing dataset</a>\n");
+	    output.append("<a href=http://10.21.1.24:8080/AnomalyDetection/rest/getHistograms?id=" + testID + "&categoryCSV=" + testCategory + "&valueCSV=" + testValue + ">link to testing dataset</a>\n");
 	    break;
 	}
 
@@ -974,5 +1015,24 @@ public class DaemonService {
 	for (int i = 0; i < v.length; i++)
 	    n += v[i]*v[i];
 	return Math.sqrt(n);
+    }
+
+    @GET
+    @Path("/populateAnomalies")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response testFunction() {
+	DataIOWriteAnomaly foo = new DataIOWriteAnomaly();
+	return Response.status(200).entity(foo.writeFakeAnomalies()).build();
+    }
+
+    @GET
+    @Path("/testFunction2")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response testFunction2() {
+	DataIOWriteAnomaly foo = new DataIOWriteAnomaly();
+	HashMap<Pair<Integer, Integer>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalies;
+	String output = foo.getAnomaliesTest();
+
+	return Response.status(200).entity(output).build();
     }
 }

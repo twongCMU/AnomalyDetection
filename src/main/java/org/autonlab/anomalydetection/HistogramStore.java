@@ -9,7 +9,7 @@ import org.javatuples.*;
 
 
 public class HistogramStore {
-    //                        ID                value                          category              scaling                 time       histogram
+    //               ID                value                          category              scaling                 time       histogram
     private HashMap<Integer, HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>>> allHistogramsMap;
     private HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, HashMap<Pair<Integer, Integer>, Integer>>> allHistogramsMapKeyRemap;
 
@@ -79,6 +79,46 @@ public class HistogramStore {
 	allHistogramsMap.put(id, putData);
 	nextHistogramMapID++;
 	return id;
+    }
+
+    /*
+     * The first dimension is an array one for each value in the histogram
+     * For each of these there are 4 values the min, max, mean, and stddev for those values in the dataset
+     */
+    public Double[][] getHistogramStats(Integer id, GenericPoint<String> valueName, GenericPoint<String> categoryPoint) {
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> data = getHistograms(id, valueName, categoryPoint);
+	if (data == null || data.size() == 0) {
+	    return null;
+	}
+
+	Double[][] ret = null;
+
+	int dimensions = data.get(0).getValue1().getDimensions();
+	ret = new Double[dimensions][4];
+	Double dataPointCount = new Double(data.size());
+	for (int i = 0; i < dimensions; i++) {
+	    ret[i][0] = Double.MIN_VALUE; // store max
+	    ret[i][1] = Double.MAX_VALUE; // store min
+	    ret[i][2] = 0.0; // store mean
+	    ret[i][3] = 0.0; // store stddev
+	}
+
+	for (Pair<Integer, GenericPoint<Integer>> oneData : data) {
+	    for (int i = 0; i < dimensions; i++) {
+		Integer val = oneData.getValue1().getCoord(i);
+		if (val > ret[i][0]) {
+		    ret[i][0] = new Double(val);
+		}
+		if (val < ret[i][1]) {
+		    ret[i][1] = new Double(val);
+		}
+		ret[i][2] += new Double(val);
+	    }
+	}
+	for (int i = 0; i < dimensions; i++) {
+	    ret[i][2] /= dataPointCount;
+	}
+	return ret;
     }
 
     public Boolean deleteHistogramSet(Integer id) {

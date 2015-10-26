@@ -153,6 +153,8 @@ public class SVMKernel implements Runnable {
 		    _retNode[index] = new svm_node[_rowSize];
 		}
 	    }
+	    // even though we haven't done the work we can unlock here. Once we set _retNode[index] to something
+	    // other than null, no other threads will try to use that 
 	    _retNodeLock.unlock();
 
 	    if (index >= _histogramsA.size()) {
