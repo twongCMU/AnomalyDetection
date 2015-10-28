@@ -52,11 +52,11 @@ public class DataIOWriteAnomaly {
 		Integer targetType = 1;
 		String algorithm ="svm_chi_squared_1.0";
 		Double score = new Double(100.0);
-		Integer patternIndex = 1;
+		Integer[] patternIndex = { 1 };
 		String[] trainingTargetValue = {  "10.80.1.148", "10.90.94.9"};
-		Integer[] trainingMinCount = { 0, 320 + (predictionValue * 20)};
-		Integer[] trainingMaxCount = { 0, 320 + (predictionValue * 20)};
-		Integer[] trainingMeanCount = { 0,  320 + (predictionValue * 20)};
+		Double[] trainingMinCount = { 0.0, 320.0 + (predictionValue * 20)};
+		Double[] trainingMaxCount = { 0.0, 320.0 + (predictionValue * 20)};
+		Double[] trainingMeanCount = { 0.0,  320.0 + (predictionValue * 20)};
 		Double[] trainingStandardDeviation = { 0.0, 0.0 };
 		String[] anomalyValue = { "10.80.1.148", "10.90.94.9"};
 		Integer[] anomalyCount = { 0, 320 + (predictionValue * 20)};
@@ -78,9 +78,9 @@ public class DataIOWriteAnomaly {
 
     public String writeAnomaly(Long testStart, Long testEnd, Long trainStart, Long trainEnd,
 			       Integer sourceType, String sourceValue, Integer targetType,
-			       String algorithm, Double score, Integer patternIndex,
-			       String[] trainingTargetValue, Integer[] trainingMinCount,
-			       Integer[] trainingMaxCount, Integer[] trainingMeanCount,
+			       String algorithm, Double score, Integer[] patternIndex,
+			       String[] trainingTargetValue, Double[] trainingMinCount,
+			       Double[] trainingMaxCount, Double[] trainingMeanCount,
 			       Double[] trainingStandardDeviation, String[] anomalyValue,
 			       Integer[] anomalyCount, Integer[] predictedCauses,
 			       Integer[] predictedStates) {
@@ -100,7 +100,17 @@ public class DataIOWriteAnomaly {
 	obj.put("targetType", targetType);
 	obj.put("algorithm", algorithm);
 	obj.put("score", score);
-	obj.put("patternIndex", patternIndex);
+
+	//obj.put("patternIndex", patternIndex);
+	JSONArray patternArray = new JSONArray();
+	if (patternIndex != null) {
+	    for (Integer onePattern : patternIndex) {
+		JSONObject patternEntry = new JSONObject();
+		patternEntry.put("id", new Integer(onePattern));
+		patternArray.add(patternEntry);
+	    }
+	}
+	obj.put("patternIndex",patternArray);
 
 	JSONArray normalEntriesArray = new JSONArray();
 	if (trainingTargetValue != null) {
@@ -108,8 +118,8 @@ public class DataIOWriteAnomaly {
 		JSONObject normalEntries = new JSONObject();
 		normalEntries.put("sequenceNumber", new Integer(i));
 		normalEntries.put("targetValue", trainingTargetValue[i]);
-		normalEntries.put("minCount", trainingMinCount[i]);
-		normalEntries.put("maxCount", trainingMaxCount[i]);
+		normalEntries.put("minCount", trainingMinCount[i].intValue());
+		normalEntries.put("maxCount", trainingMaxCount[i].intValue());
 		normalEntries.put("meanCount", trainingMeanCount[i]);
 		normalEntries.put("standardDeviation", trainingStandardDeviation[i]);
 		normalEntriesArray.add(normalEntries);

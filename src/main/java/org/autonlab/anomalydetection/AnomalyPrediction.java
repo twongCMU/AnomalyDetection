@@ -157,7 +157,6 @@ public class AnomalyPrediction {
 	if (ret[0] >= 0) {
 	    output.append("\n");
 	}
-
 	return ret;
     }
 

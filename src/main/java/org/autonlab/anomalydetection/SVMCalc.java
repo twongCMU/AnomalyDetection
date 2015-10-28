@@ -361,7 +361,9 @@ public class SVMCalc {
 	    
 	}
 
-
+	Double[][] training_stats = null;
+	Pair<Integer, Integer> train_times = histogramData.getStartAndEndTime(trainID);
+	Pair<Integer, Integer> test_times = histogramData.getStartAndEndTime(testID);
 	int index = 0;
 	/* loop through the histograms to generate the predictions */
 	for (Pair<Integer, GenericPoint<Integer>> onePoint : histogramData.getHistograms(testID, testValue, testKey)) {
@@ -404,12 +406,22 @@ public class SVMCalc {
 		    predictedStates[0] = ret[0].intValue();
 		}
 
-		output.append(writeAnomaly.writeAnomaly(0L, 0L, 0L, 0L,
+		ArrayList<Integer> pattern = new ArrayList<Integer>();
+		// if we failed to make a prediction about the cause and status, try matching a pattern 
+		if (ret[0] == -1 && ret[1] == -1 && ret[2] == -1) {
+		    if (training_stats == null) {
+			training_stats = histogramData.getHistogramStats(trainID, trainValue, trainKey);
+		    }
+		    pattern = AnomalyPrediction.patternAnomalyType(onePoint, training_stats[2], training_stats[3]);
+		}
+
+		output.append(writeAnomaly.writeAnomaly(new Long(test_times.getValue0()), new Long(test_times.getValue1()),
+							new Long(train_times.getValue0()), new Long(train_times.getValue1()),
 							1,anomalyString, 1, 
-							"svm_chi_squared_1.0", ret[2], -1,
-							null, null,
-							null, null,
-							null, HistoTuple.getDimensionNamesArray(),
+							"svm_chi_squared_1.0", ret[2], (Integer[])pattern.toArray(),
+							null, training_stats[0],
+							training_stats[1], training_stats[2],
+							training_stats[3], HistoTuple.getDimensionNamesArray(),
 							onePointToArray, predictedCauses,
 							predictedStates));
 		if (predictedCauses == null || predictedStates == null) {
