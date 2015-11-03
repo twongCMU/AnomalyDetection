@@ -47,9 +47,9 @@ public class DataIOWriteAnomaly {
 		Long testEnd = new Long(1399912451000L);
 		Long trainStart = new Long(1399830841000L);
 		Long trainEnd = new Long(1399917252000L);
-		Integer sourceType = 1;
+		Integer sourceType = AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_IP_ADDRESS;
 		String sourceValue = "10.90.94.9";
-		Integer targetType = 1;
+		Integer targetType = AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_IP_ADDRESS;
 		String algorithm ="svm_chi_squared_1.0";
 		Double score = new Double(100.0);
 		Integer[] patternIndex = { 1 };
@@ -76,6 +76,29 @@ public class DataIOWriteAnomaly {
 	return output;
     }
 
+    /**
+     * write an anomaly to the database
+     *
+     * @param testStart seconds from epoch timestamp of test data start
+     * @param testEnd seconds from epoch timestamp of test data end
+     * @param trainStart seconds from epoch timestamp of training data start
+     * @param trainEnd seconds from epoch timestamp of training data end
+     * @param sourceType see AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_ for values
+     * @param sourceValue the string representation of the histogram value
+     * @param targetType see AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_ for values
+     * @param algorithm string for how this anomaly was generated
+     * @param score score that triggered this anomaly
+     * @param patternIndex results from pattern detection (if any). See documentation
+     * @param trainingTargetValue strings representing each histogram column in the training data
+     * @param trainingMinCount array of lowest counts seen in the training data
+     * @param trainingMaxCount array of highest counts seen in the training data
+     * @param trainingMeanCount array of average counts seen in the training data
+     * @param trainingStandardDeviation array of stddev seen in the training data
+     * @param anomalyValue probably the same as trainingTargetValue
+     * @param anomalyCount array of counts in the anomaly histogram
+     * @param predictedCauses causes from the supervised learning component (if any)
+     * @param predictedStates states from the supervised learning component (if any)
+     */
     public String writeAnomaly(Long testStart, Long testEnd, Long trainStart, Long trainEnd,
 			       Integer sourceType, String sourceValue, Integer targetType,
 			       String algorithm, Double score, Integer[] patternIndex,

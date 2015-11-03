@@ -55,4 +55,7 @@ public class AnomalyDetectionConfiguration {
     }
 
     static String ANOMALY_REST_URL_PREFIX = "http://54.210.142.233/essence-services";
+
+    static final int ANOMALY_FILTER_TYPE_IP_ADDRESS = 1;
+    static final int ANOMALY_FILTER_TYPE_MESSAGE_TYPE = 2;
 }

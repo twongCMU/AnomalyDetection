@@ -141,6 +141,7 @@ public class HistoTuple {
 	for (GenericPoint<String> valueName : listMap.keySet()) {
 
 	    if (!ret.containsKey(valueName)) {
+		System.out.println("XYZ new value name " +valueName.toString());
 		ret.put(valueName, new HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
 	    }
 
@@ -263,6 +264,7 @@ public class HistoTuple {
 		    }
 		    System.out.println("");
 		}
+		System.out.println("XYZ data " +valueName.toString() + " and " + mapKey.toString());
 		ret.get(valueName).put(mapKey, new Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>(-1.0,data));
 	    }
 	}

@@ -179,6 +179,7 @@ public class AnomalyPrediction {
 
 	/* check if any histogram values are 2 or more stddev away from the mean */
 	for (int i = 0; i < anomalyObservedDataHistograms.getDimensions(); i++) {
+	    System.out.println("mean " + i + " is " + mean[i] + " stddev " + stddev[i]);
 	    if (Math.abs(anomalyObservedDataHistograms.getCoord(i)-mean[i]) >= (2*stddev[i])) {
 		ret.add(i);
 	    }

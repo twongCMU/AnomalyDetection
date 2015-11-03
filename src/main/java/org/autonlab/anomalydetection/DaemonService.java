@@ -92,6 +92,12 @@ public class DaemonService {
 	    id = newID;
 	}
 
+	Double[][] stats = histogramData.getHistogramStats(id, valuePoint, categoryPoint);
+	output.append("min: " + Arrays.asList(stats[0]) + "\n");
+	output.append("max: " + Arrays.asList(stats[1]) + "\n");
+	output.append("mean: " + Arrays.asList(stats[2]) + "\n");
+	output.append("stddev: " + Arrays.asList(stats[3]) + "\n");
+
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = histogramData.getHistograms(id, valuePoint, categoryPoint);
 	output.append("Number of datapoints: " + histograms.size() + " \n");
 	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
@@ -101,6 +107,40 @@ public class DaemonService {
 	allHistogramsMapLock.readLock().unlock();
 
 	return Response.status(200).entity(output.toString()).build();
+    }
+
+    /**
+     * create a dataset of a single histogram with the histogram values passed in by caller
+     * for debugging and testing
+     *
+     * @param catagoryCSV for data i.e., source_addr;10.90.94.9 
+     * @param valueCSV i.e., dest_addr
+     * @param valuedataCSV i.e., [100,  200]
+     */
+    @GET
+    @Path("/testhist")
+    @Produces(MediaType.TEXT_PLAIN)
+	public Response testWriteHist(@QueryParam("categoryCSV") String categoryCSV,
+				      @QueryParam("valueCSV") String valueCSV,
+				      @QueryParam("valueDataCSV") String valueDataCSV) {
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> newData = new HashMap();
+
+	GenericPoint<String> categoryPoint = getPointFromCSV(categoryCSV);
+	GenericPoint<String> valuePoint = getPointFromCSV(valueCSV);
+	GenericPoint<Integer> valueDataPoint = getPointFromCSVInt(valueDataCSV);
+
+	newData.put(valuePoint, new HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> data = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+	Pair<Integer, GenericPoint<Integer>> temp = new Pair<Integer, GenericPoint<Integer>>(1, valueDataPoint);
+	System.out.println("OOO check" + valueDataPoint.toString());
+	data.add(temp);
+
+	newData.get(valuePoint).put(categoryPoint, new Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>(-1.0,data));
+	
+	allHistogramsMapLock.writeLock().lock();
+	Integer newID = histogramData.putHistogramSet(newData);
+	allHistogramsMapLock.writeLock().unlock();
+	return Response.status(200).entity("ID "+ newID).build();
     }
 
     /**
@@ -397,6 +437,19 @@ public class DaemonService {
 
 	return point;
     }
+    public GenericPoint<Integer> getPointFromCSVInt(String csv) {
+	String[] sParts = csv.split(",");
+	// note: no sort here like with the String version of this because
+	// we're directly storing the input not translating them to another format
+	GenericPoint<Integer> point = new GenericPoint(sParts.length);
+
+	for (int ii = 0; ii < sParts.length; ii++) {
+	    System.out.println("coord " + ii + " val " + Integer.parseInt(sParts[ii]));
+	    point.setCoord(ii, Integer.parseInt(sParts[ii]));
+	}
+
+	return point;
+    }
 
     @GET
     @Path("/demo")
@@ -549,15 +602,16 @@ public class DaemonService {
 	}
 
 	MultiValueMap resultsHash = new MultiValueMap();
-	try {
+	//	try {
 	    StringBuilder ret = null;
 	    ret = SVMCalc.runOneTestSVM(histogramData, trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, resultsHash);
 	    output.append(ret.toString());
+	    /*
 	}
 	catch (Exception ex) {
 	    System.out.println("Caught excpetion. Data changing");
 	}
-
+	    */
 
 	List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 	Collections.sort(resultsHashList); // ascending order
