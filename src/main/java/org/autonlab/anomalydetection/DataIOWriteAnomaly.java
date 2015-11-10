@@ -329,9 +329,9 @@ public class DataIOWriteAnomaly {
 	if (causes != null) {
 	    return this.causes.get(lookupID);
 	}
-
 	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly/causes/");
 	String ret = webResource.accept("application/json").get(String.class);
+	System.out.println("ret is " + ret);
 	JSONArray retArray = new JSONArray();
 	retArray = (JSONArray)JSONValue.parse(ret);
 	

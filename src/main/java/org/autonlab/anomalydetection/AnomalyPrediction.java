@@ -15,6 +15,7 @@ public class AnomalyPrediction {
     /**
      * @param anomalyObservedData
      * Then, for each pair of annotation and type we do a 1 vs all
+     * returns -1 for any value that was not set
      *
      * ret[0] = predicted statusID;
      * ret[1] = predicted causeID;
@@ -42,13 +43,18 @@ public class AnomalyPrediction {
 	// fill in some fake data
 
 	if (anomalyData == null) {
-	    DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
-	    anomalyData = dataConn.getAnomalies(-1L, -1L, -1L, -1L,
-						"", -1, "", 
-						null, null);
-	    dataConn.closeConnection();
-	    dataConn = null;
-
+	    try {
+		DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
+		anomalyData = dataConn.getAnomalies(-1L, -1L, -1L, -1L,
+						    "", -1, "", 
+						    null, null);
+		dataConn.closeConnection();
+		dataConn = null;
+	    }
+	    catch (Exception ex) {
+		System.out.println("Failed to get anomaly annotation information");
+	    }
+	    
 	    /*
 	    anomalyData = new HashMap();
 	    Pair<Integer, Integer> tempKey0 = new Pair(1,0);
@@ -77,6 +83,9 @@ public class AnomalyPrediction {
 	ret[0] = -1.0;
 	ret[1] = -1.0;
 	ret[2] = -1.0;
+	if (anomalyData == null) {
+	    return ret;
+	}
 
 	// Cycle through each possible prediction and see if the anomalyObservedData is similar to it
 	for (Pair<Integer, Integer> tempPair : anomalyData.keySet()) {
@@ -125,11 +134,16 @@ public class AnomalyPrediction {
 
 
 		    String causeString = null;
-		    //causeString = dataConn.getCause(causeID);
+		    DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
+		    causeString = dataConn.getCause(causeID);
+		    dataConn.closeConnection();
+		    dataConn = null;
+
 		    if (causeString == null) {
 			causeString = causeID + "";
 		    }
-		    output.append("Predicted cause: " + causeID + " with confidence: ");
+
+		    output.append("Predicted cause: " + causeString + ", with confidence: ");
 		    if (Math.abs(1.0 - values[0]) < .15) {
 			output.append("High");
 		    }
@@ -164,6 +178,8 @@ public class AnomalyPrediction {
      * As per the design, we have defined two types of patterns:
      * 1) if one or more histogram values are 2 or more stddev away from the mean, indicate those columns
      * 2) if all of the values are within 1 stddev from the mean, indicate that with a -1
+     *
+     * Should we do something special if a stddev is zero?
      */
     public static ArrayList<Integer> patternAnomalyType(Pair<Integer, GenericPoint<Integer>> anomalyObservedData, Double[] mean, Double[] stddev) {
 	GenericPoint<Integer> anomalyObservedDataHistograms = anomalyObservedData.getValue1();
@@ -179,8 +195,13 @@ public class AnomalyPrediction {
 
 	/* check if any histogram values are 2 or more stddev away from the mean */
 	for (int i = 0; i < anomalyObservedDataHistograms.getDimensions(); i++) {
-	    System.out.println("mean " + i + " is " + mean[i] + " stddev " + stddev[i]);
-	    if (Math.abs(anomalyObservedDataHistograms.getCoord(i)-mean[i]) >= (2*stddev[i])) {
+	    Double adjusted_stddev = stddev[i];
+	    if (stddev[i] < 1.0) {
+		adjusted_stddev = 1.0;
+	    }
+
+	    System.out.println("mean " + i + " is " + mean[i] + " stddev " + adjusted_stddev);
+	    if (Math.abs(anomalyObservedDataHistograms.getCoord(i)-mean[i]) >= (2 * adjusted_stddev)) {
 		ret.add(i);
 	    }
 	}
@@ -192,8 +213,12 @@ public class AnomalyPrediction {
 	// If every single histogram value is between 1 and 2 stddev
 	Boolean allAre = true;
 	for (int i = 0; i < anomalyObservedDataHistograms.getDimensions(); i++) {
-	    if (Math.abs(anomalyObservedDataHistograms.getCoord(i)-mean[i]) <= stddev[i] &&
-		Math.abs(anomalyObservedDataHistograms.getCoord(i)-mean[i]) >= (2*stddev[i])) {
+	    Double adjusted_stddev = stddev[i];
+	    if (stddev[i] < 1.0) {
+		adjusted_stddev = 1.0;
+	    }
+	    if (Math.abs(anomalyObservedDataHistograms.getCoord(i)-mean[i]) <= adjusted_stddev &&
+		Math.abs(anomalyObservedDataHistograms.getCoord(i)-mean[i]) >= (2 * adjusted_stddev)) {
 		allAre = false;
 	    }
 	}

@@ -97,8 +97,8 @@ public class HistogramStore {
 	ret = new Double[4][dimensions];
 	Double dataPointCount = new Double(data.size());
 	for (int i = 0; i < dimensions; i++) {
-	    ret[0][i] = Double.MIN_VALUE; // store max
-	    ret[1][i] = Double.MAX_VALUE; // store min
+	    ret[0][i] = Double.MAX_VALUE; // store min
+	    ret[1][i] = Double.MIN_VALUE; // store max
 	    ret[2][i] = 0.0; // store mean
 	    ret[3][i] = 0.0; // store stddev
 	}
@@ -106,11 +106,11 @@ public class HistogramStore {
 	for (Pair<Integer, GenericPoint<Integer>> oneData : data) {
 	    for (int i = 0; i < dimensions; i++) {
 		Integer val = oneData.getValue1().getCoord(i);
-		if (val > ret[0][i]) {
-		    ret[0][i] = new Double(val);
-		}
-		if (val < ret[1][i]) {
+		if (val > ret[1][i]) {
 		    ret[1][i] = new Double(val);
+		}
+		if (val < ret[0][i]) {
+		    ret[0][i] = new Double(val);
 		}
 		ret[2][i] += new Double(val);
 	    }

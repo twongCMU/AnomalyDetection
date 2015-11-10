@@ -386,7 +386,7 @@ public class SVMCalc {
 
 	    if (prediction > 1.0) {
 		output.append("This seems suspicious, so predicting the cause of this anomaly\n");
-		/*
+		
 		Double[] ret = AnomalyPrediction.predictAnomalyType(onePoint, null, output);
 		DataIOWriteAnomaly writeAnomaly = new DataIOWriteAnomaly();
 		int dim = onePoint.getValue1().getDimensions();
@@ -410,20 +410,23 @@ public class SVMCalc {
 		ArrayList<Integer> pattern = new ArrayList<Integer>();
 		// if we failed to make a prediction about the cause and status, try matching a pattern 
 		
-		if (ret[0] == -1 && ret[1] == -1 && ret[2] == -1) {*/
-		    if (training_stats == null) {
-			training_stats = histogramData.getHistogramStats(trainID, trainValue, trainKey);
-		    }
-		    ArrayList<Integer> pattern = new ArrayList<Integer>();
+		if (training_stats == null) {
+		    training_stats = histogramData.getHistogramStats(trainID, trainValue, trainKey);
+		}
+		if (ret[0] == -1 && ret[1] == -1 && ret[2] == -1) {
 		    pattern = AnomalyPrediction.patternAnomalyType(onePoint, training_stats[2], training_stats[3]);
 		    output.append("pattern is " + pattern.toString());
-		    /*
+		    
+		}
+		Integer[] pattern_arr = null;
+		if (pattern.size() > 0) {
+		    pattern_arr = pattern.toArray(new Integer[pattern.size()]);
 		}
 
 		output.append(writeAnomaly.writeAnomaly(new Long(test_times.getValue0()), new Long(test_times.getValue1()),
 							new Long(train_times.getValue0()), new Long(train_times.getValue1()),
 							1,anomalyString, 1, 
-							"svm_chi_squared_1.0", ret[2], (Integer[])pattern.toArray(),
+							"svm_chi_squared_1.0", ret[2], pattern_arr,
 							null, training_stats[0],
 							training_stats[1], training_stats[2],
 							training_stats[3], HistoTuple.getDimensionNamesArray(),
@@ -432,7 +435,7 @@ public class SVMCalc {
 		if (predictedCauses == null || predictedStates == null) {
 		    output.append("No predicted cause was made. This happens when there is not yet enough user feedback.\n\n");
 		}
-		*/
+		
 	    }
 	    index++;
 	}
