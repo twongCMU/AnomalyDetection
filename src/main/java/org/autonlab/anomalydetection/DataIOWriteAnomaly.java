@@ -182,8 +182,8 @@ public class DataIOWriteAnomaly {
 	}
 	obj.put("predictedStates",predictedStatesArray);
 	String output = new String();
-	output += obj.toString();
-	output += "\n";
+	//output += obj.toString();
+	//output += "\n";
 
 	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly");
 	ClientResponse response = webResource.type("application/json").post(ClientResponse.class, obj.toString());
