@@ -109,13 +109,13 @@ public class DataIOWriteAnomaly {
 			       Integer[] predictedStates) {
 
 	JSONObject obj = new JSONObject();
-	DateTime testStartDateTime = new DateTime(testStart);
+	DateTime testStartDateTime = new DateTime(testStart * 1000);
 	obj.put("detectionTimeWindowStart", testStartDateTime.toString("EEE, dd MMM yyyy HH:mm:ss Z"));
-	DateTime testEndDateTime = new DateTime(testEnd);
+	DateTime testEndDateTime = new DateTime(testEnd * 1000);
 	obj.put("detectionTimeWindowEnd", testEndDateTime.toString("EEE, dd MMM yyyy HH:mm:ss Z"));
-	DateTime trainingStartDateTime = new DateTime(trainStart);
+	DateTime trainingStartDateTime = new DateTime(trainStart * 1000);
 	obj.put("trainingTimeWindowStart", trainingStartDateTime.toString("EEE, dd MMM yyyy HH:mm:ss Z"));
-	DateTime trainingEndDateTime = new DateTime(trainEnd);
+	DateTime trainingEndDateTime = new DateTime(trainEnd * 1000);
 	obj.put("trainingTimeWindowEnd", trainingEndDateTime.toString("EEE, dd MMM yyyy HH:mm:ss Z"));
 	obj.put("sourceType", sourceType);
 	// 10.90.94.9 or 10.80.1.148
@@ -124,16 +124,16 @@ public class DataIOWriteAnomaly {
 	obj.put("algorithm", algorithm);
 	obj.put("score", score);
 
+
 	//obj.put("patternIndex", patternIndex);
 	JSONArray patternArray = new JSONArray();
 	if (patternIndex != null) {
 	    for (Integer onePattern : patternIndex) {
-		JSONObject patternEntry = new JSONObject();
-		patternEntry.put("id", new Integer(onePattern));
-		patternArray.add(patternEntry);
+		patternArray.add(onePattern);
 	    }
 	}
 	obj.put("patternIndex",patternArray);
+
 
 	JSONArray normalEntriesArray = new JSONArray();
 	if (trainingTargetValue != null) {
@@ -182,8 +182,8 @@ public class DataIOWriteAnomaly {
 	}
 	obj.put("predictedStates",predictedStatesArray);
 	String output = new String();
-	//output += obj.toString();
-	//output += "\n";
+	output += obj.toString();
+	output += "\n";
 
 	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly");
 	ClientResponse response = webResource.type("application/json").post(ClientResponse.class, obj.toString());

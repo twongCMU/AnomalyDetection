@@ -15,6 +15,8 @@ import org.javatuples.*;
 import org.apache.commons.math3.distribution.UniformRealDistribution;
 import org.apache.commons.math3.distribution.UniformIntegerDistribution;
 
+import org.joda.time.*;
+
 @Path("/")
 public class DaemonService {
     static HistogramStore histogramData = new HistogramStore();
@@ -99,7 +101,7 @@ public class DaemonService {
 	output.append("stddev: " + Arrays.asList(stats[3]) + "\n");
 
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = histogramData.getHistograms(id, valuePoint, categoryPoint);
-	output.append("Number of datapoints: " + histograms.size() + " \n");
+	output.append("Number of histograms: " + histograms.size() + " \n");
 	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
 	    output.append(tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n");
 	}
@@ -131,8 +133,11 @@ public class DaemonService {
 
 	newData.put(valuePoint, new HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> data = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
-	Pair<Integer, GenericPoint<Integer>> temp = new Pair<Integer, GenericPoint<Integer>>(1, valueDataPoint);
-	System.out.println("OOO check" + valueDataPoint.toString());
+
+	DateTime startTime = new DateTime();
+	Integer startTimeSec = (int)((startTime.getMillis())/1000);
+	Pair<Integer, GenericPoint<Integer>> temp = new Pair<Integer, GenericPoint<Integer>>(startTimeSec, valueDataPoint);
+
 	data.add(temp);
 
 	newData.get(valuePoint).put(categoryPoint, new Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>(-1.0,data));

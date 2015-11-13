@@ -423,11 +423,12 @@ public class SVMCalc {
 		    pattern_arr = pattern.toArray(new Integer[pattern.size()]);
 		}
 
+		String[] dimensionArray = HistoTuple.getDimensionNamesArray();
 		output.append(writeAnomaly.writeAnomaly(new Long(test_times.getValue0()), new Long(test_times.getValue1()),
 							new Long(train_times.getValue0()), new Long(train_times.getValue1()),
 							1,anomalyString, 1, 
 							"svm_chi_squared_1.0", ret[2], pattern_arr,
-							null, training_stats[0],
+							dimensionArray, training_stats[0],
 							training_stats[1], training_stats[2],
 							training_stats[3], HistoTuple.getDimensionNamesArray(),
 							onePointToArray, predictedCauses,
