@@ -125,17 +125,20 @@ public class AnomalyPrediction {
 
 	    double best_score = 1000;
 
-	    Integer statusID = tempPair.getValue0();
-	    Integer causeID = tempPair.getValue1();
+	    Integer causeID = tempPair.getValue0();
+	    Integer statusID = tempPair.getValue1();
 
+	    System.out.println("Nope working on " + statusID + " " + causeID);
 	    if (prediction == 1.0 && causeID >= 0) {
 		if (output != null) {
 		    //output.append("Prediction " + tempPair.getValue0() + "," + tempPair.getValue1() + ": class " + prediction + " with score " + values[0] + " for anomaly " + anomalyObservedData.getValue1().toString() + " with data \n");
 
 
 		    String causeString = null;
+		    String stateString = null;
 		    DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
 		    causeString = dataConn.getCause(causeID);
+		    stateString = dataConn.getStates(statusID);
 		    dataConn.closeConnection();
 		    dataConn = null;
 
@@ -143,7 +146,11 @@ public class AnomalyPrediction {
 			causeString = causeID + "";
 		    }
 
-		    output.append("Predicted cause: " + causeString + ", with confidence: ");
+		    if (stateString == null) {
+			stateString = statusID + "";
+		    }
+
+		    output.append("Predicted cause, status: " + causeString + ", " + stateString + ", with confidence: ");
 		    if (Math.abs(1.0 - values[0]) < .15) {
 			output.append("High");
 		    }
@@ -163,7 +170,9 @@ public class AnomalyPrediction {
 		    }
 		}
 	    }
-
+	    else {
+		System.out.println("Nope, for status/cause " + statusID + " " + causeID + " got pred " + prediction);
+	    }
 	    if (results != null) {
 		results.put(prediction, tempPair);
 	    }

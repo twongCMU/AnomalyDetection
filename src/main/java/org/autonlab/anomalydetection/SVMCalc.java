@@ -434,7 +434,7 @@ public class SVMCalc {
 							onePointToArray, predictedCauses,
 							predictedStates));
 		if (predictedCauses == null || predictedStates == null) {
-		    output.append("No predicted cause was made. This happens when there is not yet enough user feedback.\n\n");
+		    output.append("\nNo predicted cause was made. This happens when there is not yet enough user feedback.\n\n");
 		}
 		
 	    }

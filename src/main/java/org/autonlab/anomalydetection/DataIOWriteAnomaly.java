@@ -24,11 +24,13 @@ public class DataIOWriteAnomaly {
 
     Client client;
     HashMap<Integer, String> causes;
+    HashMap<Integer, String> states;
 
     public DataIOWriteAnomaly()
     {
 	client = Client.create();
 	causes = null;
+	states = null;
     }
 
     public void closeConnection()
@@ -43,16 +45,16 @@ public class DataIOWriteAnomaly {
 
 	for (int predictionValue = 0; predictionValue < 4; predictionValue++) {
 	    for (int i = 0; i < numToCreate; i++) {
-		Long testStart = new Long(1399912491000L);
-		Long testEnd = new Long(1399912451000L);
-		Long trainStart = new Long(1399830841000L);
-		Long trainEnd = new Long(1399917252000L);
+		Long testStart = new Long(1399912491L);
+		Long testEnd = new Long(1399912451L);
+		Long trainStart = new Long(1399830841L);
+		Long trainEnd = new Long(1399917252L);
 		Integer sourceType = AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_IP_ADDRESS;
 		String sourceValue = "10.90.94.9";
 		Integer targetType = AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_IP_ADDRESS;
 		String algorithm ="svm_chi_squared_1.0";
 		Double score = new Double(100.0);
-		Integer[] patternIndex = { 1 };
+		Integer[] patternIndex = { };
 		String[] trainingTargetValue = {  "10.80.1.148", "10.90.94.9"};
 		Double[] trainingMinCount = { 0.0, 320.0 + (predictionValue * 20)};
 		Double[] trainingMaxCount = { 0.0, 320.0 + (predictionValue * 20)};
@@ -71,7 +73,14 @@ public class DataIOWriteAnomaly {
 				       anomalyCount,  predictedCauses,
 				       predictedStates);
 	    }
-	    output += "Sent " + numToCreate + " anomalies with data [0, " + (320 + (predictionValue * 20)) + "] and cause " + (1 + predictionValue) + "\n";
+	    String causeString = null;
+	    String stateString = null;
+	    DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
+	    causeString = dataConn.getCause(1 + predictionValue);
+	    stateString = dataConn.getStates(2);
+	    dataConn.closeConnection();
+	    dataConn = null;
+	    output += "Sent " + numToCreate + " anomalies with data [0, " + (320 + (predictionValue * 20)) + "] and cause, status " + causeString + ", " + stateString + "\n";
 	}
 	return output;
     }
@@ -326,12 +335,11 @@ public class DataIOWriteAnomaly {
     /* We should do some sort of caching here but we don't have a mechanism for invalidating the cache so for now we just retrieve the info every time */
     public String getCause(Integer lookupID)
     {
-	if (causes != null) {
-	    return this.causes.get(lookupID);
-	}
+	//if (causes != null) {
+	//return this.causes.get(lookupID);
+	//}
 	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly/causes/");
 	String ret = webResource.accept("application/json").get(String.class);
-	System.out.println("ret is " + ret);
 	JSONArray retArray = new JSONArray();
 	retArray = (JSONArray)JSONValue.parse(ret);
 	
@@ -346,6 +354,33 @@ public class DataIOWriteAnomaly {
 	    String cause = oneJObj.get("cause").toString();
 	    this.causes.put(id, cause);
 	}
+
 	return this.causes.get(lookupID);
+    }
+
+    
+    public String getStates(Integer lookupID)
+    {
+	//if (states != null) {
+	//    return this.states.get(lookupID);
+	//}
+	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly/states/");
+	String ret = webResource.accept("application/json").get(String.class);
+	JSONArray retArray = new JSONArray();
+	retArray = (JSONArray)JSONValue.parse(ret);
+	
+	this.states = new HashMap();
+
+	for (int i = 0; i < retArray.size(); i++) {
+	    Object oneObj = retArray.get(i);
+	    JSONObject oneJObj = (JSONObject)oneObj;
+
+	    
+	    Integer id = Integer.parseInt(oneJObj.get("id").toString());
+	    String state = oneJObj.get("state").toString();
+	    this.states.put(id, state);
+	}
+
+	return this.states.get(lookupID);
     }
 }
