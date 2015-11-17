@@ -404,7 +404,7 @@ public class SVMCalc {
 		if (predStateRet.size() > 0) {
 		    predictedStates = predStateRet.toArray(new Integer[predStateRet.size()]);
 		}
-		ArrayList<Integer> predCauseRet = ret[0];
+		ArrayList<Integer> predCauseRet = ret[1];
 		if (predCauseRet.size() > 0) {
 		    predictedCauses = predCauseRet.toArray(new Integer[predCauseRet.size()]);
 		}
@@ -415,7 +415,7 @@ public class SVMCalc {
 		if (training_stats == null) {
 		    training_stats = histogramData.getHistogramStats(trainID, trainValue, trainKey);
 		}
-		if (ret[0].size() > 0 && ret[1].size() > 0 && ret[2].size() > 0) {
+		if (predStateRet.size() == 0 && predCauseRet.size() == 0) {
 		    pattern = AnomalyPrediction.patternAnomalyType(onePoint, training_stats[2], training_stats[3]);
 		    output.append("pattern is " + pattern.toString());
 		    

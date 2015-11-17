@@ -63,7 +63,7 @@ public class DataIOWriteAnomaly {
 		String[] anomalyValue = { "10.80.1.148", "10.90.94.9"};
 		Integer[] anomalyCount = { 0, 320 + (predictionValue * 20)};
 		Integer[] predictedCauses = { (1 + predictionValue) };
-		Integer[] predictedStates = { 2 };
+		Integer[] predictedStates = { (1 + predictionValue) };
 		output += writeAnomaly(testStart, testEnd, trainStart, trainEnd,
 				       sourceType, sourceValue, targetType,
 				       algorithm,  score,  patternIndex,
@@ -191,8 +191,8 @@ public class DataIOWriteAnomaly {
 	}
 	obj.put("predictedStates",predictedStatesArray);
 	String output = new String();
-	output += obj.toString();
-	output += "\n";
+	//output += obj.toString();
+	//output += "\n";
 
 	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly");
 	ClientResponse response = webResource.type("application/json").post(ClientResponse.class, obj.toString());
