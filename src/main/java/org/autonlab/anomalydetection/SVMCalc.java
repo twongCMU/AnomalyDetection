@@ -387,24 +387,26 @@ public class SVMCalc {
 	    if (prediction > 1.0) {
 		output.append("This seems suspicious, so predicting the cause of this anomaly\n");
 		
-		Double[] ret = AnomalyPrediction.predictAnomalyType(onePoint, null, output);
+		ArrayList[] ret = AnomalyPrediction.predictAnomalyType(onePoint, null, output);
+		
+
 		DataIOWriteAnomaly writeAnomaly = new DataIOWriteAnomaly();
 		int dim = onePoint.getValue1().getDimensions();
 		Integer[] onePointToArray = new Integer[dim];
 		for (int i = 0; i < dim; i++) {
 		    onePointToArray[i] = onePoint.getValue1().getCoord(i);
 		}
-		Integer[] predictedCauses = null;
 
 		Integer[] predictedStates = null;
+		Integer[] predictedCauses = null;
 
-		if (ret[1] >= 0.0) {
-		    predictedCauses = new Integer[1];
-		    predictedCauses[0] = ret[1].intValue();
+		ArrayList<Integer> predStateRet = ret[0];
+		if (predStateRet.size() > 0) {
+		    predictedStates = predStateRet.toArray(new Integer[predStateRet.size()]);
 		}
-		if (ret[0] >= 0.0) {
-		    predictedStates = new Integer[1];
-		    predictedStates[0] = ret[0].intValue();
+		ArrayList<Integer> predCauseRet = ret[0];
+		if (predCauseRet.size() > 0) {
+		    predictedCauses = predCauseRet.toArray(new Integer[predCauseRet.size()]);
 		}
 
 		ArrayList<Integer> pattern = new ArrayList<Integer>();
@@ -413,7 +415,7 @@ public class SVMCalc {
 		if (training_stats == null) {
 		    training_stats = histogramData.getHistogramStats(trainID, trainValue, trainKey);
 		}
-		if (ret[0] == -1 && ret[1] == -1 && ret[2] == -1) {
+		if (ret[0].size() > 0 && ret[1].size() > 0 && ret[2].size() > 0) {
 		    pattern = AnomalyPrediction.patternAnomalyType(onePoint, training_stats[2], training_stats[3]);
 		    output.append("pattern is " + pattern.toString());
 		    
@@ -427,7 +429,7 @@ public class SVMCalc {
 		output.append(writeAnomaly.writeAnomaly(new Long(test_times.getValue0()), new Long(test_times.getValue1()),
 							new Long(train_times.getValue0()), new Long(train_times.getValue1()),
 							1,anomalyString, 1, 
-							"svm_chi_squared_1.0", ret[2], pattern_arr,
+							"svm_chi_squared_1.0", prediction, pattern_arr,
 							dimensionArray, training_stats[0],
 							training_stats[1], training_stats[2],
 							training_stats[3], HistoTuple.getDimensionNamesArray(),

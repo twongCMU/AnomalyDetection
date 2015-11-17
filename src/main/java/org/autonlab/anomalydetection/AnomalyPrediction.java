@@ -21,7 +21,7 @@ public class AnomalyPrediction {
      * ret[1] = predicted causeID;
      * ret[2] = raw score;
      */
-    public static Double[] predictAnomalyType(Pair<Integer, GenericPoint<Integer>> anomalyObservedData,
+    public static ArrayList[] predictAnomalyType(Pair<Integer, GenericPoint<Integer>> anomalyObservedData,
 					  MultiValueMap results, StringBuilder output) {
 	// XYZ upgrade dimensions if needed
 	// XYZ scale scores
@@ -42,7 +42,8 @@ public class AnomalyPrediction {
 	*/
 	// fill in some fake data
 
-	if (anomalyData == null) {
+	//we don't have a way to invalidate the cache which is bad for demos where the data is changing
+	//if (anomalyData == null) {
 	    try {
 		DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
 		anomalyData = dataConn.getAnomalies(-1L, -1L, -1L, -1L,
@@ -77,12 +78,12 @@ public class AnomalyPrediction {
 	    */
 	    //	    output.append("Best match has class=1.0 score 1.0. Over or under a score of 1.0 mean a deviation from the best match\n\n\n");
 	    
-	}
+	    //}
 
-	Double[] ret = new Double[3];
-	ret[0] = -1.0;
-	ret[1] = -1.0;
-	ret[2] = -1.0;
+	ArrayList[] ret = new ArrayList[3];
+	ret[0] = new ArrayList<Integer>();
+	ret[1] = new ArrayList<Integer>();
+	ret[2] = new ArrayList<Double>();
 	if (anomalyData == null) {
 	    return ret;
 	}
@@ -128,7 +129,6 @@ public class AnomalyPrediction {
 	    Integer causeID = tempPair.getValue0();
 	    Integer statusID = tempPair.getValue1();
 
-	    System.out.println("Nope working on " + statusID + " " + causeID);
 	    if (prediction == 1.0 && causeID >= 0) {
 		if (output != null) {
 		    //output.append("Prediction " + tempPair.getValue0() + "," + tempPair.getValue1() + ": class " + prediction + " with score " + values[0] + " for anomaly " + anomalyObservedData.getValue1().toString() + " with data \n");
@@ -164,9 +164,9 @@ public class AnomalyPrediction {
 		    output.append("\n");
 		    if (best_score > Math.abs(1.0 - values[0])) {
 			best_score = Math.abs(1.0 - values[0]);
-			ret[0] = statusID.doubleValue();
-			ret[1] = causeID.doubleValue();
-			ret[2] = values[0];
+			ret[0].add(statusID);
+			ret[1].add(causeID);
+			ret[2].add(values[0]);
 		    }
 		}
 	    }
@@ -177,7 +177,7 @@ public class AnomalyPrediction {
 		results.put(prediction, tempPair);
 	    }
 	}
-	if (ret[0] >= 0) {
+	if (ret[0].size() >= 0) {
 	    output.append("\n");
 	}
 	return ret;
