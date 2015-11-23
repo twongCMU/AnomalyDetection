@@ -64,6 +64,8 @@ public class DataIOWriteAnomaly {
 		Integer[] anomalyCount = { 0, 320 + (predictionValue * 20)};
 		Integer[] predictedCauses = { (1 + predictionValue) };
 		Integer[] predictedStates = { (1 + predictionValue) };
+		String[] predictedScoreString = { "High" };
+
 		output += writeAnomaly(testStart, testEnd, trainStart, trainEnd,
 				       sourceType, sourceValue, targetType,
 				       algorithm,  score,  patternIndex,
@@ -71,7 +73,7 @@ public class DataIOWriteAnomaly {
 				       trainingMaxCount,  trainingMeanCount,
 				       trainingStandardDeviation,  anomalyValue,
 				       anomalyCount,  predictedCauses,
-				       predictedStates);
+				       predictedStates, predictedScoreString);
 	    }
 	    String causeString = null;
 	    String stateString = null;
@@ -115,7 +117,7 @@ public class DataIOWriteAnomaly {
 			       Double[] trainingMaxCount, Double[] trainingMeanCount,
 			       Double[] trainingStandardDeviation, String[] anomalyValue,
 			       Integer[] anomalyCount, Integer[] predictedCauses,
-			       Integer[] predictedStates) {
+			       Integer[] predictedStates, String[] predictedScoreString) {
 
 	JSONObject obj = new JSONObject();
 	DateTime testStartDateTime = new DateTime(testStart * 1000);
@@ -170,7 +172,7 @@ public class DataIOWriteAnomaly {
 	    }
 	}
 	obj.put("anomalyEntries", anomalyEntriesArray);
-
+	/*
 	JSONArray predictedCausesArray = new JSONArray();
 	if (predictedCauses != null) {
 	    for (Integer oneCause : predictedCauses) {
@@ -190,6 +192,28 @@ public class DataIOWriteAnomaly {
 	    }
 	}
 	obj.put("predictedStates",predictedStatesArray);
+	*/
+	if (predictedCauses != null && predictedStates != null && predictedScoreString != null) {
+	    JSONArray predictionsArray = new JSONArray();
+	    for (int i = 0; i < predictedCauses.length; i++) {
+		JSONObject predictionsEntry = new JSONObject();
+
+
+		JSONObject predictedCauseEntry = new JSONObject();
+		predictedCauseEntry.put("id", new Integer(predictedCauses[i]));
+		predictionsEntry.put("cause", predictedCauseEntry);
+
+		predictionsEntry.put("score", predictedScoreString[i]);
+
+		JSONObject predictedStateEntry = new JSONObject();
+		predictedStateEntry.put("id", new Integer(predictedStates[i]));
+		predictionsEntry.put("state", predictedStateEntry);
+
+		predictionsArray.add(predictionsEntry);
+	    }
+	    obj.put("predictions",predictionsArray);
+	}
+
 	String output = new String();
 	//output += obj.toString();
 	//output += "\n";

@@ -399,6 +399,7 @@ public class SVMCalc {
 
 		Integer[] predictedStates = null;
 		Integer[] predictedCauses = null;
+		String[] predictedScore = null;
 
 		ArrayList<Integer> predStateRet = ret[0];
 		if (predStateRet.size() > 0) {
@@ -407,6 +408,10 @@ public class SVMCalc {
 		ArrayList<Integer> predCauseRet = ret[1];
 		if (predCauseRet.size() > 0) {
 		    predictedCauses = predCauseRet.toArray(new Integer[predCauseRet.size()]);
+		}
+		ArrayList<String> predScoreRet = ret[2];
+		if (predScoreRet.size() > 0) {
+		    predictedScore = predScoreRet.toArray(new String[predScoreRet.size()]);
 		}
 
 		ArrayList<Integer> pattern = new ArrayList<Integer>();
@@ -434,7 +439,7 @@ public class SVMCalc {
 							training_stats[1], training_stats[2],
 							training_stats[3], HistoTuple.getDimensionNamesArray(),
 							onePointToArray, predictedCauses,
-							predictedStates));
+							predictedStates, predictedScore));
 		if (predictedCauses == null || predictedStates == null) {
 		    output.append("\nNo predicted cause was made. This happens when there is not yet enough user feedback.\n\n");
 		}

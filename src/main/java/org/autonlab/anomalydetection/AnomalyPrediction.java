@@ -19,7 +19,7 @@ public class AnomalyPrediction {
      *
      * ret[0] = predicted statusID;
      * ret[1] = predicted causeID;
-     * ret[2] = raw score;
+     * ret[2] = interpreted score string;
      */
     public static ArrayList[] predictAnomalyType(Pair<Integer, GenericPoint<Integer>> anomalyObservedData,
 					  MultiValueMap results, StringBuilder output) {
@@ -38,8 +38,8 @@ public class AnomalyPrediction {
 
 	GenericPoint<Integer> fakePoint3 = new GenericPoint(0, 340);
 	Pair<Integer, GenericPoint<Integer>> fakeAnomaly3 = new Pair(0, fakePoint3);
-	
 	*/
+	
 	// fill in some fake data
 
 	//we don't have a way to invalidate the cache which is bad for demos where the data is changing
@@ -55,7 +55,6 @@ public class AnomalyPrediction {
 	    catch (Exception ex) {
 		System.out.println("Failed to get anomaly annotation information");
 	    }
-	    
 	    /*
 	    anomalyData = new HashMap();
 	    Pair<Integer, Integer> tempKey0 = new Pair(1,0);
@@ -83,7 +82,7 @@ public class AnomalyPrediction {
 	ArrayList[] ret = new ArrayList[3];
 	ret[0] = new ArrayList<Integer>();
 	ret[1] = new ArrayList<Integer>();
-	ret[2] = new ArrayList<Double>();
+	ret[2] = new ArrayList<String>();
 	if (anomalyData == null) {
 	    return ret;
 	}
@@ -131,9 +130,6 @@ public class AnomalyPrediction {
 
 	    if (prediction == 1.0 && causeID >= 0) {
 		if (output != null) {
-		    //output.append("Prediction " + tempPair.getValue0() + "," + tempPair.getValue1() + ": class " + prediction + " with score " + values[0] + " for anomaly " + anomalyObservedData.getValue1().toString() + " with data \n");
-
-
 		    String causeString = null;
 		    String stateString = null;
 		    DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
@@ -153,26 +149,25 @@ public class AnomalyPrediction {
 		    output.append("Predicted cause, status: " + causeString + ", " + stateString + ", with confidence: ");
 		    if (Math.abs(1.0 - values[0]) < .15) {
 			output.append("High");
+			ret[2].add("Confidence: High");
 		    }
 		    else if (Math.abs(1.0-values[0]) < .5) {
 			output.append("Moderate");
+			ret[2].add("Confidence: Moderate");
 		    }
 		    else {
 			output.append("Low");
+			ret[2].add("Confidence: Low");
 		    }
-		    // output.append(" (" + ((int)(Math.abs(1.0 - values[0])*1000.0))/1000.0 + ")\n");
 		    output.append("\n");
 		    if (best_score > Math.abs(1.0 - values[0])) {
 			best_score = Math.abs(1.0 - values[0]);
 			ret[0].add(statusID);
 			ret[1].add(causeID);
-			ret[2].add(values[0]);
 		    }
 		}
 	    }
-	    else {
-		System.out.println("Nope, for status/cause " + statusID + " " + causeID + " got pred " + prediction);
-	    }
+
 	    if (results != null) {
 		results.put(prediction, tempPair);
 	    }
