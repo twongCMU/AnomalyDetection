@@ -12,6 +12,10 @@ public class AnomalyDetectionConfiguration {
     // The number of seconds that we slide the SAMPLE_WINDOW_SECS for the next datapoint - can be changed via REST call
     static int SLIDE_WINDOW_SECS = 300;
 
+    // 0 = off, >0 = on
+    static int SVM_ENABLE_SUPERVISED_LEARNING = 1;
+    static double SVM_UNSUPERVISED_THRESHOLD = 1.0;
+
     static final int CALC_TYPE_KDTREE = 0;
     static final int CALC_TYPE_SVM = 1;
     static final int CALC_TYPE_SVM_RANDOM = 2;
@@ -30,7 +34,6 @@ public class AnomalyDetectionConfiguration {
     static final double SVM_GAMMA = 0.02; // For the RBF Kernel, we need the additional gamma = 1/(2*variance) factor. Variance = 5.0
     static final int SVM_D = 10000;//Number of random Fourier features 
     static final boolean RFF_SINE = true; //parameter determining whether to use cos+unif or cos+sine.
-	
 
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_NONE = 0;
     static final int SVM_PRECOMPUTED_KERNEL_TYPE_CHI_SQUARED = 1;

@@ -383,13 +383,14 @@ public class SVMCalc {
 	    if (results != null) {
 		results.put(prediction, onePoint);
 	    }
-
-	    if (prediction > 1.0) {
+	    if (prediction > AnomalyDetectionConfiguration.SVM_UNSUPERVISED_THRESHOLD && AnomalyDetectionConfiguration.SVM_ENABLE_SUPERVISED_LEARNING == 0) {
+		output.append("This seems suspicious, but Supervised Learning code disabled via config\n");
+	    }
+	    else if (prediction > AnomalyDetectionConfiguration.SVM_UNSUPERVISED_THRESHOLD) {
 		output.append("This seems suspicious, so predicting the cause of this anomaly\n");
-		
+
 		ArrayList[] ret = AnomalyPrediction.predictAnomalyType(onePoint, null, output);
 		
-
 		DataIOWriteAnomaly writeAnomaly = new DataIOWriteAnomaly();
 		int dim = onePoint.getValue1().getDimensions();
 		Integer[] onePointToArray = new Integer[dim];

@@ -67,7 +67,7 @@ public class DataIOCassandraDB implements DataIO {
 
     String dateString = null;
     /* histogram value names -> category names -> histograms */
-    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData(int minutesBack) {
+    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData(int minutesBack, int ignoreMinRecent) {
 	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
 	Date highestDate = null;
 
@@ -75,7 +75,7 @@ public class DataIOCassandraDB implements DataIO {
 	// but we can't query it from Cassandra. We loop through every record and find the highest
 	DateTime endTime = null;
 	DateTime startTime = null;
-	if (minutesBack > 0) {
+	if (minutesBack > 0 || ignoreMinRecent > 0) {
 	    String selectStatement = "SELECT time_stamp FROM " + _keyspace + "." + _table;
 	    ResultSet results = _session.execute(selectStatement);
 	    int rowCount = 0;
@@ -93,13 +93,18 @@ public class DataIOCassandraDB implements DataIO {
 	    }
 	    if (highestDate != null) {
 		endTime = new DateTime(highestDate.getTime());
-		startTime = endTime.minusMinutes(minutesBack);
+		if (minutesBack > 0) {
+		    startTime = endTime.minusMinutes(minutesBack);
+		}
+		if (ignoreMinRecent > 0) {
+		    endTime = endTime.minusMinutes(ignoreMinRecent);
+		}
 	    }
 
 	    // This happens if the database is empty
-	    if (endTime == null || startTime == null) {
-		return null;
-	    }
+	    //if (endTime == null || startTime == null) {
+		//return null;
+		//}
 	}
 
 	int getTextValues = 0;
@@ -144,8 +149,21 @@ public class DataIOCassandraDB implements DataIO {
 
 	selectStatement = selectStatement.substring(0, selectStatement.length() - 1); // drop the trailing comma from above
 	selectStatement += " FROM " + _keyspace + "." + _table;
-	if (minutesBack > 0) {
-	    selectStatement += " WHERE time_stamp > '" + startTime + "' AND time_stamp < '" + endTime + "' ALLOW FILTERING";
+	
+	if (startTime != null || endTime != null) {
+	    selectStatement += " WHERE ";
+	}
+	if (startTime != null) {
+	    selectStatement += " time_stamp > '" + startTime + "' ";
+	}
+	if (endTime != null) {
+	    if (startTime != null) {
+		selectStatement += " AND ";
+	    }
+	    selectStatement += " time_stamp < '" + endTime + "' ";
+	}
+	if (startTime != null || endTime != null) {
+	    selectStatement += " ALLOW FILTERING";
 	}
 	System.out.println("Statement is " + selectStatement);
 	ResultSet results = _session.execute(selectStatement);

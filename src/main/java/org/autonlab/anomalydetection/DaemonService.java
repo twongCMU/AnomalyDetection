@@ -166,13 +166,13 @@ public class DaemonService {
 
 	allHistogramsMapLock.writeLock().lock();
 
-	StringBuilder output = getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table);
+	StringBuilder output = getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, 0);
 
 	allHistogramsMapLock.writeLock().unlock();
 	return Response.status(200).entity(output.toString()).build();
     }
 
-    public StringBuilder getDb(String hostname, String categoryCSV, String valueCSV, Integer ageMins, String keySpace, String table) {
+    public StringBuilder getDb(String hostname, String categoryCSV, String valueCSV, Integer ageMins, String keySpace, String table, Integer ignoreRecentMin) {
 	StringBuilder output = new StringBuilder("");
 
 	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, keySpace, table);
@@ -186,8 +186,11 @@ public class DaemonService {
 	if (ageMins == null) {
 	    ageMins = 0;
 	}
+	if (ignoreRecentMin == null) {
+	    ignoreRecentMin = 0;
+	}
 
-	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> data = dbHandle.getData(ageMins);
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> data = dbHandle.getData(ageMins, ignoreRecentMin);
 
 	if (data != null) {
 	    
@@ -475,6 +478,7 @@ public class DaemonService {
 			  @QueryParam("ageMins") Integer ageMins,
            		  @QueryParam("refreshSec") Integer refreshSec,
  			  @QueryParam("keySpace") String keySpace,
+			  @QueryParam("recentWindowsForTrainingCount") Integer recentCount,
  			  @QueryParam("table") String table) throws InterruptedException {
 
 	allHistogramsMapLock.writeLock().lock();
@@ -495,11 +499,20 @@ public class DaemonService {
 	 */
 	HistoTuple.resetMap();
 
-	//this will go into ID 0
-	getDb(hostname, categoryCSV, valueCSV, null, keySpace, table);
+	// ok this is wrong. We need to consider ageMins and recentCount separately
+	// err, or maybe ageMins here should be renamed and the argument ageMins should be directly passed to the first getDb
+	if (recentCount == null) {
+	    recentCount = 10;
+	}
+	int ageDivider = 1 + (AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS/60) +
+	    ((AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS/60) * recentCount);
 
-	//this will go into ID 1
-	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table);
+
+	//this will go into ID 0 and be the training data
+	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, ageDivider);
+
+	//this will go into ID 1 and be the test data
+	getDb(hostname, categoryCSV, valueCSV, ageDivider, keySpace, table, 0);
 
 	GenericPoint<String> oneCategoryPointSource = null;
 	GenericPoint<String> oneCategoryPointDest = null;
@@ -515,8 +528,12 @@ public class DaemonService {
 			oneCategoryPointDest = oneCategoryPoint;
 		    }
 
-		    //StringBuilder output = getDataSVM(0, oneCategoryPoint.getCoord(0), valueCSV, 1, oneCategoryPoint.getCoord(0), valueCSV, null, null, null, refreshSec);
-		    StringBuilder output = getDataSVM(0, oneCategoryPointSource.getCoord(0), valueCSV, 1, oneCategoryPointDest.getCoord(0), valueCSV, null, null, null, refreshSec);
+		    // To always trigger anomalies, use wildly unrelated data for training and test data. In this example, the training set is the source IP and the 
+		    // test set is the destination IP
+		    //StringBuilder output = getDataSVM(0, oneCategoryPointSource.getCoord(0), valueCSV, 1, oneCategoryPointDest.getCoord(0), valueCSV, null, null, null, refreshSec);
+
+
+		    StringBuilder output = getDataSVM(0, oneCategoryPointSource.getCoord(0), valueCSV, 1, oneCategoryPointSource.getCoord(0), valueCSV, null, null, null, refreshSec);
 
 		    allHistogramsMapLock.writeLock().unlock();
 		    return Response.status(200).entity(output.toString()).build();
@@ -905,6 +922,41 @@ public class DaemonService {
 	return Response.status(200).entity(output).build();
     }
 
+    @GET
+    @Path("/setEnableSupervisedLearning/{newVal}")
+    @Produces(MediaType.TEXT_HTML)
+    public Response setEnableSupervisedLearning(@PathParam("newVal") Integer newValue) throws InterruptedException {
+	String output = "Enable Supervised Learning was " + AnomalyDetectionConfiguration.SVM_ENABLE_SUPERVISED_LEARNING + " and is now " + newValue;
+
+	allHistogramsMapLock.writeLock().lock();
+	if (AnomalyDetectionConfiguration.SVM_ENABLE_SUPERVISED_LEARNING == newValue) {
+	    output = "Value is already " + newValue + ". No change";
+	}
+	else {
+	    AnomalyDetectionConfiguration.SVM_ENABLE_SUPERVISED_LEARNING = newValue;
+	}
+	allHistogramsMapLock.writeLock().unlock();
+
+	return Response.status(200).entity(output).build();
+    }
+
+    @GET
+    @Path("/setUnsupervisedThreshold/{newVal}")
+    @Produces(MediaType.TEXT_HTML)
+    public Response setUnsupervisedThreshold(@PathParam("newVal") Double newValue) throws InterruptedException {
+	String output = "Unsupervised threshold was " + AnomalyDetectionConfiguration.SVM_UNSUPERVISED_THRESHOLD + " and is now " + newValue;
+
+	allHistogramsMapLock.writeLock().lock();
+	if (AnomalyDetectionConfiguration.SVM_UNSUPERVISED_THRESHOLD == newValue) {
+	    output = "Value is already " + newValue + ". No change";
+	}
+	else {
+	    AnomalyDetectionConfiguration.SVM_UNSUPERVISED_THRESHOLD = newValue;
+	}
+	allHistogramsMapLock.writeLock().unlock();
+
+	return Response.status(200).entity(output).build();
+    }
 
 // CUSTOM TESTS
 	//_______________________________________________________________________//
