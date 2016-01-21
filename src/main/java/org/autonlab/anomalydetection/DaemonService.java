@@ -462,7 +462,7 @@ public class DaemonService {
     @GET
     @Path("/setAnomalyServer")
     @Produces(MediaType.TEXT_HTML)
-    public Response demo(@QueryParam("hostname") String hostname) throws InterruptedException {
+    public Response setAnomalyServer(@QueryParam("hostname") String hostname) throws InterruptedException {
 	if (hostname != null) {
 	    AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX = "http://" + hostname + "/essence-services";
 	}
