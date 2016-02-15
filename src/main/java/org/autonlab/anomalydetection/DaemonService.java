@@ -75,6 +75,7 @@ public class DaemonService {
 	return Response.status(200).entity(output).build();
     }
 
+    /* minor bug here that if id does not exist, doesn't unlock */
     @GET
     @Path("/getHistograms")
     @Produces(MediaType.TEXT_PLAIN)
@@ -470,6 +471,17 @@ public class DaemonService {
     }
 
     @GET
+    @Path("/purgeSupervisedCache")
+    @Produces(MediaType.TEXT_HTML)
+    public Response demo() {
+	allHistogramsMapLock.writeLock().lock();
+	AnomalyPrediction.purgeCache();
+	allHistogramsMapLock.writeLock().unlock();
+	return Response.status(200).entity("ok").build();
+    }
+
+
+    @GET
     @Path("/demo")
     @Produces(MediaType.TEXT_HTML)
     public Response demo(@QueryParam("hostname") String hostname,
@@ -478,7 +490,8 @@ public class DaemonService {
 			  @QueryParam("ageMins") Integer ageMins,
            		  @QueryParam("refreshSec") Integer refreshSec,
  			  @QueryParam("keySpace") String keySpace,
-			  @QueryParam("recentWindowsForTrainingCount") Integer recentCount,
+			  @QueryParam("recentMin") Integer recentMin,
+			  @QueryParam("demoFilter") String demoFilter,
  			  @QueryParam("table") String table) throws InterruptedException {
 
 	allHistogramsMapLock.writeLock().lock();
@@ -499,27 +512,24 @@ public class DaemonService {
 	 */
 	HistoTuple.resetMap();
 
-	// ok this is wrong. We need to consider ageMins and recentCount separately
-	// err, or maybe ageMins here should be renamed and the argument ageMins should be directly passed to the first getDb
-	if (recentCount == null) {
-	    recentCount = 10;
+	// number of windows we want to split at
+	if (recentMin == null) {
+	    recentMin = 10;
 	}
-	int ageDivider = 1 + (AnomalyDetectionConfiguration.SAMPLE_WINDOW_SECS/60) +
-	    ((AnomalyDetectionConfiguration.SLIDE_WINDOW_SECS/60) * recentCount);
 
 
 	//this will go into ID 0 and be the training data
-	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, ageDivider);
+	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, recentMin);
 
 	//this will go into ID 1 and be the test data
-	getDb(hostname, categoryCSV, valueCSV, ageDivider, keySpace, table, 0);
+	getDb(hostname, categoryCSV, valueCSV, recentMin, keySpace, table, 0);
 
 	GenericPoint<String> oneCategoryPointSource = null;
 	GenericPoint<String> oneCategoryPointDest = null;
 	if (histogramData.isIDValid(0) && histogramData.isIDValid(1)) {
 	    for (GenericPoint<String> oneValuePoint: histogramData.getValueList(0)) {
 		for (GenericPoint<String> oneCategoryPoint : histogramData.getCategoryList(0, oneValuePoint)) {
-		    System.out.println(oneCategoryPoint.getCoord(0) + "ABC");
+		    System.out.println(oneCategoryPoint.toString() + "ABC");
 		    if (oneCategoryPointSource == null) {
 			oneCategoryPointSource = oneCategoryPoint;
 			continue;
@@ -532,8 +542,11 @@ public class DaemonService {
 		    // test set is the destination IP
 		    //StringBuilder output = getDataSVM(0, oneCategoryPointSource.getCoord(0), valueCSV, 1, oneCategoryPointDest.getCoord(0), valueCSV, null, null, null, refreshSec);
 
-
-		    StringBuilder output = getDataSVM(0, oneCategoryPointSource.getCoord(0), valueCSV, 1, oneCategoryPointSource.getCoord(0), valueCSV, null, null, null, refreshSec);
+		    String newFilter = demoFilter;
+		    if (newFilter == null) {
+			newFilter = oneCategoryPointSource.getCoord(0);
+		    }
+		    StringBuilder output = getDataSVM(0, newFilter, valueCSV, 1, newFilter, valueCSV, null, null, null, refreshSec);
 
 		    allHistogramsMapLock.writeLock().unlock();
 		    return Response.status(200).entity(output.toString()).build();
@@ -545,7 +558,7 @@ public class DaemonService {
 
 	// There is no data yet so reload the page every 2 seconds
 	StringBuilder output = new StringBuilder("<html>");
-	output.append("<head><meta http-equiv='refresh' content='2'></head>");
+	output.append("<head><meta http-equiv='refresh' content='" + refreshSec + "'></head>");
 	output.append("<body><pre>No data yet\n");
 	return Response.status(200).entity(output.toString()).build();
     }

@@ -12,6 +12,10 @@ public class AnomalyPrediction {
      */
     private static HashMap<Pair<Integer, Integer>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalyData = null;
 
+    public static void purgeCache() {
+	anomalyData = null;
+    }
+
     /**
      * @param anomalyObservedData
      * Then, for each pair of annotation and type we do a 1 vs all
@@ -43,7 +47,7 @@ public class AnomalyPrediction {
 	// fill in some fake data
 
 	//we don't have a way to invalidate the cache which is bad for demos where the data is changing
-	//if (anomalyData == null) {
+	if (anomalyData == null) {
 	    try {
 		DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
 		anomalyData = dataConn.getAnomalies(-1L, -1L, -1L, -1L,
@@ -77,7 +81,7 @@ public class AnomalyPrediction {
 	    */
 	    //	    output.append("Best match has class=1.0 score 1.0. Over or under a score of 1.0 mean a deviation from the best match\n\n\n");
 	    
-	    //}
+	}
 
 	ArrayList[] ret = new ArrayList[3];
 	ret[0] = new ArrayList<Integer>();
@@ -108,6 +112,7 @@ public class AnomalyPrediction {
 	    ArrayList<Pair<Integer, GenericPoint<Integer>>> combinedData = new ArrayList();
 	    combinedData.addAll(one);
 	    combinedData.addAll(all);
+	    //SVMKernel svmKernel = new SVMKernel(anomalyObservedDataPackaged, combinedData, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, 1);
 	    SVMKernel svmKernel = new SVMKernel(anomalyObservedDataPackaged, combinedData, AnomalyDetectionConfiguration.SVM_KERNEL_TYPE, AnomalyDetectionConfiguration.SVM_TYPE_PRECOMPUTED_KERNEL_TYPE, 1);
 	   
 	    svm_node[][] bar = svmKernel.getData();
@@ -117,7 +122,13 @@ public class AnomalyPrediction {
 	    double[] values = new double[1];
 
 	    // XYZ should I expect the bar to only have a single row in it?
-	    double prediction = svm.svm_predict_values(svmModel, bar[0], values);
+	    double prediction = -1;
+	    try {
+		prediction = svm.svm_predict_values(svmModel, bar[0], values);
+	    } catch (Exception e) {
+		System.out.println("Supervised prediction saw exception: " + e.toString());
+		continue;
+	    }
 	    //double prediction = values[0];
 
 	    // this code returns a lower score for more anomalous so we flip it to match kdtree

@@ -159,6 +159,7 @@ public class HistoTuple {
 		}
 	    }
 
+	    //look at each category's value. mapKey is source_addr;10.0.0.1, etc
 	    for (GenericPoint<String> mapKey : listMap.get(valueName).keySet()) {
 		ArrayList<HistoTuple> list = listMap.get(valueName).get(mapKey);
 

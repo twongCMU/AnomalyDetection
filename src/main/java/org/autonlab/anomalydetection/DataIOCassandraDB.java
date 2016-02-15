@@ -92,7 +92,7 @@ public class DataIOCassandraDB implements DataIO {
 		}
 	    }
 	    if (highestDate != null) {
-		endTime = new DateTime(highestDate.getTime());
+		endTime = new DateTime(highestDate.getTime(), DateTimeZone.UTC);
 		if (minutesBack > 0) {
 		    startTime = endTime.minusMinutes(minutesBack);
 		}
@@ -149,9 +149,9 @@ public class DataIOCassandraDB implements DataIO {
 
 	selectStatement = selectStatement.substring(0, selectStatement.length() - 1); // drop the trailing comma from above
 	selectStatement += " FROM " + _keyspace + "." + _table;
-	
 	if (startTime != null || endTime != null) {
 	    selectStatement += " WHERE ";
+
 	}
 	if (startTime != null) {
 	    selectStatement += " time_stamp > '" + startTime + "' ";
@@ -162,6 +162,8 @@ public class DataIOCassandraDB implements DataIO {
 	    }
 	    selectStatement += " time_stamp < '" + endTime + "' ";
 	}
+
+
 	if (startTime != null || endTime != null) {
 	    selectStatement += " ALLOW FILTERING";
 	}
@@ -173,6 +175,8 @@ public class DataIOCassandraDB implements DataIO {
 	int rowCount = 0;
 	int categoryFieldsListSize = _categoryFieldsList.size();//cache these outside of the loops to save recalculation
 	int valueFieldsListSize = _valueFieldsList.size() - 1; // -1 because  we don't want to count time_stamp
+
+	HashMap< GenericPoint<String>, Double> highestDateSeen = new HashMap();
 
 	for (Row row: results) {
 	    GenericPoint<String> category = new GenericPoint<String>(categoryFieldsListSize);
@@ -207,6 +211,7 @@ public class DataIOCassandraDB implements DataIO {
 		category.setCoord(ii, categoryString);
 		ii++;
 	    }
+
 	    if (!_valueFieldsList.get(0).equals("time_stamp")) {
 		throw new RuntimeException("First value field was not time_stamp");
 	    }
@@ -250,7 +255,25 @@ public class DataIOCassandraDB implements DataIO {
 	    }
 	    HistoTuple newTuple = new HistoTuple(dateSecs, value, valueNamePoint);
 
-	    trainMap.get(valueNamePoint).get(category).add(newTuple);
+	    if (!highestDateSeen.containsKey(category)) {
+		highestDateSeen.put(category,new Double(-1));
+	    }
+
+	    // we have to sort the data here because Cassandra won't do it for us
+	    if (dateSecs > highestDateSeen.get(category)) {
+		//System.out.println(dateSecs + ">"+highestDateSeen);
+		highestDateSeen.put(category, dateSecs);
+		trainMap.get(valueNamePoint).get(category).add(newTuple);
+	    }
+	    else {
+		for (int sort_i = 0; sort_i < trainMap.get(valueNamePoint).get(category).size(); sort_i++) {
+		    //System.out.println(trainMap.get(valueNamePoint).get(category).get(sort_i)._timeStamp +" vs "+dateSecs);
+		    if (trainMap.get(valueNamePoint).get(category).get(sort_i)._timeStamp >= dateSecs) {
+			trainMap.get(valueNamePoint).get(category).add(sort_i, newTuple);
+			break;
+		    }
+		}
+	    }
 
 	    rowCount++;
 	    if ((rowCount % 1000) == 0) {
