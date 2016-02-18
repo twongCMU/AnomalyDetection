@@ -94,30 +94,42 @@ public class HistogramStore {
 	Double[][] ret = null;
 
 	int dimensions = data.get(0).getValue1().getDimensions();
-	ret = new Double[dimensions][4];
+	ret = new Double[4][dimensions];
 	Double dataPointCount = new Double(data.size());
 	for (int i = 0; i < dimensions; i++) {
-	    ret[i][0] = Double.MIN_VALUE; // store max
-	    ret[i][1] = Double.MAX_VALUE; // store min
-	    ret[i][2] = 0.0; // store mean
-	    ret[i][3] = 0.0; // store stddev
+	    ret[0][i] = Double.MAX_VALUE; // store min
+	    ret[1][i] = Double.MIN_VALUE; // store max
+	    ret[2][i] = 0.0; // store mean
+	    ret[3][i] = 0.0; // store stddev
 	}
 
 	for (Pair<Integer, GenericPoint<Integer>> oneData : data) {
 	    for (int i = 0; i < dimensions; i++) {
 		Integer val = oneData.getValue1().getCoord(i);
-		if (val > ret[i][0]) {
-		    ret[i][0] = new Double(val);
+		if (val > ret[1][i]) {
+		    ret[1][i] = new Double(val);
 		}
-		if (val < ret[i][1]) {
-		    ret[i][1] = new Double(val);
+		if (val < ret[0][i]) {
+		    ret[0][i] = new Double(val);
 		}
-		ret[i][2] += new Double(val);
+		ret[2][i] += new Double(val);
 	    }
 	}
 	for (int i = 0; i < dimensions; i++) {
-	    ret[i][2] /= dataPointCount;
+	    ret[2][i] /= dataPointCount;
 	}
+
+	for (Pair<Integer, GenericPoint<Integer>> oneData : data) {
+	    for (int i = 0; i < dimensions; i++) {
+		Integer val = oneData.getValue1().getCoord(i);
+		ret[3][i] += new Double(Math.pow(val-ret[2][i], 2));
+	    }
+	}
+	for (int i = 0; i < dimensions; i++) {
+	    ret[3][i] /= dataPointCount;
+	    ret[3][i] = Math.sqrt(ret[3][i]);
+	}
+
 	return ret;
     }
 

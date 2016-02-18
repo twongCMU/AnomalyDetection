@@ -15,6 +15,8 @@ import org.javatuples.*;
 import org.apache.commons.math3.distribution.UniformRealDistribution;
 import org.apache.commons.math3.distribution.UniformIntegerDistribution;
 
+import org.joda.time.*;
+
 @Path("/")
 public class DaemonService {
     static HistogramStore histogramData = new HistogramStore();
@@ -73,6 +75,7 @@ public class DaemonService {
 	return Response.status(200).entity(output).build();
     }
 
+    /* minor bug here that if id does not exist, doesn't unlock */
     @GET
     @Path("/getHistograms")
     @Produces(MediaType.TEXT_PLAIN)
@@ -92,8 +95,14 @@ public class DaemonService {
 	    id = newID;
 	}
 
+	Double[][] stats = histogramData.getHistogramStats(id, valuePoint, categoryPoint);
+	output.append("min: " + Arrays.asList(stats[0]) + "\n");
+	output.append("max: " + Arrays.asList(stats[1]) + "\n");
+	output.append("mean: " + Arrays.asList(stats[2]) + "\n");
+	output.append("stddev: " + Arrays.asList(stats[3]) + "\n");
+
 	ArrayList<Pair<Integer, GenericPoint<Integer>>> histograms = histogramData.getHistograms(id, valuePoint, categoryPoint);
-	output.append("Number of datapoints: " + histograms.size() + " \n");
+	output.append("Number of histograms: " + histograms.size() + " \n");
 	for (Pair<Integer, GenericPoint<Integer>> tempPair : histograms) {
 	    output.append(tempPair.getValue0() + " : " + tempPair.getValue1().toString() + "\n");
 	}
@@ -101,6 +110,43 @@ public class DaemonService {
 	allHistogramsMapLock.readLock().unlock();
 
 	return Response.status(200).entity(output.toString()).build();
+    }
+
+    /**
+     * create a dataset of a single histogram with the histogram values passed in by caller
+     * for debugging and testing
+     *
+     * @param catagoryCSV for data i.e., source_addr;10.90.94.9 
+     * @param valueCSV i.e., dest_addr
+     * @param valuedataCSV i.e., [100,  200]
+     */
+    @GET
+    @Path("/testhist")
+    @Produces(MediaType.TEXT_PLAIN)
+	public Response testWriteHist(@QueryParam("categoryCSV") String categoryCSV,
+				      @QueryParam("valueCSV") String valueCSV,
+				      @QueryParam("valueDataCSV") String valueDataCSV) {
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>> newData = new HashMap();
+
+	GenericPoint<String> categoryPoint = getPointFromCSV(categoryCSV);
+	GenericPoint<String> valuePoint = getPointFromCSV(valueCSV);
+	GenericPoint<Integer> valueDataPoint = getPointFromCSVInt(valueDataCSV);
+
+	newData.put(valuePoint, new HashMap<GenericPoint<String>, Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>>());
+	ArrayList<Pair<Integer, GenericPoint<Integer>>> data = new ArrayList<Pair<Integer, GenericPoint<Integer>>>();
+
+	DateTime startTime = new DateTime();
+	Integer startTimeSec = (int)((startTime.getMillis())/1000);
+	Pair<Integer, GenericPoint<Integer>> temp = new Pair<Integer, GenericPoint<Integer>>(startTimeSec, valueDataPoint);
+
+	data.add(temp);
+
+	newData.get(valuePoint).put(categoryPoint, new Pair<Double, ArrayList<Pair<Integer, GenericPoint<Integer>>>>(-1.0,data));
+	
+	allHistogramsMapLock.writeLock().lock();
+	Integer newID = histogramData.putHistogramSet(newData);
+	allHistogramsMapLock.writeLock().unlock();
+	return Response.status(200).entity("ID "+ newID).build();
     }
 
     /**
@@ -121,13 +167,13 @@ public class DaemonService {
 
 	allHistogramsMapLock.writeLock().lock();
 
-	StringBuilder output = getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table);
+	StringBuilder output = getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, 0);
 
 	allHistogramsMapLock.writeLock().unlock();
 	return Response.status(200).entity(output.toString()).build();
     }
 
-    public StringBuilder getDb(String hostname, String categoryCSV, String valueCSV, Integer ageMins, String keySpace, String table) {
+    public StringBuilder getDb(String hostname, String categoryCSV, String valueCSV, Integer ageMins, String keySpace, String table, Integer ignoreRecentMin) {
 	StringBuilder output = new StringBuilder("");
 
 	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, keySpace, table);
@@ -141,8 +187,11 @@ public class DaemonService {
 	if (ageMins == null) {
 	    ageMins = 0;
 	}
+	if (ignoreRecentMin == null) {
+	    ignoreRecentMin = 0;
+	}
 
-	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> data = dbHandle.getData(ageMins);
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> data = dbHandle.getData(ageMins, ignoreRecentMin);
 
 	if (data != null) {
 	    
@@ -397,6 +446,40 @@ public class DaemonService {
 
 	return point;
     }
+    public GenericPoint<Integer> getPointFromCSVInt(String csv) {
+	String[] sParts = csv.split(",");
+	// note: no sort here like with the String version of this because
+	// we're directly storing the input not translating them to another format
+	GenericPoint<Integer> point = new GenericPoint(sParts.length);
+
+	for (int ii = 0; ii < sParts.length; ii++) {
+	    System.out.println("coord " + ii + " val " + Integer.parseInt(sParts[ii]));
+	    point.setCoord(ii, Integer.parseInt(sParts[ii]));
+	}
+
+	return point;
+    }
+
+    @GET
+    @Path("/setAnomalyServer")
+    @Produces(MediaType.TEXT_HTML)
+    public Response setAnomalyServer(@QueryParam("hostname") String hostname) throws InterruptedException {
+	if (hostname != null) {
+	    AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX = "http://" + hostname + "/essence-services";
+	}
+	return Response.status(200).entity("ok").build();
+    }
+
+    @GET
+    @Path("/purgeSupervisedCache")
+    @Produces(MediaType.TEXT_HTML)
+    public Response demo() {
+	allHistogramsMapLock.writeLock().lock();
+	AnomalyPrediction.purgeCache();
+	allHistogramsMapLock.writeLock().unlock();
+	return Response.status(200).entity("ok").build();
+    }
+
 
     @GET
     @Path("/demo")
@@ -407,6 +490,8 @@ public class DaemonService {
 			  @QueryParam("ageMins") Integer ageMins,
            		  @QueryParam("refreshSec") Integer refreshSec,
  			  @QueryParam("keySpace") String keySpace,
+			  @QueryParam("recentMin") Integer recentMin,
+			  @QueryParam("demoFilter") String demoFilter,
  			  @QueryParam("table") String table) throws InterruptedException {
 
 	allHistogramsMapLock.writeLock().lock();
@@ -427,18 +512,24 @@ public class DaemonService {
 	 */
 	HistoTuple.resetMap();
 
-	//this will go into ID 0
-	getDb(hostname, categoryCSV, valueCSV, null, keySpace, table);
+	// number of windows we want to split at
+	if (recentMin == null) {
+	    recentMin = 10;
+	}
 
-	//this will go into ID 1
-	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table);
+
+	//this will go into ID 0 and be the training data
+	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, recentMin);
+
+	//this will go into ID 1 and be the test data
+	getDb(hostname, categoryCSV, valueCSV, recentMin, keySpace, table, 0);
 
 	GenericPoint<String> oneCategoryPointSource = null;
 	GenericPoint<String> oneCategoryPointDest = null;
 	if (histogramData.isIDValid(0) && histogramData.isIDValid(1)) {
 	    for (GenericPoint<String> oneValuePoint: histogramData.getValueList(0)) {
 		for (GenericPoint<String> oneCategoryPoint : histogramData.getCategoryList(0, oneValuePoint)) {
-		    System.out.println(oneCategoryPoint.getCoord(0) + "ABC");
+		    System.out.println(oneCategoryPoint.toString() + "ABC");
 		    if (oneCategoryPointSource == null) {
 			oneCategoryPointSource = oneCategoryPoint;
 			continue;
@@ -447,8 +538,15 @@ public class DaemonService {
 			oneCategoryPointDest = oneCategoryPoint;
 		    }
 
-		    //StringBuilder output = getDataSVM(0, oneCategoryPoint.getCoord(0), valueCSV, 1, oneCategoryPoint.getCoord(0), valueCSV, null, null, null, refreshSec);
-		    StringBuilder output = getDataSVM(0, oneCategoryPointSource.getCoord(0), valueCSV, 1, oneCategoryPointDest.getCoord(0), valueCSV, null, null, null, refreshSec);
+		    // To always trigger anomalies, use wildly unrelated data for training and test data. In this example, the training set is the source IP and the 
+		    // test set is the destination IP
+		    //StringBuilder output = getDataSVM(0, oneCategoryPointSource.getCoord(0), valueCSV, 1, oneCategoryPointDest.getCoord(0), valueCSV, null, null, null, refreshSec);
+
+		    String newFilter = demoFilter;
+		    if (newFilter == null) {
+			newFilter = oneCategoryPointSource.getCoord(0);
+		    }
+		    StringBuilder output = getDataSVM(0, newFilter, valueCSV, 1, newFilter, valueCSV, null, null, null, refreshSec);
 
 		    allHistogramsMapLock.writeLock().unlock();
 		    return Response.status(200).entity(output.toString()).build();
@@ -460,7 +558,7 @@ public class DaemonService {
 
 	// There is no data yet so reload the page every 2 seconds
 	StringBuilder output = new StringBuilder("<html>");
-	output.append("<head><meta http-equiv='refresh' content='2'></head>");
+	output.append("<head><meta http-equiv='refresh' content='" + refreshSec + "'></head>");
 	output.append("<body><pre>No data yet\n");
 	return Response.status(200).entity(output.toString()).build();
     }
@@ -549,15 +647,16 @@ public class DaemonService {
 	}
 
 	MultiValueMap resultsHash = new MultiValueMap();
-	try {
+	//	try {
 	    StringBuilder ret = null;
 	    ret = SVMCalc.runOneTestSVM(histogramData, trainID, trainCategoryPoint, trainValuePoint, testID, testCategoryPoint, testValuePoint, anomalyTrainID, anomalyTrainCategoryPoint, anomalyTrainValuePoint, resultsHash);
 	    output.append(ret.toString());
+	    /*
 	}
 	catch (Exception ex) {
 	    System.out.println("Caught excpetion. Data changing");
 	}
-
+	    */
 
 	List<Double> resultsHashList = new ArrayList<Double>(resultsHash.keySet());
 	Collections.sort(resultsHashList); // ascending order
@@ -836,6 +935,41 @@ public class DaemonService {
 	return Response.status(200).entity(output).build();
     }
 
+    @GET
+    @Path("/setEnableSupervisedLearning/{newVal}")
+    @Produces(MediaType.TEXT_HTML)
+    public Response setEnableSupervisedLearning(@PathParam("newVal") Integer newValue) throws InterruptedException {
+	String output = "Enable Supervised Learning was " + AnomalyDetectionConfiguration.SVM_ENABLE_SUPERVISED_LEARNING + " and is now " + newValue;
+
+	allHistogramsMapLock.writeLock().lock();
+	if (AnomalyDetectionConfiguration.SVM_ENABLE_SUPERVISED_LEARNING == newValue) {
+	    output = "Value is already " + newValue + ". No change";
+	}
+	else {
+	    AnomalyDetectionConfiguration.SVM_ENABLE_SUPERVISED_LEARNING = newValue;
+	}
+	allHistogramsMapLock.writeLock().unlock();
+
+	return Response.status(200).entity(output).build();
+    }
+
+    @GET
+    @Path("/setUnsupervisedThreshold/{newVal}")
+    @Produces(MediaType.TEXT_HTML)
+    public Response setUnsupervisedThreshold(@PathParam("newVal") Double newValue) throws InterruptedException {
+	String output = "Unsupervised threshold was " + AnomalyDetectionConfiguration.SVM_UNSUPERVISED_THRESHOLD + " and is now " + newValue;
+
+	allHistogramsMapLock.writeLock().lock();
+	if (AnomalyDetectionConfiguration.SVM_UNSUPERVISED_THRESHOLD == newValue) {
+	    output = "Value is already " + newValue + ". No change";
+	}
+	else {
+	    AnomalyDetectionConfiguration.SVM_UNSUPERVISED_THRESHOLD = newValue;
+	}
+	allHistogramsMapLock.writeLock().unlock();
+
+	return Response.status(200).entity(output).build();
+    }
 
 // CUSTOM TESTS
 	//_______________________________________________________________________//

@@ -24,11 +24,13 @@ public class DataIOWriteAnomaly {
 
     Client client;
     HashMap<Integer, String> causes;
+    HashMap<Integer, String> states;
 
     public DataIOWriteAnomaly()
     {
 	client = Client.create();
 	causes = null;
+	states = null;
     }
 
     public void closeConnection()
@@ -43,25 +45,27 @@ public class DataIOWriteAnomaly {
 
 	for (int predictionValue = 0; predictionValue < 4; predictionValue++) {
 	    for (int i = 0; i < numToCreate; i++) {
-		Long testStart = new Long(1399912491000L);
-		Long testEnd = new Long(1399912451000L);
-		Long trainStart = new Long(1399830841000L);
-		Long trainEnd = new Long(1399917252000L);
-		Integer sourceType = 1;
+		Long testStart = new Long(1399912491L);
+		Long testEnd = new Long(1399912451L);
+		Long trainStart = new Long(1399830841L);
+		Long trainEnd = new Long(1399917252L);
+		Integer sourceType = AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_IP_ADDRESS;
 		String sourceValue = "10.90.94.9";
-		Integer targetType = 1;
+		Integer targetType = AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_IP_ADDRESS;
 		String algorithm ="svm_chi_squared_1.0";
 		Double score = new Double(100.0);
-		Integer patternIndex = 1;
+		Integer[] patternIndex = { };
 		String[] trainingTargetValue = {  "10.80.1.148", "10.90.94.9"};
-		Integer[] trainingMinCount = { 0, 320 + (predictionValue * 20)};
-		Integer[] trainingMaxCount = { 0, 320 + (predictionValue * 20)};
-		Integer[] trainingMeanCount = { 0,  320 + (predictionValue * 20)};
+		Double[] trainingMinCount = { 0.0, 320.0 + (predictionValue * 20)};
+		Double[] trainingMaxCount = { 0.0, 320.0 + (predictionValue * 20)};
+		Double[] trainingMeanCount = { 0.0,  320.0 + (predictionValue * 20)};
 		Double[] trainingStandardDeviation = { 0.0, 0.0 };
 		String[] anomalyValue = { "10.80.1.148", "10.90.94.9"};
 		Integer[] anomalyCount = { 0, 320 + (predictionValue * 20)};
 		Integer[] predictedCauses = { (1 + predictionValue) };
-		Integer[] predictedStates = { 2 };
+		Integer[] predictedStates = { (1 + predictionValue) };
+		String[] predictedScoreString = { "High" };
+
 		output += writeAnomaly(testStart, testEnd, trainStart, trainEnd,
 				       sourceType, sourceValue, targetType,
 				       algorithm,  score,  patternIndex,
@@ -69,30 +73,60 @@ public class DataIOWriteAnomaly {
 				       trainingMaxCount,  trainingMeanCount,
 				       trainingStandardDeviation,  anomalyValue,
 				       anomalyCount,  predictedCauses,
-				       predictedStates);
+				       predictedStates, predictedScoreString);
 	    }
-	    output += "Sent " + numToCreate + " anomalies with data [0, " + (320 + (predictionValue * 20)) + "] and cause " + (1 + predictionValue) + "\n";
+	    String causeString = null;
+	    String stateString = null;
+	    DataIOWriteAnomaly dataConn = new DataIOWriteAnomaly();
+	    causeString = dataConn.getCause(1 + predictionValue);
+	    stateString = dataConn.getStates(2);
+	    dataConn.closeConnection();
+	    dataConn = null;
+	    output += "Sent " + numToCreate + " anomalies with data [0, " + (320 + (predictionValue * 20)) + "] and cause, status " + causeString + ", " + stateString + "\n";
 	}
 	return output;
     }
 
+    /**
+     * write an anomaly to the database
+     *
+     * @param testStart seconds from epoch timestamp of test data start
+     * @param testEnd seconds from epoch timestamp of test data end
+     * @param trainStart seconds from epoch timestamp of training data start
+     * @param trainEnd seconds from epoch timestamp of training data end
+     * @param sourceType see AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_ for values
+     * @param sourceValue the string representation of the histogram value
+     * @param targetType see AnomalyDetectionConfiguration.ANOMALY_FILTER_TYPE_ for values
+     * @param algorithm string for how this anomaly was generated
+     * @param score score that triggered this anomaly
+     * @param patternIndex results from pattern detection (if any). See documentation
+     * @param trainingTargetValue strings representing each histogram column in the training data
+     * @param trainingMinCount array of lowest counts seen in the training data
+     * @param trainingMaxCount array of highest counts seen in the training data
+     * @param trainingMeanCount array of average counts seen in the training data
+     * @param trainingStandardDeviation array of stddev seen in the training data
+     * @param anomalyValue probably the same as trainingTargetValue
+     * @param anomalyCount array of counts in the anomaly histogram
+     * @param predictedCauses causes from the supervised learning component (if any)
+     * @param predictedStates states from the supervised learning component (if any)
+     */
     public String writeAnomaly(Long testStart, Long testEnd, Long trainStart, Long trainEnd,
 			       Integer sourceType, String sourceValue, Integer targetType,
-			       String algorithm, Double score, Integer patternIndex,
-			       String[] trainingTargetValue, Integer[] trainingMinCount,
-			       Integer[] trainingMaxCount, Integer[] trainingMeanCount,
+			       String algorithm, Double score, Integer[] patternIndex,
+			       String[] trainingTargetValue, Double[] trainingMinCount,
+			       Double[] trainingMaxCount, Double[] trainingMeanCount,
 			       Double[] trainingStandardDeviation, String[] anomalyValue,
 			       Integer[] anomalyCount, Integer[] predictedCauses,
-			       Integer[] predictedStates) {
+			       Integer[] predictedStates, String[] predictedScoreString) {
 
 	JSONObject obj = new JSONObject();
-	DateTime testStartDateTime = new DateTime(testStart);
+	DateTime testStartDateTime = new DateTime(testStart * 1000);
 	obj.put("detectionTimeWindowStart", testStartDateTime.toString("EEE, dd MMM yyyy HH:mm:ss Z"));
-	DateTime testEndDateTime = new DateTime(testEnd);
+	DateTime testEndDateTime = new DateTime(testEnd * 1000);
 	obj.put("detectionTimeWindowEnd", testEndDateTime.toString("EEE, dd MMM yyyy HH:mm:ss Z"));
-	DateTime trainingStartDateTime = new DateTime(trainStart);
+	DateTime trainingStartDateTime = new DateTime(trainStart * 1000);
 	obj.put("trainingTimeWindowStart", trainingStartDateTime.toString("EEE, dd MMM yyyy HH:mm:ss Z"));
-	DateTime trainingEndDateTime = new DateTime(trainEnd);
+	DateTime trainingEndDateTime = new DateTime(trainEnd * 1000);
 	obj.put("trainingTimeWindowEnd", trainingEndDateTime.toString("EEE, dd MMM yyyy HH:mm:ss Z"));
 	obj.put("sourceType", sourceType);
 	// 10.90.94.9 or 10.80.1.148
@@ -100,7 +134,17 @@ public class DataIOWriteAnomaly {
 	obj.put("targetType", targetType);
 	obj.put("algorithm", algorithm);
 	obj.put("score", score);
-	obj.put("patternIndex", patternIndex);
+
+
+	//obj.put("patternIndex", patternIndex);
+	JSONArray patternArray = new JSONArray();
+	if (patternIndex != null) {
+	    for (Integer onePattern : patternIndex) {
+		patternArray.add(onePattern);
+	    }
+	}
+	obj.put("patternIndex",patternArray);
+
 
 	JSONArray normalEntriesArray = new JSONArray();
 	if (trainingTargetValue != null) {
@@ -108,8 +152,8 @@ public class DataIOWriteAnomaly {
 		JSONObject normalEntries = new JSONObject();
 		normalEntries.put("sequenceNumber", new Integer(i));
 		normalEntries.put("targetValue", trainingTargetValue[i]);
-		normalEntries.put("minCount", trainingMinCount[i]);
-		normalEntries.put("maxCount", trainingMaxCount[i]);
+		normalEntries.put("minCount", trainingMinCount[i].intValue());
+		normalEntries.put("maxCount", trainingMaxCount[i].intValue());
 		normalEntries.put("meanCount", trainingMeanCount[i]);
 		normalEntries.put("standardDeviation", trainingStandardDeviation[i]);
 		normalEntriesArray.add(normalEntries);
@@ -128,7 +172,7 @@ public class DataIOWriteAnomaly {
 	    }
 	}
 	obj.put("anomalyEntries", anomalyEntriesArray);
-
+	/*
 	JSONArray predictedCausesArray = new JSONArray();
 	if (predictedCauses != null) {
 	    for (Integer oneCause : predictedCauses) {
@@ -148,9 +192,31 @@ public class DataIOWriteAnomaly {
 	    }
 	}
 	obj.put("predictedStates",predictedStatesArray);
+	*/
+	if (predictedCauses != null && predictedStates != null && predictedScoreString != null) {
+	    JSONArray predictionsArray = new JSONArray();
+	    for (int i = 0; i < predictedCauses.length; i++) {
+		JSONObject predictionsEntry = new JSONObject();
+
+
+		JSONObject predictedCauseEntry = new JSONObject();
+		predictedCauseEntry.put("id", new Integer(predictedCauses[i]));
+		predictionsEntry.put("cause", predictedCauseEntry);
+
+		predictionsEntry.put("score", predictedScoreString[i]);
+
+		JSONObject predictedStateEntry = new JSONObject();
+		predictedStateEntry.put("id", new Integer(predictedStates[i]));
+		predictionsEntry.put("state", predictedStateEntry);
+
+		predictionsArray.add(predictionsEntry);
+	    }
+	    obj.put("predictions",predictionsArray);
+	}
+
 	String output = new String();
 	//output += obj.toString();
-	//output += "\n";
+	output += "\n";
 
 	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly");
 	ClientResponse response = webResource.type("application/json").post(ClientResponse.class, obj.toString());
@@ -293,10 +359,9 @@ public class DataIOWriteAnomaly {
     /* We should do some sort of caching here but we don't have a mechanism for invalidating the cache so for now we just retrieve the info every time */
     public String getCause(Integer lookupID)
     {
-	if (causes != null) {
-	    return this.causes.get(lookupID);
-	}
-
+	//if (causes != null) {
+	//return this.causes.get(lookupID);
+	//}
 	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly/causes/");
 	String ret = webResource.accept("application/json").get(String.class);
 	JSONArray retArray = new JSONArray();
@@ -313,6 +378,33 @@ public class DataIOWriteAnomaly {
 	    String cause = oneJObj.get("cause").toString();
 	    this.causes.put(id, cause);
 	}
+
 	return this.causes.get(lookupID);
+    }
+
+    
+    public String getStates(Integer lookupID)
+    {
+	//if (states != null) {
+	//    return this.states.get(lookupID);
+	//}
+	WebResource webResource = client.resource(AnomalyDetectionConfiguration.ANOMALY_REST_URL_PREFIX + "/anomaly/states/");
+	String ret = webResource.accept("application/json").get(String.class);
+	JSONArray retArray = new JSONArray();
+	retArray = (JSONArray)JSONValue.parse(ret);
+	
+	this.states = new HashMap();
+
+	for (int i = 0; i < retArray.size(); i++) {
+	    Object oneObj = retArray.get(i);
+	    JSONObject oneJObj = (JSONObject)oneObj;
+
+	    
+	    Integer id = Integer.parseInt(oneJObj.get("id").toString());
+	    String state = oneJObj.get("state").toString();
+	    this.states.put(id, state);
+	}
+
+	return this.states.get(lookupID);
     }
 }
