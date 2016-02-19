@@ -181,7 +181,8 @@ class Histograms():
 
 
     def get_histograms(self, features=None, start_sec=None, end_sec=None,
-                       from_start_min=None, from_end_min=None):
+                       from_start_min=None, from_end_min=None,
+                       drop_end_min=None, drop_start_min=None):
         """
         Return the histogram datastructure. If debugging is enabled
         it will first verify that all of the timestamps are in the correct
@@ -199,6 +200,8 @@ class Histograms():
         to_end_min = only include data from the most recent time to this many
             minutes back. Use for ignorning old data. This operates on the
             original histogram end time, not the end_sec argument
+        drop_start_min = do not include data this many minutes from the start
+        drop_end_min = do not include data this many minutes from the end
 
         The timestamps are lost during this conversion. The first row in the
         matrix will correspond to the window beginning at the lowest valid 
@@ -260,6 +263,7 @@ class Histograms():
         # but when we put it in the return matrix we remap the lowest
         # index in self._histograms with data to ret[0]
         row = 0
+
         for i in range(low, high + 1):
             cur_time = self._sample_window + (i * self._slide_window)
             if start_sec is not None and cur_time < start_sec:
@@ -268,13 +272,16 @@ class Histograms():
                 continue
             if from_start_min is not None and \
                     cur_time > self._start_sec + (from_start_min * 60):
-                print "from_start discard",cur_time,">",self._start_sec + (from_start_min * 60)
                 continue
             if from_end_min is not None and \
                     cur_time < self._end_sec - (from_end_min * 60):
-                print "from end discard",cur_time,"<",self._end_sec - (from_end_min * 60)
                 continue
-            print "time is ",cur_time
+            if drop_start_min is not None and \
+                    cur_time < self._start_sec + (drop_start_min * 60):
+                continue
+            if drop_end_min is not None and \
+                    cur_time > self._end_sec - (drop_end_min * 60):
+                continue
 
             if i in self._histograms:
                 one_histogram = self._histograms[i]
@@ -291,13 +298,19 @@ class Histograms():
                 for f in features:
                     if f in self._index_feature_to_id:
                         feature_offset = self._index_feature_to_id[f]
-                        ret[row][count] = one_histogram[feature_offset]
+                        if feature_offset >= len(one_histogram):
+                            # this happens if we had to grow the matrix
+                            # dimensions to match another histogram we're
+                            # testing against, so just set the value to zero
+                            ret[row][count] = 0
+                        else:
+                            ret[row][count] = one_histogram[feature_offset]
                     else:
                         ret[row][count] = 0
                     count += 1
                 
             row += 1
-        print "returning",ret[:row].shape
+
         ### adjust the ret to account for any rows we discarded
         return ret[:row]
 

@@ -58,7 +58,7 @@ class TestHistograms:
         for r in res:
             score = r[0]
             if score < -0.001:
-                raise Exception("Same data for training and testing got",
+                raise Exception("Padded same data for training and testing got",
                                 "unexpectedly high anomaly score", score)
             count += 1
             if score < 0:
@@ -66,7 +66,7 @@ class TestHistograms:
         pct = anom/float(count)
         print "Anomaly percentage %0.3f" % (pct)
         if (pct > 0.05):
-            raise Exception("Same data for training and testing got",
+            raise Exception("Padded same data for training and testing got",
                             "unexpectedly high anomaly ratio", (pct))
 
         # make some very anomalous data
@@ -92,6 +92,29 @@ class TestHistograms:
         print "Anomaly percentage %0.3f" % (pct)
         if (pct < 0.99):
             raise Exception("With highly anomalous data, got unexpectedly",
+                            "low anomaly ratio", (pct))
+
+        print "Anomalous data with padding"
+        (r,c) = i.data.shape
+        wide_m = np.ones((r,c+3), np.float64)
+        wide_m[0:r, 0:c] = i.data.copy()
+        h4 = Histograms(0, 0, matrix = wide_m)
+        res = SVMCalc.test(h1, h4)
+
+        count = 0
+        anom = 0
+        for r in res:
+            score = r[0]
+            if score > -0.5:
+                raise Exception("Padded anomalous data, got unexpectedly",
+                                "low anomaly score", score)
+            count += 1
+            if score < 0:
+                anom += 1
+        pct = anom/float(count)
+        print "Anomaly percentage %0.3f" % (pct)
+        if (pct < 0.99):
+            raise Exception("Padded anomalous data got unexpectedly",
                             "low anomaly ratio", (pct))
 
         print "Testing bounds splitting"
@@ -120,7 +143,6 @@ class TestHistograms:
                 raise Exception("Split data for training and testing got",
                                 "unexpectedly high anomaly score", score)
             if score < worst_score_same_data:
-                print score,"worse than",worst_score_same_data
                 worse_score_than_same_data += 1
             count += 1
             if score < 0:
@@ -160,14 +182,22 @@ class TestHistograms:
                             "unexpectedly high anomaly ratio", (pct))
 
     def test_cassandra(self):
+        """
+        This test assumes a specifically configured database so
+        it isn't worth much. However it is good for specifying
+        a test for a known database especially if the test will
+        be run repeatedly over a short time
+        """
         d = CassandraIO("demo", "packet", hostname="54.210.142.233")
         #if res.source_addr != "10.80.1.148":
-        hist = d.get_histogram(60, 10, "source_addr", "10.0.0.1",
+        hist = d.get_histogram(60, 10, "source_addr", "10.0.0.2",
                                "dest_addr")
         hist.print_histograms()
         print time.time()
-        SVMCalc.test(hist,hist)
-
+        res = SVMCalc.test(hist,hist, train_drop_end_min=37)
+        h_get = hist.get_histograms()
+        for k,h in zip(res,h_get):
+            print h,k
         d.close()
 
     def test_histogram(self):

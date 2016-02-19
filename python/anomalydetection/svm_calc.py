@@ -12,7 +12,9 @@ class SVMCalc(GenericCalc):
     @staticmethod
     def test(train_h, test_h, train_start_sec=None, train_end_sec=None,
              train_from_start_min=None, train_from_end_min=None,
+             train_drop_start_min=None, train_drop_end_min=None,
              test_start_sec=None, test_end_sec=None,
+             test_drop_start_min=None, test_drop_end_min=None,
              test_from_start_min=None, test_from_end_min=None):
         """
         TODO: the edges of the dataspace should be dropped
@@ -38,12 +40,16 @@ class SVMCalc(GenericCalc):
                                          start_sec = train_start_sec,
                                          end_sec = train_end_sec,
                                          from_start_min = train_from_start_min,
-                                         from_end_min = train_from_end_min)
+                                         from_end_min = train_from_end_min,
+                                         drop_start_min = train_drop_start_min,
+                                         drop_end_min = train_drop_end_min)
         test_m = test_h.get_histograms(features=sort_feat,
                                        start_sec = test_start_sec,
                                        end_sec = test_end_sec,
                                        from_start_min = test_from_start_min,
-                                       from_end_min = test_from_end_min)
+                                       from_end_min = test_from_end_min,
+                                       drop_start_min = test_drop_start_min,
+                                       drop_end_min = test_drop_end_min)
 
         train_k = chi2_kernel(train_m)
         test_k = chi2_kernel(test_m, train_m)
