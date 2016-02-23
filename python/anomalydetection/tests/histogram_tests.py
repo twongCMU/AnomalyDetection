@@ -29,14 +29,11 @@ class TestHistograms:
 
         count = 0
         anom = 0
-        worst_score_same_data = 9999
         for r in res:
             score = r[0]
             if score < -0.001:
                 raise Exception("Same data for training and testing got",
                                 "unexpectedly high anomaly score", score)
-            if score < worst_score_same_data:
-                worst_score_same_data = score
             count += 1
             if score < 0:
                 anom += 1
@@ -80,9 +77,9 @@ class TestHistograms:
         res = SVMCalc.test(h1, h3)
         count = 0
         anom = 0
-        for r in sorted(res):
+        for r in res:
             score = r[0]
-            if score > -0.5:
+            if score > -0.04:
                 raise Exception("With highly anomalous data, got unexpectedly",
                                 "low anomaly score", score)
             count += 1
@@ -105,7 +102,7 @@ class TestHistograms:
         anom = 0
         for r in res:
             score = r[0]
-            if score > -0.5:
+            if score > -0.04:
                 raise Exception("Padded anomalous data, got unexpectedly",
                                 "low anomaly score", score)
             count += 1
@@ -128,7 +125,7 @@ class TestHistograms:
 
         res = SVMCalc.test(h1, h1, train_from_start_min = train_time,
                            test_from_end_min = test_time)
-        assert len(res) < i.data.shape[0] * .50
+
         count = 0
         anom = 0
         # we know the worst score that using the same data for training and test
@@ -137,13 +134,10 @@ class TestHistograms:
         worse_score_than_same_data = 0
         for r in res:
             score = r[0]
-            print score
             # score tolerance is loosened because we have less training data
-            if score < -0.01:
+            if score < 0.0:
                 raise Exception("Split data for training and testing got",
                                 "unexpectedly high anomaly score", score)
-            if score < worst_score_same_data:
-                worse_score_than_same_data += 1
             count += 1
             if score < 0:
                 anom += 1
@@ -152,9 +146,6 @@ class TestHistograms:
         if (pct > 0.05):
             raise Exception("Split data for training and testing got",
                             "unexpectedly high anomaly ratio", (pct))
-        if (worse_score_than_same_data == 0):
-            raise Exception("Split data score unexpectedly all less anomalous",
-                            "than using same training and test data")
 
         print "Using same data for training and testing (low anomaly rate)"
         h1 = Histograms(0, 0, matrix = i.data)
