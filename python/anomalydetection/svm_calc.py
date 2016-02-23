@@ -6,6 +6,7 @@ from sklearn import cross_validation
 from constants import *
 from histograms import Histograms
 from generic_calc import GenericCalc
+from sklearn import preprocessing
 
 class SVMCalc(GenericCalc):
 
@@ -51,8 +52,13 @@ class SVMCalc(GenericCalc):
                                        drop_start_min = test_drop_start_min,
                                        drop_end_min = test_drop_end_min)
 
-        train_k = chi2_kernel(train_m)
-        test_k = chi2_kernel(test_m, train_m)
+
+        scaler = preprocessing.MinMaxScaler().fit(train_m)
+        train_m_s = scaler.transform(train_m)
+        test_m_s = scaler.transform(test_m)
+
+        train_k = chi2_kernel(train_m_s)
+        test_k = chi2_kernel(test_m_s, train_m_s)
 
         if train_h._nu == -1:
             best_nu = SVMCalc._cross_validate(train_k)

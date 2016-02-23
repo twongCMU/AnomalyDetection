@@ -56,6 +56,12 @@ class Histograms():
         self._start_sec = sys.maxint
         self._end_sec = -1
 
+        # sometimes we build a histogram using data that doesn't have a time
+        # sequence so we have internal support for faking it to get a useful
+        # result. See below where the matrix argument is converted into 
+        # internal format.
+        self._internal_timestamp = 1
+
         self._histograms = dict()
 
         # to save space, store the feature name as an id. This table
@@ -76,7 +82,7 @@ class Histograms():
             # middle one
             self._sample_window = 2
             self._slide_window = 2
-            time_t = 1
+            self._internal_timestamp = 1
             for r in matrix:
                 index_list = range(len(r))
                 # in debug mode, randomize the feature insert order to verify
@@ -84,19 +90,30 @@ class Histograms():
                 if self._histograms_debug > 0:
                     random.shuffle(index_list)
                 for c in index_list:
-                    self.insert_one(c, time_t, value=r[c])
-                time_t += 2
+                    self.insert_one(c, self._internal_timestamp, value=r[c])
+                self._internal_timestamp += 2
 
         # used by svm_calc. If more classes store things here
         # we'll want to use a dict and provide more generic support
         self._nu = -1
 
-    def insert_one(self, feature_value, timestamp, value = 1.0):
+    def next_row(self):
+        self._internal_timestamp += 2
+
+    def insert_one(self, feature_value, timestamp, value = 1.0, 
+                   use_internal_time = False):
         """
         Save one datapoint into all of the appropriate histograms
         An optional 'value' param allows us to insert a different quantity
         """
+        if use_internal_time == True:
+            timestamp = self._internal_timestamp
+            self._sample_window = 2
+            self._slide_window = 2
+
         assert timestamp >= 0
+        assert self._sample_window > 0
+        assert self._slide_window > 0
 
         try:
             feature_index_id = self._index_feature_to_id[feature_value]

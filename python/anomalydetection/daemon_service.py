@@ -7,7 +7,8 @@ import sys
 import re
 from cassandraIO import CassandraIO
 from svm_calc import SVMCalc
-
+from flask_restful import reqparse
+from anomalyIO import AnomalyIO
 ##
 # To run this, make sure the permissions are right:
 # chmod a+x daemon_service.py 
@@ -20,54 +21,186 @@ app = Flask(__name__)
 
 next_id = 0
 hist_dict = dict()
+anom = None
 
 @app.route('/getdb')
 def getdb():
+    """
+    Assumes that the packet and anomaly databases are ont he same machine
+    """
     global next_id
     global hist_dict
+    global anom
 
-    host = request.args.get('hostname')
-    keyspace = request.args.get('keyspace')
-    table = request.args.get('table')
-    filter_name = request.args.get('filter')
-    filter_value = request.args.get('filter_val')
-    features = request.args.get('featuresCSV')
+    parser = reqparse.RequestParser()
+    parser.add_argument('hostname', help="default = localhost")
+    parser.add_argument('keyspace', required=True)
+    parser.add_argument('table', required=True)
+    parser.add_argument('filter', required=True)
+    parser.add_argument('filter_val', required=True)
+    parser.add_argument('featuresCSV', required=True)
+    parser.add_argument('sample_window_sec', required=True, type=int)
+    parser.add_argument('slide_window_sec', required=True, type=int)
+    args = parser.parse_args()
 
-    c = CassandraIO(keyspace, table, hostname=host)
-    print "ok",filter_name,filter_value,features
-    hist = c.get_histogram(60, 10, filter_name, filter_value, features)
+    c = CassandraIO(args['keyspace'], args['table'], hostname=args['hostname'])
+
+    hist = c.get_histogram(args['sample_window_sec'], args['slide_window_sec'],
+                           args['filter'], args['filter_val'],
+                           args['featuresCSV'])
     c.close()
 
     hist_dict[next_id] = hist
 
-    output = "Dataset ID: " + str(next_id) + "\nFeatures (" + features + "):\n"
+    output = "Dataset ID: " + str(next_id) + "\nFeatures (" + \
+        args['featuresCSV'] + "):\n"
     for f in hist.get_features():
         output += f + "\n"
 
     next_id += 1
 
-    return Response(output,  mimetype='text/plain')
+    if anom is None:
+        anom = AnomalyIO(hostname=args['hostname'])
+
+    return Response(output, mimetype='text/plain')
+
+@app.route('/getcause')
+def getcause():
+    """
+    Translate an ID to a string from the anomaly causes table. If a hostname
+    is passed, use that hostname from now on (and reset the caches)
+
+    If getDB is called first, we will use that hostname
+    """
+    global anom
+    parser = reqparse.RequestParser()
+    parser.add_argument('id', required=True, type=int)
+    parser.add_argument('hostname', help="not required if getDB called first")
+    args = parser.parse_args()
+    if args['hostname'] is not None:
+        anom = AnomalyIO(hostname=args['hostname'])
+
+    if anom == None:
+        return Response("hostname undefined. See docs", mimetype='text/plain')
+
+    ret = anom.getCause(args['id'])
+    if ret is None:
+        ret = "ID not found"
+    return Response(ret, mimetype='text/plain')
+
+@app.route('/getstates')
+def getstates():
+    """
+    Translate an ID to a string from the anomaly states table. If a hostname
+    is passed, use that hostname from now on (and reset the caches)
+
+    If getDB is called first, we will use that hostname
+    """
+    global anom
+
+    parser = reqparse.RequestParser()
+    parser.add_argument('id', required=True, type=int)
+    parser.add_argument('hostname', help="not required if getDB called first")
+    args = parser.parse_args()
+    if args['hostname'] is not None:
+        anom = AnomalyIO(hostname=args['hostname'])
+
+    if anom == None:
+        return Response("hostname undefined. See docs", mimetype='text/plain')
+
+    ret = anom.getStates(args['id'])
+    if ret is None:
+        ret = "ID not found"
+
+    return Response(ret, mimetype='text/plain')
+
+@app.route('/getanomalies')
+def getanomalies():
+    global anom
+
+    parser = reqparse.RequestParser()
+    parser.add_argument('testStart', type=int)
+    parser.add_argument('testEnd', type=int)
+    parser.add_argument('trainStart', type=int)
+    parser.add_argument('trainEnd', type=int)
+    parser.add_argument('filterValue')
+    parser.add_argument('targetType')
+    parser.add_argument('algorithm')
+    parser.add_argument('userState')
+    parser.add_argument('userCause')
+    args = parser.parse_args()
+
+    ret = anom.getAnomalies(testStart=args['testStart'],
+                            testEnd=args['testEnd'],
+                            trainStart=args['trainStart'],
+                            trainEnd=args['trainEnd'],
+                            filterValue=args['filterValue'],
+                            targetType=args['targetType'],
+                            algorithm=args['algorithm'],
+                            userState=args['userState'],
+                            userCause=args['userCause'])
+    output = ""
+    for k in ret:
+        output += str(k[0]) + "," +str(k[1]) + str(len(ret[k].get_histograms())) + "\n"
+
+    return Response(output, mimetype='text/plain')
 
 @app.route('/test')
 def test():
     global hist_dict
 
-    train = int(request.args.get('train_id'))
-    test = int(request.args.get('test_id'))
+    # see svm_calc.py:test()
+    parser = reqparse.RequestParser()
+    parser.add_argument('train_start_sec', type=int)
+    parser.add_argument('train_end_sec', type=int)
+    parser.add_argument('train_from_start_min', type=int)
+    parser.add_argument('train_from_end_min', type=int)
+    parser.add_argument('train_drop_start_min', type=int)
+    parser.add_argument('train_drop_end_min', type=int)
+    parser.add_argument('test_start_sec', type=int)
+    parser.add_argument('test_end_sec', type=int)
+    parser.add_argument('test_from_start_min', type=int)
+    parser.add_argument('test_from_end_min', type=int)
+    parser.add_argument('test_drop_start_min', type=int)
+    parser.add_argument('test_drop_end_min', type=int)
+
+    parser.add_argument('train_id', required=True, type=int)
+    parser.add_argument('test_id', required=True, type=int)
+    args = parser.parse_args()
 
     output = ""
     error = 0
-    if train not in hist_dict:
-        output += "Error: training ID not found: " + train
+    if args['train_id'] not in hist_dict:
+        output += "Error: training ID not found: " + str(args['train_id'])
         error += 1
-    if test not in hist_dict:
-        output += "Error: test ID not found: " + test
+    if args['test_id'] not in hist_dict:
+        output += "Error: test ID not found: " + str(args['test_id'])
         error += 1
     if error == 0:
-        ret = SVMCalc.test(hist_dict[train], hist_dict[test])
+        ret = SVMCalc.test(hist_dict[args['train_id']], 
+                           hist_dict[args['test_id']],
+                           train_start_sec=args['train_start_sec'],
+                           train_end_sec=args['train_end_sec'],
+                           train_from_start_min=args['train_from_start_min'],
+                           train_from_end_min=args['train_from_end_min'],
+                           train_drop_start_min=args['train_drop_start_min'],
+                           train_drop_end_min=args['train_drop_end_min'],
+                           test_start_sec=args['test_start_sec'],
+                           test_end_sec=args['test_end_sec'],
+                           test_from_start_min=args['test_from_start_min'],
+                           test_from_end_min=args['test_from_end_min'],
+                           test_drop_start_min=args['test_drop_start_min'],
+                           test_drop_end_min=args['test_drop_end_min'])
+        h_get = hist_dict[args['test_id']].get_histograms(
+            start_sec=args['test_start_sec'],
+            end_sec=args['test_end_sec'],
+            from_start_min=args['test_from_start_min'],
+            from_end_min=args['test_from_end_min'],
+            drop_start_min=args['test_drop_start_min'],
+            drop_end_min=args['test_drop_end_min'])
         count = 0
-        for r in ret:
-            output += str(count) + ":" +str(r) + "\n"
+        for r,h in zip(ret,h_get):
+            output += str(count) + ":" + str(h) + " - " + str(r) + "\n"
             count += 1
 
     return Response(output,  mimetype='text/plain')
