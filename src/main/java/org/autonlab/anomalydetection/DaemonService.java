@@ -163,17 +163,20 @@ public class DaemonService {
 			  @QueryParam("value") String valueCSV,
 			  @QueryParam("ageMins") Integer ageMins,
 			  @QueryParam("keySpace") String keySpace,
-			  @QueryParam("table") String table) throws InterruptedException {
+			  @QueryParam("table") String table,
+			  @QueryParam("useNow") Integer useNow) throws InterruptedException {
 
 	allHistogramsMapLock.writeLock().lock();
 
-	StringBuilder output = getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, 0);
+	StringBuilder output = getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, 0, useNow);
 
 	allHistogramsMapLock.writeLock().unlock();
 	return Response.status(200).entity(output.toString()).build();
     }
 
-    public StringBuilder getDb(String hostname, String categoryCSV, String valueCSV, Integer ageMins, String keySpace, String table, Integer ignoreRecentMin) {
+
+
+    public StringBuilder getDb(String hostname, String categoryCSV, String valueCSV, Integer ageMins, String keySpace, String table, Integer ignoreRecentMin, Integer useNow) {
 	StringBuilder output = new StringBuilder("");
 
 	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, keySpace, table);
@@ -190,8 +193,10 @@ public class DaemonService {
 	if (ignoreRecentMin == null) {
 	    ignoreRecentMin = 0;
 	}
-
-	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> data = dbHandle.getData(ageMins, ignoreRecentMin);
+	if (useNow == null) {
+	    useNow = 0;
+	}
+	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> data = dbHandle.getData(ageMins, ignoreRecentMin, useNow);
 
 	if (data != null) {
 	    
@@ -492,7 +497,12 @@ public class DaemonService {
  			  @QueryParam("keySpace") String keySpace,
 			  @QueryParam("recentMin") Integer recentMin,
 			  @QueryParam("demoFilter") String demoFilter,
- 			  @QueryParam("table") String table) throws InterruptedException {
+ 			  @QueryParam("table") String table,
+			  @QueryParam("useNow") Integer useNow) throws InterruptedException {
+	//assume we use demo mode at a live site with live data
+	if (useNow == null) {
+	    useNow = 1;
+	}
 
 	allHistogramsMapLock.writeLock().lock();
 
@@ -519,10 +529,10 @@ public class DaemonService {
 
 
 	//this will go into ID 0 and be the training data
-	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, recentMin);
+	getDb(hostname, categoryCSV, valueCSV, ageMins, keySpace, table, recentMin, useNow);
 
 	//this will go into ID 1 and be the test data
-	getDb(hostname, categoryCSV, valueCSV, recentMin, keySpace, table, 0);
+	getDb(hostname, categoryCSV, valueCSV, recentMin, keySpace, table, 0, useNow);
 
 	GenericPoint<String> oneCategoryPointSource = null;
 	GenericPoint<String> oneCategoryPointDest = null;
@@ -1166,6 +1176,27 @@ public class DaemonService {
 	DataIOWriteAnomaly foo = new DataIOWriteAnomaly();
 	HashMap<Pair<Integer, Integer>, ArrayList<Pair<Integer, GenericPoint<Integer>>>> anomalies;
 	String output = foo.getAnomaliesTest();
+
+	return Response.status(200).entity(output).build();
+    }
+
+    @GET
+    @Path("/packetStats")
+    @Produces(MediaType.TEXT_HTML)
+    public Response packetStats(@QueryParam("hostname") String hostname, 
+				@QueryParam("keySpace") String keySpace, 
+				@QueryParam("table") String table,
+				@QueryParam("minutesBack") int minutesBack) {
+	String output = new String();
+	allHistogramsMapLock.writeLock().lock();
+
+
+	DataIOCassandraDB dbHandle = new DataIOCassandraDB(hostname, keySpace, table);
+
+	output = dbHandle.packetStats(minutesBack);
+	dbHandle.close();
+
+	allHistogramsMapLock.writeLock().unlock();
 
 	return Response.status(200).entity(output).build();
     }
