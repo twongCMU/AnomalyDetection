@@ -1,5 +1,8 @@
 import numpy as np
 from sklearn.svm import OneClassSVM
+from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics.pairwise import chi2_kernel
 import time
 from sklearn import cross_validation
@@ -53,11 +56,12 @@ class SVMCalc(GenericCalc):
                                        drop_end_min = test_drop_end_min)
 
 
-        scaler = preprocessing.MinMaxScaler().fit(train_m)
+        scaler = preprocessing.MaxAbsScaler().fit(train_m)
         train_m_s = scaler.transform(train_m)
         test_m_s = scaler.transform(test_m)
 
         train_k = chi2_kernel(train_m_s)
+        print "XYZ",test_m_s
         test_k = chi2_kernel(test_m_s, train_m_s)
 
         if train_h._nu == -1:
@@ -151,3 +155,69 @@ class SVMCalc(GenericCalc):
         # then something is broken
         assert(nu_dict[best_nu] > 0.01) #cross validate returned 0% correct
         return best_nu
+
+    @staticmethod
+    def onevsall(anomalies, observed):
+        dims = (0,0);
+        all_h = None
+        labels = None
+        next_label = 0;
+        # build a giant matrix of all anomaly data and make the labels
+        # The labels matrix is samples x n_classes with a 1 if that sample
+        # is in that class and a 0 if not. It is currently not sparse but
+        # should eventually be
+        label_count = len(anomalies.keys())
+
+        for k in sorted(anomalies.keys()):
+            if all_h is None:
+                all_h = anomalies[k].get_histograms()
+                for r in range(all_h.shape[0]):
+                    row_label = np.zeros(label_count)
+                    row_label[next_label] = 1
+                    if labels is None:
+                        labels = row_label
+                    else:
+                        labels = np.vstack((labels,row_label))
+                next_label = 1
+            else:
+                #all_h.insert(anomalies[k].get_histograms(), axis=0)
+                new_h = anomalies[k].get_histograms()
+                all_h = np.vstack([all_h, new_h])
+                for r in range(new_h.shape[0]):
+                    row_label = np.zeros(label_count)
+                    row_label[next_label] = 1
+                    labels = np.vstack((labels,row_label))
+                next_label += 1
+
+        #SVC is quadratic with the number of samples and a dataset of 10k+ is hard
+        #support vector classification
+        #I used this because an example I found did. We should find out if there is
+                # a better one
+        clf = OneVsRestClassifier(SVC(probability=True), n_jobs = -1)
+        scaler = preprocessing.MaxAbsScaler().fit(all_h)
+        all_m_s = scaler.transform(all_h)
+
+        ## fix this:
+        # the input is an array of one data point but the algo
+        # takes in an array of data points (array of array)
+        # so either we need to call this functino that way
+        # and allow for multiple datapoints to be tested at once
+        # or know to wrap it in here
+        # I think we'll want to do the former: when running a test, pass
+        # all anomalies in here at once to save having to rebuild the
+        # labels matrix
+        observed_m_s = scaler.transform([observed])
+
+        clf.fit(all_m_s, labels)
+
+        # now test the new anomaly against the classifier
+        # this seems to work but with this quirk: if two training classes have similar data
+        # and is tested with an observed data that is similar to both, this reports neither as being matches
+        # so the different classes influence each other  in that they split the 
+        # vote if they're the same training data rather than simply maching both
+        # as independent comparisons
+
+
+
+        return clf.predict_proba(observed_m_s)
+

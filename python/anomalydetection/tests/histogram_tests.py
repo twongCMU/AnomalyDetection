@@ -1,3 +1,4 @@
+from anomalydetection.anomalyIO import AnomalyIO
 from anomalydetection.constants import *
 from anomalydetection.histograms import Histograms
 from anomalydetection.cassandraIO import CassandraIO
@@ -6,6 +7,8 @@ from anomalydetection.svm_calc import SVMCalc
 import time
 from sklearn.datasets import load_iris
 import numpy as np
+import json
+import datetime
 
 class TestHistograms:
     def setUp(self):
@@ -252,3 +255,92 @@ class TestHistograms:
         print "Validating results"
         new_hist.get_histograms()
 
+    def test_anomalies(self):
+        anom = AnomalyIO()
+
+        testStart = 1234
+        testEnd = 4321
+        trainStart = 34567
+        trainEnd = 76543
+        filterType = "source_address"
+        filterValue = "10.0.0.1"
+        featureType = "dest_address"
+        algorithm = "chi_squared"
+        score = 1.23
+        trainingFeatureValue = ["10.0.0.2", "10.0.0.3", "10.0.0.4"]
+        trainingMinCount = [0, 1, 2]
+        trainingMaxCount = [300, 400, 500]
+        trainingMeanCount = [150, 250, 350]
+        trainingStandardDeviation = [22, 33, 44]
+        anomalyFeatureValue = ["10.0.0.2", "10.0.0.3", "10.0.0.4"]
+        anomalyCount = [150, 999, 10]
+        patternIndex = [3, 1, 2]
+        predictedCauses = [2, 3]
+        predictedStates = [4, 5]
+        predictedScoreString = ["low", "high"]
+
+        ret_json = anom.prepareJson(testStart, testEnd, trainStart, trainEnd,
+                         filterType, filterValue, featureType,
+                         algorithm, score,
+                         trainingFeatureValue, trainingMinCount,
+                         trainingMaxCount, trainingMeanCount,
+                         trainingStandardDeviation, anomalyFeatureValue,
+                         anomalyCount, patternIndex=patternIndex, 
+                         predictedCauses=predictedCauses,
+                         predictedStates=predictedStates, 
+                         predictedScoreString=predictedScoreString)
+
+        ret = json.loads(ret_json)
+
+        temp = datetime.datetime.strptime(ret['detectionTimeWindowStart'],
+                                          "%a, %d %b %Y  %H:%M:%S +0000")     
+        assert int(time.mktime(temp.timetuple())) == testStart
+
+        temp = datetime.datetime.strptime(ret['detectionTimeWindowEnd'],
+                                          "%a, %d %b %Y  %H:%M:%S +0000")     
+        assert int(time.mktime(temp.timetuple())) == testEnd
+
+        temp = datetime.datetime.strptime(ret['trainingTimeWindowStart'],
+                                          "%a, %d %b %Y  %H:%M:%S +0000")     
+        assert int(time.mktime(temp.timetuple())) == trainStart
+
+        temp = datetime.datetime.strptime(ret['trainingTimeWindowEnd'],
+                                          "%a, %d %b %Y  %H:%M:%S +0000")     
+        assert int(time.mktime(temp.timetuple())) == trainEnd
+
+        # the essence REST API uses outdated terminology
+        # see anomalyIO.prepareJson
+        assert filterType == ret['sourceType']
+        assert filterValue == ret['sourceValue']
+        assert featureType == ret['targetType']
+        assert algorithm == ret['algorithm']
+        assert score == ret['score']
+        assert sorted(patternIndex) == sorted(ret['patternIndex'])
+
+        for i in range(len(ret['normalEntries'])):
+            temp = ret['normalEntries'][i]
+            assert temp['sequenceNumber'] == i
+            #do these necessarily retain their ordering? not sure
+            assert temp['targetValue'] == trainingFeatureValue[i]
+            assert temp['minCount'] == trainingMinCount[i]
+            assert temp['maxCount'] == trainingMaxCount[i]
+            assert temp['meanCount'] == trainingMeanCount[i]
+            assert temp['standardDeviation'] == trainingStandardDeviation[i]
+            
+        for i in range(len(ret['anomalyEntries'])):
+            temp = ret['anomalyEntries'][i]
+            assert temp['sequenceNumber'] == i
+            assert temp['targetValue'] == anomalyFeatureValue[i]
+            assert temp['count'] == anomalyCount[i]
+
+        for i in range(len(ret['predictions'])):
+            temp = ret['predictions'][i]
+            assert len(temp['cause']) == 1
+            assert temp['cause'][0] == predictedCauses[i]
+
+            assert len(temp['state']) == 1
+            assert temp['state'][0] == predictedStates[i]
+
+            assert temp['score'] == predictedScoreString[i]
+            
+            

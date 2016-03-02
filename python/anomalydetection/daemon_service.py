@@ -9,6 +9,7 @@ from cassandraIO import CassandraIO
 from svm_calc import SVMCalc
 from flask_restful import reqparse
 from anomalyIO import AnomalyIO
+from histograms import Histograms
 ##
 # To run this, make sure the permissions are right:
 # chmod a+x daemon_service.py 
@@ -62,6 +63,30 @@ def getdb():
     if anom is None:
         anom = AnomalyIO(hostname=args['hostname'])
 
+    return Response(output, mimetype='text/plain')
+
+@app.route('/getfakedata')
+def getfakedata():
+    global next_id
+    global hist_dict
+    train_h = Histograms.get_fake_histogram_train()
+    test_h = Histograms.get_fake_histogram_test()
+    hist_dict[next_id] = train_h
+
+    output = "Dataset ID: " + str(next_id) + "\n"
+    for f in train_h.get_features():
+        output += f + "\n"
+
+    next_id += 1
+    train_h.print_histograms()
+    hist_dict[next_id] = test_h
+
+    output += "Dataset ID: " + str(next_id) + "\n"
+    for f in test_h.get_features():
+        output += f + "\n"
+
+    next_id += 1
+    test_h.print_histograms()
     return Response(output, mimetype='text/plain')
 
 @app.route('/getcause')
@@ -145,6 +170,20 @@ def getanomalies():
 
     return Response(output, mimetype='text/plain')
 
+@app.route('/writeanomalies')
+def writeanomalies():
+    global anom
+
+    anom.writeAnomalies(1,10,2,20,
+                        "okay", "okay2", "foo",
+                        "chi2",1.2, 
+                        ["a","b","c"], [3,4,5], 
+                        [100,200,300], [150,151,152], 
+                        [2,3,4], ['7','8','9'],
+                        [11,12,13], patternIndex=[1,2,3], predictedCauses=[1,2], 
+                        predictedStates=[1,2],predictedScoreString="good")
+    return Response("ok", mimetype='text/plain')
+
 @app.route('/test')
 def test():
     global hist_dict
@@ -199,9 +238,15 @@ def test():
             drop_start_min=args['test_drop_start_min'],
             drop_end_min=args['test_drop_end_min'])
         count = 0
+
+
+        anomalies = AnomalyIO.getFakeAnomalies()
         for r,h in zip(ret,h_get):
-            output += str(count) + ":" + str(h) + " - " + str(r) + "\n"
+            output += str(count) + ":" + str(h) + " score " + str(r) + "\n"
             count += 1
+            if r < -0.02:
+                output += "ANOMALY\n"
+                output += np.array_str(SVMCalc.onevsall(anomalies, h))+"\n"
 
     return Response(output,  mimetype='text/plain')
 

@@ -17,6 +17,30 @@ class CassandraIO():
         self._session = self._cluster.connect(keyspace)
         self._table = table
 
+    def get_fake_histogram_train():
+        ret = Histograms(60, 10)
+
+        for t in range(1200):
+            for i in range(20):
+                ret.insert_one("10.0.0.2", t)
+        return ret
+
+    def get_fake_histogram_test():
+        ret = Histograms(60, 10)
+
+        for t in range(2000,2060):
+            for i in range(20):
+                ret.insert_one("10.0.0.2", t)
+        for t in range(2060,2110):
+            for i in range(10):
+                ret.insert_one("10.0.0.2", t)
+                ret.insert_one("10.0.0.1", t)
+                ret.insert_one("10.0.0.3", t)
+        for t in range(2110,2200):
+            for i in range(20):
+                ret.insert_one("10.0.0.2", t)
+        return ret
+
     def get_histogram(self, sample_window_sec, slide_window_sec, 
                       filter_name, filter_value, features_keep):
         """
