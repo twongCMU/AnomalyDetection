@@ -1,15 +1,19 @@
 #!/usr/bin/python2.7
-from flask import Flask
-from flask import Response
-from flask import request
-import numpy as np
-import sys
-import re
-from cassandraIO import CassandraIO
-from svm_calc import SVMCalc
-from flask_restful import reqparse
+
 from anomalyIO import AnomalyIO
+from cassandraIO import CassandraIO
+from flask import Flask
+from flask import request
+from flask import Response
+from flask_restful import reqparse
 from histograms import Histograms
+from pattern import AnomalyPattern
+from svm_calc import SVMCalc
+
+import numpy as np
+import re
+import sys
+
 ##
 # To run this, make sure the permissions are right:
 # chmod a+x daemon_service.py 
@@ -230,23 +234,49 @@ def test():
                            test_from_end_min=args['test_from_end_min'],
                            test_drop_start_min=args['test_drop_start_min'],
                            test_drop_end_min=args['test_drop_end_min'])
-        h_get = hist_dict[args['test_id']].get_histograms(
+
+        # These histograms might have different features or they're in 
+        # different orders. Generate a union of them
+        train_feat = hist_dict[args['train_id']].get_features()
+        test_feat = hist_dict[args['test_id']].get_features()
+        feat_uniq = dict()
+        for f in train_feat + test_feat:
+            feat_uniq[f] = 0
+        sort_feat = sorted(feat_uniq.keys())
+
+        test_h_get = hist_dict[args['test_id']].get_histograms(
+            features=sort_feat,
             start_sec=args['test_start_sec'],
             end_sec=args['test_end_sec'],
             from_start_min=args['test_from_start_min'],
             from_end_min=args['test_from_end_min'],
             drop_start_min=args['test_drop_start_min'],
             drop_end_min=args['test_drop_end_min'])
+
+        train_h_get = hist_dict[args['train_id']].get_histograms(
+            features=sort_feat,
+            start_sec=args['train_start_sec'],
+            end_sec=args['train_end_sec'],
+            from_start_min=args['train_from_start_min'],
+            from_end_min=args['train_from_end_min'],
+            drop_start_min=args['train_drop_start_min'],
+            drop_end_min=args['train_drop_end_min'])
+        
         count = 0
 
-
         anomalies = AnomalyIO.getFakeAnomalies()
-        for r,h in zip(ret,h_get):
+        for r,h in zip(ret,test_h_get):
             output += str(count) + ":" + str(h) + " score " + str(r) + "\n"
             count += 1
             if r < -0.02:
                 output += "ANOMALY\n"
-                output += np.array_str(SVMCalc.onevsall(anomalies, h))+"\n"
+                output += np.array_str(SVMCalc.onevsall(anomalies, [h]))+"\n"
+                #output += SVMCalc.onevsall2(anomalies, [h])
+                #ret = AnomalyPattern.anomaly_pattern(h, 
+                #                     np.mean(train_h_get, axis=0),
+                #                     np.std(train_h_get, axis=0))
+                #if len(ret) > 0:
+                #    output += "pattern: " + str(ret) + "\n"
 
     return Response(output,  mimetype='text/plain')
 
