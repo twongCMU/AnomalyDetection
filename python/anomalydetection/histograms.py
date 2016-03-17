@@ -1,8 +1,7 @@
 from constants import *
 import numpy as np
-import sys
 import random
-
+import sys
 
 class Histograms():
     """ 
@@ -105,6 +104,10 @@ class Histograms():
         """
         Save one datapoint into all of the appropriate histograms
         An optional 'value' param allows us to insert a different quantity
+
+        Call this multiple times, one for each feature.
+
+        If using internal time, call next_row to move onto the next timestamp
         """
         if use_internal_time == True:
             timestamp = self._internal_timestamp
@@ -307,12 +310,14 @@ class Histograms():
                 continue
 
             if features == None:
-                for f in range(self._next_feature_index):
-                    if f in one_histogram:
-                        ret[row][f] = one_histogram[f]
+                index = 0
+                for feat in sorted(self._index_feature_to_id.keys()):
+                    f_offset = self._index_feature_to_id[feat]
+                    if f_offset in one_histogram:
+                        ret[row][index] = one_histogram[f_offset]
             else:
                 count = 0
-                for f in features:
+                for f in sorted(features):
                     if f in self._index_feature_to_id:
                         feature_offset = self._index_feature_to_id[f]
                         if feature_offset >= len(one_histogram):
@@ -333,16 +338,27 @@ class Histograms():
 
     @staticmethod
     def get_fake_histogram_train():
+        """
+        For testing purposes
+        Generate a dataset where a lot of data is sent to 10.0.0.2
+        using a window size of 60 seconds and a slide window of 10 seconds
+        """
         ret = Histograms(60, 10)
 
         for t in range(1200):
-            for i in range(20):
+            for i in range(20 + random.randint(0,10)):
                 ret.insert_one("10.0.0.2", t)
 
         return ret
 
     @staticmethod
     def get_fake_histogram_test():
+        """
+        For testing purposes
+        Generate a dataset that stats to look like get_fake_histogram_train
+        then changes to traffic sent to 3 IP addresses then returns to
+        normal traffic again
+        """
         ret = Histograms(60, 10)
 
         for t in range(2000,2060):

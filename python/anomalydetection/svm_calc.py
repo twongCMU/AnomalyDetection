@@ -1,15 +1,15 @@
 import numpy as np
+import time
+
+from constants import *
+from generic_calc import GenericCalc
+from histograms import Histograms
+from sklearn import cross_validation
+from sklearn import preprocessing
+from sklearn.metrics.pairwise import chi2_kernel
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.svm import OneClassSVM
 from sklearn.svm import SVC
-from sklearn.svm import LinearSVC
-from sklearn.multiclass import OneVsRestClassifier
-from sklearn.metrics.pairwise import chi2_kernel
-import time
-from sklearn import cross_validation
-from constants import *
-from histograms import Histograms
-from generic_calc import GenericCalc
-from sklearn import preprocessing
 
 class SVMCalc(GenericCalc):
 
@@ -55,13 +55,11 @@ class SVMCalc(GenericCalc):
                                        drop_start_min = test_drop_start_min,
                                        drop_end_min = test_drop_end_min)
 
-
         scaler = preprocessing.MaxAbsScaler().fit(train_m)
         train_m_s = scaler.transform(train_m)
         test_m_s = scaler.transform(test_m)
 
         train_k = chi2_kernel(train_m_s)
-        print "XYZ",test_m_s
         test_k = chi2_kernel(test_m_s, train_m_s)
 
         if train_h._nu == -1:
@@ -147,9 +145,6 @@ class SVMCalc(GenericCalc):
                 nu_dict[nu_try] = mean
 
 
-        for k in sorted(nu_dict):
-            print "result:",k,nu_dict[k]
-        print "best is ",best_nu
         # we don't want to ruin the user experience by asserting 
         # inappropriately but if cross validation returns 0% correct
         # then something is broken
@@ -157,7 +152,40 @@ class SVMCalc(GenericCalc):
         return best_nu
 
     @staticmethod
+    def onevsall2(anomalies, observed):
+        observed_h = None
+        output = " "
+
+        #somehow this is generating the same scores for training data.. weird
+        for k in sorted(anomalies.keys()):
+            if observed_h is None:
+                observed_h = Histograms(0,0)
+                features = anomalies[k].get_features()
+                for i in range(len(features)):
+                    observed_h.insert_one(features[i], 0, value=observed[0][i], 
+                                          use_internal_time = True)
+
+            #print anomalies[k].get_histograms()
+            #import IPython
+            #IPython.embed()
+            output += str(k) + " : " + np.array_str(SVMCalc.test(anomalies[k], observed_h)) + "\n"
+
+        return output
+
+    @staticmethod
     def onevsall(anomalies, observed):
+        """
+        Test the observed data against the labeled anomalies
+        observed MUST be a list of data points (each point is also
+        a list) so passing in a single piece of observed data for
+        testing still requires an array inside an array
+
+        anomalies is a dict of Histograms where each key is
+        
+        """
+        assert(isinstance(anomalies, dict))
+        assert(isinstance(observed, list))
+
         dims = (0,0);
         all_h = None
         labels = None
@@ -180,7 +208,6 @@ class SVMCalc(GenericCalc):
                         labels = np.vstack((labels,row_label))
                 next_label = 1
             else:
-                #all_h.insert(anomalies[k].get_histograms(), axis=0)
                 new_h = anomalies[k].get_histograms()
                 all_h = np.vstack([all_h, new_h])
                 for r in range(new_h.shape[0]):
@@ -189,24 +216,15 @@ class SVMCalc(GenericCalc):
                     labels = np.vstack((labels,row_label))
                 next_label += 1
 
+        # From the documentation:
         #SVC is quadratic with the number of samples and a dataset of 10k+ is hard
-        #support vector classification
         #I used this because an example I found did. We should find out if there is
                 # a better one
         clf = OneVsRestClassifier(SVC(probability=True), n_jobs = -1)
         scaler = preprocessing.MaxAbsScaler().fit(all_h)
         all_m_s = scaler.transform(all_h)
 
-        ## fix this:
-        # the input is an array of one data point but the algo
-        # takes in an array of data points (array of array)
-        # so either we need to call this functino that way
-        # and allow for multiple datapoints to be tested at once
-        # or know to wrap it in here
-        # I think we'll want to do the former: when running a test, pass
-        # all anomalies in here at once to save having to rebuild the
-        # labels matrix
-        observed_m_s = scaler.transform([observed])
+        observed_m_s = scaler.transform(observed)
 
         clf.fit(all_m_s, labels)
 
@@ -217,7 +235,6 @@ class SVMCalc(GenericCalc):
         # vote if they're the same training data rather than simply maching both
         # as independent comparisons
 
-
-
-        return clf.predict_proba(observed_m_s)
+        #return clf.predict_proba(observed_m_s)
+        return clf.predict(observed_m_s)
 

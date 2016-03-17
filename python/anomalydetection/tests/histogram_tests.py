@@ -175,25 +175,6 @@ class TestHistograms:
             raise Exception("Same data for training and testing got",
                             "unexpectedly high anomaly ratio", (pct))
 
-    def test_cassandra(self):
-        """
-        This test assumes a specifically configured database so
-        it isn't worth much. However it is good for specifying
-        a test for a known database especially if the test will
-        be run repeatedly over a short time
-        """
-        d = CassandraIO("demo", "packet", hostname="54.210.142.233")
-        #if res.source_addr != "10.80.1.148":
-        hist = d.get_histogram(60, 10, "source_addr", "10.0.0.2",
-                               "dest_addr")
-        hist.print_histograms()
-        print time.time()
-        res = SVMCalc.test(hist,hist, train_drop_end_min=37)
-        h_get = hist.get_histograms()
-        for k,h in zip(res,h_get):
-            print h,k
-        d.close()
-
     def test_histogram(self):
         debug_override = 1
 
@@ -336,10 +317,11 @@ class TestHistograms:
         for i in range(len(ret['predictions'])):
             temp = ret['predictions'][i]
             assert len(temp['cause']) == 1
-            assert temp['cause'][0] == predictedCauses[i]
+
+            assert temp['cause']['id'] == predictedCauses[i]
 
             assert len(temp['state']) == 1
-            assert temp['state'][0] == predictedStates[i]
+            assert temp['state']['id'] == predictedStates[i]
 
             assert temp['score'] == predictedScoreString[i]
             
