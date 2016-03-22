@@ -33,6 +33,7 @@ class TestSupervisedLearning:
                                                      np.mean(train_h_get, axis=0),
                                                      np.std(train_h_get, axis=0))
         print "total ", anom_count
+
         # These bounds are mostly made up. I think as long as it isn't none
         # or all, it is ok. The randomness of the data generation and the 
         # cross validation affects the results
