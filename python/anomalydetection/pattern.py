@@ -27,6 +27,9 @@ class AnomalyPattern():
             return ret;
 
         # check if every single histogram value is between 1 stddev and 2 stddev
+        # Note: I don't know if it is possible to trigger an anomaly and have it
+        # fit into this pattern. It seems extremely unlikely or even impossible
+        # This will affect code coverage scores
         all_are = True
         for i in range(len(mean)):
             adj_stddev = stddev[i]

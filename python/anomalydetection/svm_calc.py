@@ -153,6 +153,14 @@ class SVMCalc(GenericCalc):
 
     @staticmethod
     def onevsall2(anomalies, observed):
+        """
+        This takes an observed data and tests them against each
+        set of anomalies and sees which one has the best score.
+        This is not a onevsall impelementation but more of a
+        one class classifier used against each class. I don't know
+        if it is any better or worse, but it is much faster than
+        onevsall, so I'll leave it here for now.
+        """
         observed_h = None
         output = " "
 
@@ -182,6 +190,9 @@ class SVMCalc(GenericCalc):
 
         anomalies is a dict of Histograms where each key is
         
+        This function implements a one-vs-all for each call. In my demo
+        where this is called multiple times, this is actually a bit slow.
+        See onevsall2
         """
         assert(isinstance(anomalies, dict))
         assert(isinstance(observed, list))

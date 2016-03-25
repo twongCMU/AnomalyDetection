@@ -39,3 +39,4 @@ class TestSupervisedLearning:
         # cross validation affects the results
         assert anom_count >= 10
         assert anom_count <= 23
+        

@@ -10,6 +10,7 @@ from histograms import Histograms
 from pattern import AnomalyPattern
 from svm_calc import SVMCalc
 
+import argparse
 import numpy as np
 import re
 import sys
@@ -21,6 +22,11 @@ import sys
 # Then run it:
 # ./daemon_service.py
 ##
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--docker_mode', default=False, action='store_true',
+                    help='Configure server to operate inside Docker container')
+args = parser.parse_args()
 
 app = Flask(__name__)
 
@@ -270,8 +276,8 @@ def test():
             count += 1
             if r < -0.02:
                 output += "ANOMALY\n"
-                output += np.array_str(SVMCalc.onevsall(anomalies, [h]))+"\n"
-                #output += SVMCalc.onevsall2(anomalies, [h])
+                #output += np.array_str(SVMCalc.onevsall(anomalies, [h]))+"\n"
+                output += SVMCalc.onevsall2(anomalies, [h])
                 #ret = AnomalyPattern.anomaly_pattern(h, 
                 #                     np.mean(train_h_get, axis=0),
                 #                     np.std(train_h_get, axis=0))
@@ -281,4 +287,7 @@ def test():
     return Response(output,  mimetype='text/plain')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    if args.docker_mode == True:
+        app.run(host='0.0.0.0', debug=False)
+    else:
+        app.run(debug=True)
