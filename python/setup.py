@@ -15,7 +15,7 @@ setup(
                           "coverage >= 4.0",
                           "nose >= 1.3.7",
                           "scipy >= 0.17.0",
-                          "scikit-learn-0.17",
+                          "scikit-learn >= 0.17",
                           "requests >= 2.9.1",
 			  "numpy >= 1.10.4"],
       include_package_data = True,
