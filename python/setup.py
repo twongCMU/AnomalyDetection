@@ -14,9 +14,10 @@ setup(
                           "flask-nav >= 0.5",
                           "coverage >= 4.0",
                           "nose >= 1.3.7",
+			  "numpy >= 1.10.4",
                           "scipy >= 0.17.0",
                           "scikit-learn >= 0.17",
-                          "requests >= 2.9.1",
-			  "numpy >= 1.10.4"],
+                          "requests >= 2.9.1"],
+
       include_package_data = True,
       )
