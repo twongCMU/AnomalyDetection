@@ -7,7 +7,7 @@ setup(
       author = 'Terrence Wong',
       author_email = 'tw@andrew.cmu.edu', 
       packages = ['anomalydetection',
-                  'anomalydetection.histograms']
+                  'anomalydetection.histograms'],
       package_dir = {'anomalydetection': 'anomalydetection'},
       url="http://www.github.com",
       install_requires = ["cassandra-driver >= 3.0.0", 
