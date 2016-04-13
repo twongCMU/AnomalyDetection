@@ -35,5 +35,24 @@ To start the daemon:
 mvn clean; mvn tomcat:run
 
 # Python port
-As this code is proof-of-concept, it has grown organically and has many shortcomings. Therefore, we have written
-a Python port of the code. For more information, see [the python page](https://github.com/twongCMU/AnomalyDetection/tree/twong/python/python)
+As this code is proof-of-concept and do not yet know what kinds of Multispeak traffic to expect, the code
+ has grown organically and has many shortcomings. We have written a Python port of the code to address
+some of the problems and hopefully construct a better foundation for future changes.
+
+For more information, see [the python page](https://github.com/twongCMU/AnomalyDetection/tree/twong/python/python)
+
+Shortcomings of the Java code
+ * Required 3rd party library that had to be manually installed (not in Maven repo)
+ * Codebase grew organically due to unknown requirements
+ * Codebase not well documented
+ * No automated tests
+ 
+Python port's improvements
+ * Optionally uses a Docker container to deliver a pre-packaged running system with a single command
+ * Codebase tries to reimplement the same external API as the Java code
+   * The REST API is different but the interface with Essence follows the documented API
+ * The Python code allows the same functionality in just 20% as much code
+ * Codebase is better documented
+ * Uses nosetest to verify functionality and confirm code coverage
+ * Uses TeamCity to automatically run tests when repo changes
+
