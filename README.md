@@ -36,4 +36,4 @@ mvn clean; mvn tomcat:run
 
 # Python port
 As this code is proof-of-concept, it has grown organically and has many shortcomings. Therefore, we have written
-a Python port of the code. For more information, see 
+a Python port of the code. For more information, see [the python page](https://github.com/twongCMU/AnomalyDetection/tree/twong/python/python)
