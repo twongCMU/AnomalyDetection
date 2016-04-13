@@ -29,8 +29,8 @@ in docs/Dockerfile and python/setup.py
 
 ## Exercising the code
 To exercise the API once the code is running:
-http://127.0.0.1:5000/getfakedata
-http://localhost:5000/test?train_id=0&test_id=1
+* http://127.0.0.1:5000/getfakedata
+* http://127.0.0.1:5000/test?train_id=0&test_id=1
 
 ## Running tests
  * cd AnomalyDetection/python/anomalydetection
