@@ -1,7 +1,7 @@
 AnomalyDetection python
 =======================
 
-For more about this project, see the [parent doc](../../)
+For more about this project, see the [parent doc](https://github.com/twongCMU/AnomalyDetection)
 
 As of this writing, this code is tested internally under both supervised and
 unsupervised learning. It has also been run against an existing
