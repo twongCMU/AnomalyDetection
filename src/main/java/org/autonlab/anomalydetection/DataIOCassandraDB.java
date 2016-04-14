@@ -65,9 +65,55 @@ public class DataIOCassandraDB implements DataIO {
 	}
     }
 
+    public String packetStats(int minutesBack) {
+	DateTime startTime = null;
+	String statementExtra = new String();
+	Date highestDate = null;
+	Date lowestDate = null;
+
+	if (minutesBack > 0) {
+	    startTime = DateTime.now(DateTimeZone.UTC).minusMinutes(minutesBack);
+	    statementExtra += " WHERE time_stamp > '" + startTime + "' ALLOW FILTERING";
+	}
+
+	String selectStatement = "SELECT time_stamp FROM " + _keyspace + "." + _table + statementExtra;
+	ResultSet results = _session.execute(selectStatement);
+	int rowCount = 0;
+	for (Row row: results) {
+	    if (highestDate == null) {
+		highestDate = row.getDate("time_stamp");
+	    }
+	    else if (row.getDate("time_stamp").after(highestDate)) {
+		highestDate = row.getDate("time_stamp");
+	    }
+	    if (lowestDate == null) {
+		lowestDate = row.getDate("time_stamp");
+	    }
+	    else if (row.getDate("time_stamp").before(lowestDate)) {
+		lowestDate = row.getDate("time_stamp");
+	    }
+	    rowCount++;
+	    if ((rowCount % 1000) == 0) {
+		System.out.println("Read in " + rowCount + " rows");
+	    }
+	}
+
+	long diff = (highestDate.getTime() - lowestDate.getTime()) / 1000;
+	String output = new String();
+	Double rate = new Double(new Double(rowCount)/new Double(diff));
+	int sample = (int)(400/rate);
+	int slide = (int)(400/rate/6);
+	output += rowCount + " packets in " + diff + " seconds (" + rate + "/sec).\n<br>";
+	output += "To get about 400 packets in a window, try a window width of " + sample + " seconds\n<br>";
+	output += "and a slide width of 1/6 that, or " + slide + " seconds\n\n<br><br>";
+	output += "<a href=setSampleWindowSecs/" + sample + ">Set sample window to " + sample + " seconds</a>\n<br><br>";
+	output += "<a href=setSlideWindowSecs/" + slide + ">Set slide window to " + slide + " seconds</a>\n<br><br>";
+	return output;
+    }
+
     String dateString = null;
     /* histogram value names -> category names -> histograms */
-    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData(int minutesBack, int ignoreMinRecent) {
+    public HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> getData(int minutesBack, int ignoreMinRecent, int useNow) {
 	HashMap<GenericPoint<String>, HashMap<GenericPoint<String>, ArrayList<HistoTuple>>> trainMap = new HashMap();
 	Date highestDate = null;
 
@@ -75,7 +121,7 @@ public class DataIOCassandraDB implements DataIO {
 	// but we can't query it from Cassandra. We loop through every record and find the highest
 	DateTime endTime = null;
 	DateTime startTime = null;
-	if (minutesBack > 0 || ignoreMinRecent > 0) {
+	if ((minutesBack > 0 || ignoreMinRecent > 0) && useNow ==0) {
 	    String selectStatement = "SELECT time_stamp FROM " + _keyspace + "." + _table;
 	    ResultSet results = _session.execute(selectStatement);
 	    int rowCount = 0;
@@ -106,6 +152,16 @@ public class DataIOCassandraDB implements DataIO {
 		//return null;
 		//}
 	}
+	if ((minutesBack > 0 || ignoreMinRecent > 0) && useNow > 0) {
+	    endTime = DateTime.now(DateTimeZone.UTC);
+	    if (minutesBack > 0) {
+		startTime = endTime.minusMinutes(minutesBack);
+	    }
+	    if (ignoreMinRecent > 0) {
+		endTime = endTime.minusMinutes(ignoreMinRecent);
+	    }
+	}
+
 
 	int getTextValues = 0;
 
