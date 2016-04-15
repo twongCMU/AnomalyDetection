@@ -41,9 +41,10 @@ simulation.
 To perform a simple manual exercise, see the file docs/live_demo_outline_jan_2016
 
 # Python port
-As this code is proof-of-concept and do not yet know what kinds of Multispeak traffic to expect, the code
+As the Java code is proof-of-concept and we do not yet know what kinds of Multispeak traffic to expect, the code
  has grown organically and has many shortcomings. We have written a Python port of the code to address
-some of the problems and hopefully construct a better foundation for future changes.
+some of the problems and hopefully construct a better foundation for future changes. The REST API is different
+in this port so we have not yet used it in a demo.
 
 For more information, see [the python page](https://github.com/twongCMU/AnomalyDetection/tree/twong/python/python)
 
