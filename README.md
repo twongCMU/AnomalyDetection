@@ -22,7 +22,7 @@ It should be noted that the word "anomaly" does not imply hostile or adversarial
 detect that traffic patterns are different; it is up to the operator to decide if the alerts are acceptable or require
 action.
 
-# Running the code
+# Running the daemon
 The code is written in Java 7. Most dependencies are installed using Apache Maven. There is one exception:
 
   * Download the newest version of the library here: https://www.savarese.com/software/libssrckdtree-j/
@@ -33,6 +33,12 @@ The code is written in Java 7. Most dependencies are installed using Apache Mave
 
 To start the daemon:
 mvn clean; mvn tomcat:run
+
+# Running a test
+There are no self-contained tests as this code depends on an external packet database as well as Essence. The Python port attempts to address this issue using artifical data to validate correctness. However the generated data is not a realistic
+simulation.
+
+To perform a simple manual exercise, see the file docs/live_demo_outline_jan_2016
 
 # Python port
 As this code is proof-of-concept and do not yet know what kinds of Multispeak traffic to expect, the code
