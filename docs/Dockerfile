@@ -7,7 +7,7 @@ RUN apt-get -y install git python python-setuptools libblas-dev liblapack-dev li
 
 RUN cd /tmp && /usr/bin/git clone https://08d86aa9ca967566177315f1d0286064e5aea4b1@github.com/twongCMU/AnomalyDetection.git
 
-RUN cd /tmp/AnomalyDetection && /usr/bin/git checkout twong/python
+#RUN cd /tmp/AnomalyDetection && /usr/bin/git checkout twong/python
 RUN cd /tmp/AnomalyDetection/python/ && python setup.py install
 
 WORKDIR /tmp/AnomalyDetection/python/anomalydetection
