@@ -37,7 +37,10 @@ anom = None
 @app.route('/getdb')
 def getdb():
     """
-    Assumes that the packet and anomaly databases are ont he same machine
+    Retrieve a dataset from the packet database and store it. An ID number
+    is returned which can be used to reference this dataset in the future
+
+    Assumes that the packet and anomaly databases are on the same machine
     """
     global next_id
     global hist_dict
@@ -151,6 +154,9 @@ def getstates():
 
 @app.route('/getanomalies')
 def getanomalies():
+    """
+    Retrieve the user-labeled anomaly data
+    """
     global anom
 
     parser = reqparse.RequestParser()
@@ -176,12 +182,17 @@ def getanomalies():
                             userCause=args['userCause'])
     output = ""
     for k in ret:
-        output += str(k[0]) + "," +str(k[1]) + str(len(ret[k].get_histograms())) + "\n"
+        output += str(k[0]) + "," +str(k[1]) + \
+            str(len(ret[k].get_histograms())) + "\n"
 
     return Response(output, mimetype='text/plain')
 
 @app.route('/writeanomalies')
 def writeanomalies():
+    """
+    Write a new anomaly to the anomaly database. As of this writing, this code 
+    not been tested against the Essence API so this function is a placeholder
+    """
     global anom
 
     anom.writeAnomalies(1,10,2,20,
@@ -190,12 +201,19 @@ def writeanomalies():
                         ["a","b","c"], [3,4,5], 
                         [100,200,300], [150,151,152], 
                         [2,3,4], ['7','8','9'],
-                        [11,12,13], patternIndex=[1,2,3], predictedCauses=[1,2], 
+                        [11,12,13], patternIndex=[1,2,3], predictedCauses=[1,2],
                         predictedStates=[1,2],predictedScoreString="good")
     return Response("ok", mimetype='text/plain')
 
 @app.route('/test')
 def test():
+    """
+    Run a test and look for anomalies
+
+    The inputs are two dataset IDs and optional
+    parameters to define the time windows being
+    considered
+    """
     global hist_dict
 
     # see svm_calc.py:test()

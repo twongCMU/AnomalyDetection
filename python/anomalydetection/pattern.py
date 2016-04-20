@@ -1,7 +1,11 @@
 import numpy as np
 
 class AnomalyPattern():
-
+    """
+    This module implements the pattern detection scheme. If supervised
+    learning fails to provide anomaly hints, this module will look at 
+    the raw data and try to provide clues as to where to start an investigation
+    """
     @staticmethod
     def anomaly_pattern(observed, mean, stddev):
 

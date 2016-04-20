@@ -21,6 +21,9 @@ class SVMCalc(GenericCalc):
              test_drop_start_min=None, test_drop_end_min=None,
              test_from_start_min=None, test_from_end_min=None):
         """
+        Run a test. Takes in a training dataset and a test dataset and
+        optional arguments to set a time window to work with
+
         TODO: the edges of the dataspace should be dropped
         train_h and test_h are the Histogram() for training
         data and test data
@@ -55,6 +58,7 @@ class SVMCalc(GenericCalc):
                                        drop_start_min = test_drop_start_min,
                                        drop_end_min = test_drop_end_min)
 
+        # scale the data
         scaler = preprocessing.MaxAbsScaler().fit(train_m)
         train_m_s = scaler.transform(train_m)
         test_m_s = scaler.transform(test_m)
@@ -78,6 +82,14 @@ class SVMCalc(GenericCalc):
 
     @staticmethod
     def _generate_nu_list(nu_dict, nu_start_pow_low, nu_start_pow_high):
+        """
+        nu is a configuration parameter for our classifier. The ideal nu
+        depends on the dataset, so we generate a list of possibilities
+        and do cross-validation on them to see which produces the best
+        results. If the best nu is on the edge of the range of values,
+        we expand the range and try again
+        """
+
         for nu_base in NU_BASE_LIST:
             for nu_pow in range(nu_start_pow_low, nu_start_pow_high):
                 new_nu = nu_base * pow(10, nu_pow)
@@ -160,6 +172,8 @@ class SVMCalc(GenericCalc):
         one class classifier used against each class. I don't know
         if it is any better or worse, but it is much faster than
         onevsall, so I'll leave it here for now.
+
+        The Java code used this method.
         """
         observed_h = None
         output = " "
